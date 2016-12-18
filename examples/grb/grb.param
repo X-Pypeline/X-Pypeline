@@ -1,0 +1,1 @@
+setup.py --inifile grb_full.ini --name GRB160830 --eventTime 1156610000 --ra 307.65 --dec 45.72 -ifos H1,L1,V1
