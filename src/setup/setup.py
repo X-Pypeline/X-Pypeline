@@ -5,6 +5,7 @@ import string
 import shutil
 import ConfigParser
 import optparse
+import argparse
 import json
 import rlcompleter
 import pdb
@@ -20,25 +21,24 @@ pdb.Pdb.complete = rlcompleter.Completer(locals()).complete
 
 def parse_commandline():
     """Parse the options given on the command-line.
+       Some commandine argument are optional and some are not
     """
-    parser = optparse.OptionParser()
-    parser.add_option("--inifile", help="Name of ini file of params")
-    parser.add_option("--eventTime", type=float,help="Trigger time of the glitch")
-    parser.add_option("--uniqueID", action="store_true", default=False,help="Is this image being generated for the GravitySpy project, is so we will create a uniqueID strong to use for labeling images instead of GPS time")
-    parser.add_option("--ID", default='',help="Already supplying an ID? If not then ignore this flag. Only to be used in conjunction with --uniqueID")
-    parser.add_option("--outDir", help="Outdir of omega scan and omega scan webpage (i.e. your html directory)")
-    parser.add_option("--NSDF", action="store_true", default=False,help="No framecache file available want to use NSDF server")
-    parser.add_option("--condor", action="store_true", default=False,help="Want to run as condor job?")
-    parser.add_option("--plot-whitened-timeseries", action="store_true", default=False,help="Plot whitened timeseries")
-    parser.add_option("--plot-highpassfiltered-timeseries", action="store_true", default=False,help="Plot high pass filtered timeseries")
-    parser.add_option("--plot-raw-timeseries", action="store_true", default=False,help="Plot raw timeseries")
-    parser.add_option("--plot-eventgram", action="store_true", default=False,help="Plot eventgram")
-    parser.add_option("--runML", action="store_true", default=False,help="Run the ML classifer on the omega scans")
-    parser.add_option("--verbose", action="store_true", default=False,help="Run in Verbose Mode")
-    opts, args = parser.parse_args()
+    parser = argparse.ArgumentParser(description='Process arguments needed to run XPypeline.')
+    parser.add_argument("--condor", action="store_true", default=False,help="Want to run X thorugh condor?") 
+    parser.add_argument("--eventTime", type=float,help="Trigger time of the glitch")
+    parser.add_argument('--ifos', nargs='+', default=['H1', 'L1', 'V1'], help='IFOs for the analysis.')
+    parser.add_argument("--inifile", help="Name of ini file containing the parameters of the X-Pypeline run")
+    parser.add_argument("--name", default="TESTRUN",help="The name of the event being followed-up")
+    parser.add_argument("--NSDF", action="store_true", default=False,help="No framecache file available want to use NSDF server to retrieve your data.")
+    parser.add_argument("--outDir", help="output files containing the triggers found from the search will go here")
+    parser.add_argument('--ra', default=None, help='RA of trigger.')
+    parser.add_argument('--dec', default=None, help='Dec of trigger')
+    parser.add_argument("--verbose", action="store_true", default=False,help="Run in Verbose Mode")
 
+    args = parser.parse_args()
 
-    return opts
+    return args
 
 if __name__ == '__main__':
-    main()
+    pdb.set_trace()
+    args = parse_commandline()
