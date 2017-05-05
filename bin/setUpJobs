@@ -8,7 +8,7 @@
 import sys, os, shutil, math, random, copy, getopt, re, string, popen2, time
 import ConfigParser, glob, operator, argparse
 from glue import segments
-from glue import segmentsUtils
+from glue.segmentsUtils import fromsegwizard, tosegwizard
 from glue import pipeline
 from numpy import loadtxt
 #from pylal.date import LIGOTimeGPS
@@ -837,10 +837,10 @@ else:
 	    print '... finished converting segment list to TXT file.'
 
 	    # ---- Read in science and veto segments.
-	    sciseg   = segmentsUtils.fromsegwizard(open(seg_filename_TXT)); sciseg.coalesce()
-	    cat1veto = segmentsUtils.fromsegwizard(open("input/"+ifo+"-veto-cat1.txt")); cat1veto.coalesce()
-	    cat2veto = segmentsUtils.fromsegwizard(open("input/"+ifo+"-veto-cat2.txt")); cat2veto.coalesce()
-	    cat4veto = segmentsUtils.fromsegwizard(open("input/"+ifo+"-veto-cat4.txt")); cat4veto.coalesce()
+	    sciseg   = fromsegwizard(open(seg_filename_TXT)); sciseg.coalesce()
+	    cat1veto = fromsegwizard(open("input/"+ifo+"-veto-cat1.txt")); cat1veto.coalesce()
+	    cat2veto = fromsegwizard(open("input/"+ifo+"-veto-cat2.txt")); cat2veto.coalesce()
+	    cat4veto = fromsegwizard(open("input/"+ifo+"-veto-cat4.txt")); cat4veto.coalesce()
 
 	    # ---- Subtract cat1veto flags from the science segments.
 	    sciseg_cat1 = sciseg - cat1veto; sciseg_cat1.coalesce()
@@ -848,7 +848,7 @@ else:
 	    # ---- Write out newly constructed segment list.
 	    filename = ''.join(["input/",ifo,"_science_cat1.txt"])
 	    print 'Writing file: ', filename
-	    f = open(filename,"w"); segmentsUtils.tosegwizard(f,sciseg_cat1); f.flush(); f.close()
+	    f = open(filename,"w"); tosegwizard(f,sciseg_cat1); f.flush(); f.close()
 	    analysis_seg_files.append(filename)
 
 	    # ---- Add cat2veto and cat4veto segments for each ifo.
@@ -856,7 +856,7 @@ else:
 	    # ---- Write out newly constructed veto list.
 	    filename = ''.join(["input/",ifo,"_cat24veto.txt"])
 	    print 'Writing file: ', filename
-	    f = open(filename,"w"); segmentsUtils.tosegwizard(f,cat24veto); f.flush(); f.close()
+	    f = open(filename,"w"); tosegwizard(f,cat24veto); f.flush(); f.close()
 	    veto_seg_files.append(filename)
 
 # ---- Read in segment_lists to ScienceData object.
@@ -2226,7 +2226,7 @@ else:
                 # ---- Need to write out these gap segments so we can read them
                 #      in again as ScienceData object, we really should choose
                 #      one type of segment object and use it everywhere.
-                f = open("gaps.txt","w"); segmentsUtils.tosegwizard(f,gaps_segments); f.flush(); f.close()
+                f = open("gaps.txt","w"); tosegwizard(f,gaps_segments); f.flush(); f.close()
             elif datafind_exec=='gw_data_find':
                 # ---- File is of the form 
                 #        Missing segments:
