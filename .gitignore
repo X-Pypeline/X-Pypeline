@@ -1,0 +1,19 @@
+# unwanted file-types
+*.pyc
+/*.patch
+*.ipynb_checkpoints
+
+# build products
+/XPypeline/version.py
+/build/
+/dist/
+/XPypeline.egg-info
+/.eggs/
+
+# documentation products
+/docs/_build/
+/docs/api/
+
+# test products
+/.cache/
+/.coverage
