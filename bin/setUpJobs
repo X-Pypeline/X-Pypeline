@@ -8,7 +8,7 @@
 import sys, os, shutil, math, random, copy, getopt, re, string, popen2, time
 import ConfigParser, glob, operator, argparse
 from glue import segments
-from glue.segmentsUtils import fromsegwizard, tosegwizard
+#from glue.segmentsUtils import fromsegwizard, tosegwizard
 from glue import pipeline
 from numpy import loadtxt
 #from pylal.date import LIGOTimeGPS
