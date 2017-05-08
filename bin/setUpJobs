@@ -235,31 +235,33 @@ backgroundAsymmetryFactor = 0.5
 #      grb.param.
 #      This file is used by xgrbwebpage.py which expects the short form of
 #      the options to have been used
-command_string = 'setUpJobs.py '
+command_string = 'setUpJobs '
 with open('setUpJobs.param', 'w') as f:
-    f.write(' '.join(sys.argv[1:]))
+    f.write(command_string + ' '.join(sys.argv[1:]))
 
-import pdb
-pdb.set_trace()
+# Print command line (and thus code) variables
+print args
+reUseInj = args.reUseInj
+mergingCutsPath = args.mergingCutsPath
+grid_type = args.grid_type
+grb_name = args.grb_name
+params_file = args.params_file
+trigger_time = args.trigger_time
+ra = args.ra
+decl = args.decl
+sky_pos_err = args.sky_pos_err
+injdistrib = args.injdistrib
+ra2 = args.ra2
+decl2 = args.decl2
+sky_pos_err2 = args.sky_pos_err2
+injdistrib2 = args.injdistrib2
+detector = args.detector
+network_selection = args.network_selection
+mdc_path = args.mdc_path
+condorPriority = args.condorPriority
+xtmvaFlag = args.xtmvaFlag
+manualEndOffset = args.manualEndOffset
 
-
-# ---- Check that all required arguments are specified, else exit.
-if reUseInj and not mergingCutsPath:
-    print >> sys.stderr, "Want to reuse injection path to previous tuning not provided"
-    print >> sys.stderr, "Use --use-merging-cuts to specify the path to previous tuning"
-    sys.exit(1)
-if not grid_type:
-    grid_type = 'circular'
-    print >> sys.stderr, "No grid type specified."
-    print >> sys.stderr, "Will use 2-d circular grid of sky positions."
-
-# ---- If one of ra2 and decl2 is specified, then the other must be too.
-if not ra2 and decl2 or ra2 and not decl2:
-    print >> sys.stderr, "Error: Only one of --right-ascension2 and --declination2 specified."
-    sys.exit(1)
-# ---- If ra2 and decl2 specified, then assign a sky position error.
-if ra2 and decl2 and not sky_pos_err2:
-    sky_pos_err2 = sky_pos_err
 
 # ---- grb_name should have format e.g., "GRB070201"
 #      we append GRB prefix if missing unless we are analysing a

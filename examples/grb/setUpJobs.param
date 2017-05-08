@@ -1,0 +1,1 @@
+setUpJobs -p grb_full.ini --grb-name GRB160830 -g 1156610000 -r 307.65 -d 45.72 -i H1 L1 V1 -s grb
