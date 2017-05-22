@@ -11,9 +11,6 @@ from glue import segments
 #from glue.segmentsUtils import fromsegwizard, tosegwizard
 from glue import pipeline
 from numpy import loadtxt
-#from pylal.date import LIGOTimeGPS
-sys.path.append('/usr/lib/python')
-
 
 def parse_commandline():
     parser = argparse.ArgumentParser(description="Script for setting up \
@@ -100,7 +97,8 @@ def parse_commandline():
                        File which contains (R.A.,Dec) coordinates
 		       of simulated source positions.  To be used with
 		       '--grid-type file' option.
-                       """)
+                       """,
+                       default='')
     parser.add_argument("--network-selection", help=
                         """
                         If this flag is set we select the appropriate
@@ -261,7 +259,13 @@ mdc_path = args.mdc_path
 condorPriority = args.condorPriority
 xtmvaFlag = args.xtmvaFlag
 manualEndOffset = args.manualEndOffset
-
+longInjections = args.longInjections
+disableFastInjections = args.disableFastInjections
+catalog_dir = args.catalog_dir
+offSourceInj = args.offSourceInj
+grid_sim_file = args.grid_sim_file
+smartCluster = args.smartCluster
+minimalMem = args.minimalMem
 
 # ---- grb_name should have format e.g., "GRB070201"
 #      we append GRB prefix if missing unless we are analysing a
@@ -346,9 +350,6 @@ if xtmvaFlag:
 print >> sys.stdout
 
 # ---- Write ASCII file holding grb.py command.
-pfile = open('grb.param','w')
-pfile.write(command_string + "\n")
-pfile.close()
 
 summary_file = 'grb_summary.txt'
 # ---- Append to summary file.
