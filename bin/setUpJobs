@@ -6,11 +6,13 @@
 
 # ---- Import standard modules to the python path.
 import sys, os, shutil, math, random, copy, getopt, re, string, popen2, time
-import ConfigParser, glob, operator, argparse
+import ConfigParser, glob, operator, argparse, socket, socket, uuid
 from glue import segments
 #from glue.segmentsUtils import fromsegwizard, tosegwizard
 from glue import pipeline
 from numpy import loadtxt
+
+from XPypeline import xcondor
 
 def parse_commandline():
     parser = argparse.ArgumentParser(description="Script for setting up \
@@ -225,20 +227,8 @@ def parse_commandline():
 # -------------------------------------------------------------------------
 args = parse_commandline()
 
-# Set some ini file defaults
-doAsymmetricBackground    = 0
-backgroundAsymmetryFactor = 0.5
-
-# ---- We will record the command line arguments to grb.py in a file called
-#      grb.param.
-#      This file is used by xgrbwebpage.py which expects the short form of
-#      the options to have been used
-command_string = 'setUpJobs '
-with open('setUpJobs.param', 'w') as f:
-    f.write(command_string + ' '.join(sys.argv[1:]))
-
-# Print command line (and thus code) variables
-print args
+# Set command line arguments to variables to be used later in the code
+# Also based on command line arguments set some other defaults
 reUseInj = args.reUseInj
 mergingCutsPath = args.mergingCutsPath
 grid_type = args.grid_type
@@ -267,6 +257,10 @@ grid_sim_file = args.grid_sim_file
 smartCluster = args.smartCluster
 minimalMem = args.minimalMem
 
+#
+#    Naming defaults
+#
+
 # ---- grb_name should have format e.g., "GRB070201"
 #      we append GRB prefix if missing unless we are analysing a
 #      MOCK GRB.
@@ -285,18 +279,11 @@ else:
 # -------------------------------------------------------------------------
 
 # ---- Get partial hostname.
-os.system('hostname > host.txt')
-f = open('host.txt','r')
-hostname=f.read()
-f.close()
+hostname = socket.gethostname()
 
 # ---- Get full hostame.
-os.system('hostname -f > host.txt')
-f = open('host.txt','r')
-fullhostname=f.read()
-f.close()
+fullhostname = socket.getfqdn()
 
-os.system('rm host.txt')
 # ---- Check hostname and set flag if necessary.
 if 'atlas' in fullhostname:
     atlasFlag = 1
@@ -349,7 +336,7 @@ if xtmvaFlag:
     print >> sys.stdout, "       running XTMVA: yes"
 print >> sys.stdout
 
-# ---- Write ASCII file holding grb.py command.
+# ---- Write ASCII file holding setUpJobs command.
 
 summary_file = 'grb_summary.txt'
 # ---- Append to summary file.
@@ -358,16 +345,20 @@ sfile.write('\t'.join(['\nname','gps','ra','dec','network','numSky','numBG','ana
 sfile.write('\t'.join([grb_name,str(trigger_time),str(ra),str(decl)]))
 sfile.close()
 
+# ---- We will record the command line arguments to setUpJobs in a file called
+#      grb.param.
+#      This file is used by xgrbwebpage.py which expects the short form of
+#      the options to have been used
+command_string = 'setUpJobs '
+with open('setUpJobs.param', 'w') as f:
+    f.write(command_string + ' '.join(sys.argv[1:]))
+
 # -------------------------------------------------------------------------
 #      Preparatory.
 # -------------------------------------------------------------------------
 
 # ---- Generate unique id tag.
-os.system('uuidgen > uuidtag.txt')
-f = open('uuidtag.txt','r')
-uuidtag=f.read()
-f.close()
-os.system('rm uuidtag.txt')
+uuidtag = str(uuid.uuid4()).replace('-','')
 
 # ---- Record the current working directory in a string.
 cwdstr = "."
@@ -403,6 +394,10 @@ if not os.path.isfile(params_file):
         params_file
     sys.exit(1)
 
+# Set some ini file defaults
+doAsymmetricBackground    = 0
+backgroundAsymmetryFactor = 0.5
+
 # ---- Create configuration-file-parser object and read parameters file.
 cp = ConfigParser.ConfigParser()
 cp.read(params_file)
@@ -416,22 +411,22 @@ if cp.has_option('tags','version') :
 #      variables are actually used.
 
 # ---- Read needed variables from [parameters] and [background] sections.
-background_period = int(cp.get('background','backgroundPeriod'))
+background_period = cp.getint('background','backgroundPeriod')
 if cp.has_option('parameters','doAsymmetricBackground') :
-    doAsymmetricBackground   = int(cp.get('parameters','doAsymmetricBackground'))
+    doAsymmetricBackground   = cp.getint('parameters','doAsymmetricBackground')
 if cp.has_option('parameters','backgroundAsymmetryFactor') :
-    backgroundAsymmetryFactor = float(cp.get('parameters', 'backgroundAsymmetryFactor'))
-blockTime         =  int(cp.get('parameters','blockTime'))
-whiteningTime     =  float(cp.get('parameters','whiteningTime'))
+    backgroundAsymmetryFactor = cp.getfloat('parameters', 'backgroundAsymmetryFactor')
+blockTime         =  cp.getint('parameters','blockTime')
+whiteningTime     =  cp.getfloat('parameters','whiteningTime')
 transientTime     =  4 * whiteningTime
-onSourceBeginOffset = int(cp.get('parameters','onSourceBeginOffset'))
-onSourceEndOffset   = int(cp.get('parameters','onSourceEndOffset'))
+onSourceBeginOffset = cp.getint('parameters','onSourceBeginOffset')
+onSourceEndOffset   = cp.getint('parameters','onSourceEndOffset')
 onSourceEndOffset   = max(onSourceEndOffset,manualEndOffset)
 onSourceTimeLength = onSourceEndOffset - onSourceBeginOffset
 jobsPerWindow=int(math.ceil(float(onSourceTimeLength)/float(blockTime-2*transientTime)))
 onSourceWindowLength=2*transientTime+jobsPerWindow*(blockTime-2*transientTime)
-minimumFrequency = int(cp.get('parameters','minimumFrequency'));
-maximumFrequency = int(cp.get('parameters','maximumFrequency'));
+minimumFrequency = cp.getint('parameters','minimumFrequency')
+maximumFrequency = cp.getint('parameters','maximumFrequency')
 
 # ---- Interval of data to be analysed.
 # ---- Allow for asymmetric background analyses, if needed by the online analysis
@@ -508,6 +503,7 @@ try:
     datafind_server = cp.get('datafind','datafind_server')
 except:
     datafind_server = os.environ['LIGO_DATAFIND_SERVER']
+
 # ---- Get datafind executable e.g., ligo_data_find.
 datafind_exec = cp.get("datafind", 'datafind_exec')
 # ---- Get segfind executable e.g., ligolw_segment_query.
@@ -569,7 +565,7 @@ print >> sys.stdout
 # -------------------------------------------------------------------------
 
 # ---- xdetection is not yet set up to read and use this clustering parameters
-#      file.  Therefore, this section of grb.py is commented out until
+#      file.  Therefore, this section of setUpJobs is commented out until
 #      xdetection is able to use it.
 
 # # ---- Note: If outputType is clusters, then the parameters ini file must
@@ -2338,7 +2334,7 @@ if cp.has_section('waveforms') :
             os.system(command)
             print >>  sys.stdout, "    Using-premade injection file:", injfilename
 
-  	# ---- grb.py script that was here before [SARAH]
+  	# ---- setUpJobs script that was here before [SARAH]
         else:
             # ---- Construct command to make injection file for this waveform set.
             if ra2 and decl2:
@@ -2501,349 +2497,6 @@ if xtmvaFlag:
         print >> sys.stdout, "Error: xtmva analysis requested by ini file does not have an [xtmva] section. Exiting."
         sys.exit(4)
  
-
-# -------------------------------------------------------------------------
-#      Define special job classes.
-# -------------------------------------------------------------------------
-
-class XsearchJob(pipeline.CondorDAGJob, pipeline.AnalysisJob):
-    """
-    An x search job
-    """
-    def __init__(self,cp):
-        """
-        cp = ConfigParser object from which options are read.
-        """
-        # ---- Get path to executable from parameters file.
-        # self.__executable = cp.get('condor','xsearch')
-        # ---- Get path to executable.
-        os.system('which xdetection > path_file.txt')
-        f = open('path_file.txt','r')
-        xdetectionstr = f.read()
-        f.close()
-        os.system('rm path_file.txt')
-        self.__executable = xdetectionstr
-        # ---- Get condor universe from parameters file.
-        self.__universe = cp.get('condor','universe')
-        pipeline.CondorDAGJob.__init__(self,self.__universe,self.__executable)
-        pipeline.AnalysisJob.__init__(self,cp,False)
-        self.__param_file = None
-
-        # ---- Add required environment variables.
-        self.add_condor_cmd('environment',"USER=$ENV(USER);HOME=$ENV(HOME);" \
-            "LD_LIBRARY_PATH=$ENV(LD_LIBRARY_PATH);" \
-            "XPIPE_INSTALL_BIN=$ENV(XPIPE_INSTALL_BIN);" \
-            "PATH=/usr/bin:/bin")
-
-        # ----Add Accounting Group Flag
-        grouptag = 'ligo.' + \
-                cp.get('condor','ProdDevSim') + '.' +\
-                cp.get('condor','Era') + '.' +\
-                cp.get('condor','Group') + '.' +\
-                cp.get('condor','SearchType')
-        self.add_condor_cmd('accounting_group',grouptag)
-
-        # ----Add Username Flag
-        self.add_condor_cmd('accounting_group_user',cp.get('condor','UserName'))
-
-        # ---- Add priority specification
-        self.add_condor_cmd('priority',condorPriority)
-
-        # --- add minimal memory needed
-        if minimalMem :
-            self.add_condor_cmd('request_memory',minimalMem)
-        else:
-            minimalMemSearch = "1400"
-            self.add_condor_cmd('request_memory',minimalMemSearch)
-
-        # ---- Path and file names for standard out, standard error for this job.
-        self.set_stdout_file('logs/xsearch-$(cluster)-$(process).out')
-        self.set_stderr_file('logs/xsearch-$(cluster)-$(process).err')
-
-        # If on Atlas, use getenv=true to pass variables
-        if atlasFlag:
-           self.add_condor_cmd('getenv',"true")
-
-        # ---- Name of condor job submission file to be written.
-        self.set_sub_file('xsearch.sub')
-
-class XsearchGPUJob(pipeline.CondorDAGJob, pipeline.AnalysisJob):
-    """
-    An x search job
-    """
-    def __init__(self,cp):
-        """
-        cp = ConfigParser object from which options are read.
-        """
-        # FOR GPUS
-
-        # ---- Get path to executable from parameters file.
-        # self.__executable = cp.get('condor','xsearch')
-        # ---- Get path to executable.
-        os.system('which xdetection > path_file.txt')
-        f = open('path_file.txt','r')
-        xdetectionstr = f.read()
-        f.close()
-        os.system('rm path_file.txt')
-        self.__executable = xdetectionstr
-        # ---- Get condor universe from parameters file.
-        self.__universe = cp.get('condor','universe')
-        pipeline.CondorDAGJob.__init__(self,self.__universe,self.__executable)
-        pipeline.AnalysisJob.__init__(self,cp,False)
-        self.__param_file = None
-
-        # ---- Add required environment variables.
-        self.add_condor_cmd('environment',"USER=$ENV(USER);HOME=$ENV(HOME);" \
-            "LD_LIBRARY_PATH=$ENV(LD_LIBRARY_PATH);" \
-            "XPIPE_INSTALL_BIN=$ENV(XPIPE_INSTALL_BIN);" \
-            "PATH=/usr/bin:/bin")
-
-        # ----Add Accounting Group Flag
-        grouptag = 'ligo.' + \
-                cp.get('condor','ProdDevSim') + '.' +\
-                cp.get('condor','Era') + '.' +\
-                cp.get('condor','Group') + '.' +\
-                cp.get('condor','SearchType')
-        self.add_condor_cmd('accounting_group',grouptag)
-
-        # ----Add Username Flag
-        self.add_condor_cmd('accounting_group_user',cp.get('condor','UserName'))
-
-        # ---- Add priority specification
-        self.add_condor_cmd('priority',condorPriority)
-
-        # --- add minimal memory needed
-        if minimalMem :
-            self.add_condor_cmd('request_memory',minimalMem)
-        else:
-            minimalMemSearch = "4000"
-            self.add_condor_cmd('request_memory',minimalMemSearch)
-
-        # ---- Path and file names for standard out, standard error for this job.
-        self.set_stdout_file('logs/xsearch-$(cluster)-$(process).out')
-        self.set_stderr_file('logs/xsearch-$(cluster)-$(process).err')
-
-        # If on Atlas, use getenv=true to pass variables
-        if atlasFlag:
-           self.add_condor_cmd('getenv',"true")
-
-        self.add_condor_cmd('Requirements','TARGET.WantGPU =?= True')
-        self.add_condor_cmd('+WantGPU','True')
-
-        # ---- Name of condor job submission file to be written.
-        self.set_sub_file('xsearch_gpu.sub')
-
-class XsearchNode(pipeline.CondorDAGNode, pipeline.AnalysisNode):
-    """
-    xsearch node
-    """
-    def __init__(self,job):
-        """
-        job = A CondorDAGJob.
-        """
-        pipeline.CondorDAGNode.__init__(self,job)
-        pipeline.AnalysisNode.__init__(self)
-        self.__x_jobnum = None
-        self.__x_injnum = None
-
-    # ---- Set parameters file.
-    def set_param_file(self,path):
-        self.add_var_arg(path)
-        self.__param_file = path
-
-    def get_param_file(self):
-        return self.__param_file
-
-    def set_x_jobnum(self,n):
-        self.add_var_arg(str(n))
-        self.__x_jobnum = n
-
-    def get_x_jobnum(self):
-        return self.__x_jobnum
-
-    def set_output_dir(self,path):
-        self.add_var_arg(path)
-        self.__output_dir = path
-
-    def get_output_dir(self,path):
-        return self.__output_dir
-
-    def set_x_injnum(self,n):
-        self.add_var_arg(n)
-        self.__x_injnum = n
-
-    def get_x_injnum(self):
-        return self.__x_injnum
-
-class XmergeJob(pipeline.CondorDAGJob, pipeline.AnalysisJob):
-    """
-    An x merge job
-    """
-    def __init__(self,cp):
-        """
-        cp = ConfigParser object from which options are read.
-        """
-        # ---- Get path to executable.
-        os.system('which xmergegrbresults > path_file.txt')
-        f = open('path_file.txt','r')
-        xmergestr = f.read()
-        f.close()
-        os.system('rm path_file.txt')
-        self.__executable = xmergestr
-        # ---- Get condor universe from parameters file.
-        self.__universe = cp.get('condor','universe')
-        pipeline.CondorDAGJob.__init__(self,self.__universe,self.__executable)
-        pipeline.AnalysisJob.__init__(self,cp,False)
-        # ---- Add name of 'output' directory as first argument.
-        self.add_arg('output')
-        # ---- Add required environment variables.
-        self.add_condor_cmd('environment',"USER=$ENV(USER);HOME=$ENV(HOME);" \
-            "LD_LIBRARY_PATH=$ENV(LD_LIBRARY_PATH)")
-
-        # ----Add Accounting Group Flag
-        grouptag = 'ligo.' + \
-                cp.get('condor','ProdDevSim') + '.' +\
-                cp.get('condor','Era') + '.' +\
-                cp.get('condor','Group') + '.' +\
-                cp.get('condor','SearchType')
-        self.add_condor_cmd('accounting_group',grouptag)
-
-        # ----Add Username Flag
-        self.add_condor_cmd('accounting_group_user',cp.get('condor','UserName'))
-
-        # ---- Add priority specification
-        self.add_condor_cmd('priority',condorPriority)
-
-        # --- add minimal memory needed
-        if minimalMem :
-            self.add_condor_cmd('request_memory',minimalMem)
-        else:
-            minimalMemMerge = "2000"
-            self.add_condor_cmd('request_memory',minimalMemMerge)
-
-        # ---- Path and file names for standard out, standard error for this job.
-        self.set_stdout_file('logs/xmerge-$(cluster)-$(process).out')
-        self.set_stderr_file('logs/xmerge-$(cluster)-$(process).err')
-
-        # If on Atlas
-        if atlasFlag:
-           self.add_condor_cmd('getenv',"true")
-
-        # ---- Name of condor job submission file to be written.
-        self.set_sub_file('xmerge.sub')
-
-class XmergeNode(pipeline.CondorDAGNode, pipeline.AnalysisNode):
-    """
-    merge results that were cut into blocks of less than maxInjNum jobs
-    """
-    def __init__(self,job):
-        pipeline.CondorDAGNode.__init__(self,job)
-        pipeline.AnalysisNode.__init__(self)
-
-    def set_dir_prefix(self,path):
-        self.add_var_arg(path)
-        self.__dir_prefix = path
-
-    def get_dir_prefix(self):
-        return self.__dir_prefix
-
-    def set_sn_flag(self,path):
-        self.add_var_arg(path)
-        self.__sn_flag = path
-
-    def get_sn_flag(self):
-        return self.__sn_flag
-
-class XmergeClusteredJob(pipeline.CondorDAGJob, pipeline.AnalysisJob):
-  """
-  An x merge clustered job
-  """
-  def __init__(self,cp,nDet):
-    # ---- Get path to executable.
-    """
-    cp = ConfigParser object from which options are read.
-    """
-    if nDet==3:
-      os.system('which xmergegrbclusteredresults > path_file.txt')
-    else:
-      os.system('which xmergegrbclusteredresultsTwoDets > path_file.txt')
-    f = open('path_file.txt','r')
-    xmergestr = f.read()
-    f.close()
-    os.system('rm path_file.txt')
-    self.__executable = xmergestr
-    # ---- Get condor universe from parameters file.
-    self.__universe = cp.get('condor','universe')
-    pipeline.CondorDAGJob.__init__(self,self.__universe,self.__executable)
-    pipeline.AnalysisJob.__init__(self,cp,False)
-    # ---- Add name of 'output' directory as first argument.
-    self.add_arg('output_clustered')
-    # ---- Add required environment variables.
-    self.add_condor_cmd('environment',"USER=$ENV(USER);HOME=$ENV(HOME);" \
-        "LD_LIBRARY_PATH=$ENV(LD_LIBRARY_PATH)")
-
-    # ----Add Accounting Group Flag
-    grouptag = 'ligo.' + \
-            cp.get('condor','ProdDevSim') + '.' +\
-            cp.get('condor','Era') + '.' +\
-            cp.get('condor','Group') + '.' +\
-            cp.get('condor','SearchType')
-    self.add_condor_cmd('accounting_group',grouptag)
-
-    # ----Add Username Flag
-    self.add_condor_cmd('accounting_group_user',cp.get('condor','UserName'))
-
-    # ---- Add priority specification.
-    self.add_condor_cmd('priority',condorPriority)
-
-    # ---- Add minimal memory request. Note that with current default minimalMem
-    #      we never access the "else" statement below.
-    if minimalMem :
-      self.add_condor_cmd('request_memory',minimalMem)
-    else :
-      minimalMemMerge = "1500"
-      self.add_condor_cmd('request_memory',minimalMemMerge)
-
-    # ---- Path and file names for standard out, standard error for this job.
-    self.set_stdout_file('logs/xmergeclustered-$(cluster)-$(process).out')
-    self.set_stderr_file('logs/xmergeclustered-$(cluster)-$(process).err')
-
-    # If on Atlas
-    if atlasFlag:
-     self.add_condor_cmd('getenv',"true")
-
-    # ---- Name of condor job submission file to be written.
-    self.set_sub_file('xmergeclustered.sub')
-
-class XmergeClusteredNode(pipeline.CondorDAGNode, pipeline.AnalysisNode):
-  """
-  cluster and merge results that were cut into blocks of less than maxInjNum jobs
-  """
-  def __init__(self,job):
-    pipeline.CondorDAGNode.__init__(self,job)
-    pipeline.AnalysisNode.__init__(self)
-
-  def set_dir_prefix(self,path):
-    self.add_var_arg(path)
-    self.__dir_prefix = path
-
-  def get_dir_prefix(self):
-    return self.__dir_prefix
-
-  def set_sn_flag(self,path):
-    self.add_var_arg(path)
-    self.__sn_flag = path
-
-  def get_sn_flag(self):
-    return self.__sn_flag
-
-  def set_sc_flag(self,path):
-    self.add_var_arg(path)
-    self.__sc_flag = path
-
-  def get_sc_flag(self):
-    return self.__sc_flag
-
 # -------------------------------------------------------------------------
 #    Preparations for writing dags.
 # -------------------------------------------------------------------------
@@ -2943,85 +2596,6 @@ if cp.has_option('mdc','mdc_sets') :
 
 
 # -------------------------------------------------------------------------
-#    Define needed job classes.
-# -------------------------------------------------------------------------
-
-class XtmvaJob(pipeline.CondorDAGJob, pipeline.AnalysisJob):
-  """
-  An xtmva classification job.
-  """
-  def __init__(self,cp,nDet):
-    """
-    cp = ConfigParser object from which options are read.
-    """
-    # ---- Get path to executable.
-    self.__executable = os.getcwd() + "/xtmvapy/xtmva.py \n"
-    # ---- Get condor universe from parameters file.
-    self.__universe = cp.get('condor','universe')
-    pipeline.CondorDAGJob.__init__(self,self.__universe,self.__executable)
-    pipeline.AnalysisJob.__init__(self,cp,False)
-    # ---- Add name of 'output' directory as first argument.
-    cwdstr_split = os.path.split(os.getcwd())
-    fdir = cwdstr_split[0]
-    grbdir = cwdstr_split[1]
-    argumentstr = " --fdir=" + fdir + " --grbname=" + grbdir + " --nifo=" + str(nDet) + " --cname=xtmva.ini "
-    print >> sys.stdout, argumentstr
-    # ---- Add name of 'output' directory as first argument.
-    self.add_arg(argumentstr)
-    # ---- Define environment variables that are needed by xtmva.py. We hard-code 
-    #      most of them to avoid need to create a special gen-wrapper-script*.sh 
-    #      script for this one function.
-    envarstr = "USER=" + os.getenv("USER") + ";" \
-    + "HOME=" + os.getenv("HOME") + ";" \
-    + "LD_LIBRARY_PATH=" + os.getenv("LD_LIBRARY_PATH") + ";" \
-    + "XPIPE_INSTALL_BIN=$ENV(XPIPE_INSTALL_BIN);" \
-    + "PATH=" + os.getenv("ROOTSYS") + "/bin:" + os.getenv("XPIPE_INSTALL_BIN") + ":/usr/bin:/bin;" \
-    + "LIBPATH=" + os.getenv("LIBPATH") + ";" \
-    + "DYLD_LIBRARY_PATH=" + os.getenv("DYLD_LIBRARY_PATH") + ";" \
-    + "PYTHONPATH=" + os.getenv("PYTHONPATH") + ";" \
-    + "SHLIB_PATH=" +  os.getenv("SHLIB_PATH") + ";" \
-    + "ROOTSYS=" + os.getenv("ROOTSYS") 
-    # ---- Add required environment variables.
-    self.add_condor_cmd('environment',envarstr)
-
-    # ---- Add priority specification.
-    self.add_condor_cmd('priority',condorPriority)
-
-    # ---- Add minimal memory request. 
-    minimalMem = 4000
-    self.add_condor_cmd('request_memory',minimalMem)
-
-    # ----Add Accounting Group Flag
-    grouptag = 'ligo.' + \
-            cp.get('condor','ProdDevSim') + '.' +\
-            cp.get('condor','Era') + '.' +\
-            cp.get('condor','Group') + '.' +\
-            cp.get('condor','SearchType')
-    self.add_condor_cmd('accounting_group',grouptag)
-
-    # ----Add Username Flag
-    self.add_condor_cmd('accounting_group_user',cp.get('condor','UserName'))
-
-    # ---- Path and file names for standard out, standard error for this job.
-    self.set_stdout_file('logs/xtmva-$(cluster)-$(process).out')
-    self.set_stderr_file('logs/xtmva-$(cluster)-$(process).err')
-
-    # If on Atlas
-    if atlasFlag:
-     self.add_condor_cmd('getenv',"true")
-
-    # ---- Name of condor job submission file to be written.
-    self.set_sub_file('xtmva.sub')
-
-class XtmvaNode(pipeline.CondorDAGNode, pipeline.AnalysisNode):
-  """
-  cluster and merge results that were cut into blocks of less than maxInjNum jobs
-  """
-  def __init__(self,job):
-    pipeline.CondorDAGNode.__init__(self,job)
-    pipeline.AnalysisNode.__init__(self)
-
-# -------------------------------------------------------------------------
 #      Prepare xtmva dag.
 # -------------------------------------------------------------------------
 
@@ -3052,11 +2626,11 @@ dag = pipeline.CondorDAG(log_file_on_source + uuidtag)
 dag.set_dag_file( 'grb_on_source' )
 
 # ---- Make instance of XsearchJob.
-job = XsearchJob(cp)
+job = xcondor.XsearchJob(cp)
 
 if outputType == 'seedless':
     if doGPUOnSource == "true":
-        job = XsearchGPUJob(cp)
+        job = xcondor.XsearchGPUJob(cp)
 
 # ---- Make instance of XmergeJob.
 mergejob = XmergeJob(cp)
@@ -3108,7 +2682,7 @@ if distributeOnSource == 1:
 
 # ---- Add one node to the job for each segment to be analysed.
 for i in range(len(segmentList)):
-    node = XsearchNode(job)
+    node = xcondor.XsearchNode(job)
     # ---- Parameters file:
     matlab_param_file = cwdstr + "/input/parameters_on_source_" + str(i) + ".txt"
     node.set_param_file(matlab_param_file)
@@ -3171,11 +2745,11 @@ dag = pipeline.CondorDAG(log_file_on_source + uuidtag)
 dag.set_dag_file( 'grb_ul_source' )
 
 # ---- Make instance of XsearchJob.
-job = XsearchJob(cp)
+job = xcondor.XsearchJob(cp)
 
 if outputType == 'seedless':
     if doGPUUL == "true":
-        job = XsearchGPUJob(cp)
+        job = xcondor.XsearchGPUJob(cp)
 
 # ---- Make instance of XmergeJob.
 mergejob = XmergeJob(cp)
@@ -3198,7 +2772,7 @@ event_on_file.close()
 
 # ---- Add one node to the job for each segment to be analysed.
 for i in range(len(segmentList)):
-    node = XsearchNode(job)
+    node = xcondor.XsearchNode(job)
     # ---- Parameters file:
     matlab_param_file = cwdstr + "/input/parameters_ul_source_" + str(i) + ".txt"
     node.set_param_file(matlab_param_file)
@@ -3242,11 +2816,11 @@ dag = pipeline.CondorDAG(log_file_off_source + uuidtag)
 dag.set_dag_file( 'grb_off_source' )
 
 # ---- Make instance of XsearchJob.
-job = XsearchJob(cp)
+job = xcondor.XsearchJob(cp)
 
 if outputType == 'seedless':
     if doGPUOffSource == "true":
-        job = XsearchGPUJob(cp)
+        job = xcondor.XsearchGPUJob(cp)
 
 # ---- Make instance of XmergeJob.
 mergejob = XmergeJob(cp)
@@ -3310,7 +2884,7 @@ if maxOffNum == 0 :
     #      a lot of them, so we will check below if the output files are to
     #      be distributed over the cluster nodes.
     for i in range(nOffEvents):
-        node = XsearchNode(job)
+        node = xcondor.XsearchNode(job)
         matlab_param_file = cwdstr + "/input/parameters_off_source.txt"
         node.set_param_file(matlab_param_file)
         node.set_x_jobnum(i)
@@ -3353,7 +2927,7 @@ else:
     #      directory.
     nSets = int(math.ceil(float(nOffEvents)/float(maxOffNum)))
     for i in range(nSets) :
-        node = XsearchNode(job)
+        node = xcondor.XsearchNode(job)
         matlab_param_file = cwdstr + "/input/parameters_off_source_" + str(int(math.floor((jobsPerWindow*i)/nSets))) + ".txt"
         node.set_param_file(matlab_param_file)
         node.set_x_jobnum("%d-"%(i*maxOffNum) + "%d"%(min((i+1)*maxOffNum-1,nOffEvents-1)))
@@ -3445,11 +3019,11 @@ if cp.has_section('waveforms') :
         dag.set_dag_file( "grb_simulations_" + set )
 
         # ---- Make instance of XsearchJob.
-        job = XsearchJob(cp)
+        job = xcondor.XsearchJob(cp)
 
         if outputType == 'seedless':
             if doGPUSimulation == "true":
-                job = XsearchGPUJob(cp)
+                job = xcondor.XsearchGPUJob(cp)
 
         mergejob = XmergeJob(cp)
 
@@ -3530,7 +3104,7 @@ if cp.has_section('waveforms') :
               for i in range(len(thisInjSeg)):
                 if thisInjSeg :
                   thisInjSeg.sort()
-                  node = XsearchNode(job)
+                  node = xcondor.XsearchNode(job)
                   matlab_param_file = cwdstr + "/input/parameters_simulation_" + set + "_0_" + str(thisInjSeg[i]) + ".txt"
                   node.set_param_file(matlab_param_file)
                   # --- method of grouping together segments for one condor job
@@ -3607,7 +3181,7 @@ if cp.has_section('waveforms') :
                 #print('We do not have injections that are done at the block border, we use standard GRB injection placing')
                 if  0 == maxInjNum:
                     # ---- Create job node.
-                    node = XsearchNode(job)
+                    node = xcondor.XsearchNode(job)
                     # ---- Assign first argument: parameters file
                     matlab_param_file = cwdstr + "/input/parameters_simulation_" \
                         + set + "_" + str(scale_counter) + '_' + str(i) + ".txt"
@@ -3684,7 +3258,7 @@ if cp.has_section('waveforms') :
                                 thisSegmentInjNumber += 1
                                 thisSegmentInjStart = min(thisSegmentInjStart,iInj)
                         for iInjRange in range(int(math.ceil(float(thisSegmentInjNumber)/float(maxInjNum)))) :
-                            node = XsearchNode(job)
+                            node = xcondor.XsearchNode(job)
                             matlab_param_file = cwdstr + "/input/parameters_simulation_" \
                                 + set + "_" + str(scale_counter) + "_" + str(i) + ".txt"
                             node.set_param_file(matlab_param_file)
@@ -3792,7 +3366,7 @@ if cp.has_option('mdc','mdc_sets') :
         dag.set_dag_file( "grb_" + set )
 
         # ---- Make instance of XsearchJob.
-        job = XsearchJob(cp)
+        job = xcondor.XsearchJob(cp)
 
         # ---- Make instance of XmergeJob. This job will merge the results files
         #      produced by the several analysis nodes.
@@ -3829,7 +3403,7 @@ if cp.has_option('mdc','mdc_sets') :
                 i = 0
 
                 # ---- Create job node.
-                node = XsearchNode(job)
+                node = xcondor.XsearchNode(job)
                 # ---- Assign first argument: parameters file
                 matlab_param_file = cwdstr + "/input/parameters_" + set \
                     + "_" + str(scale_counter) + ".txt"
@@ -3903,7 +3477,7 @@ if cp.has_option('mdc','mdc_sets') :
                 injJobs = range(int(math.ceil(float(numberOfInjections)/float(maxInjNum))))
                 for iSegRange in segJobs :
                     for iInjRange in injJobs :
-                        node = XsearchNode(job)
+                        node = xcondor.XsearchNode(job)
                         matlab_param_file = cwdstr + "/input/parameters_" + set \
                             + "_" + str(scale_counter) + ".txt"
                         node.set_param_file(matlab_param_file)
