@@ -2610,8 +2610,8 @@ if xtmvaFlag:
     print(log_file_xtmva)
     dag_xtmva = pipeline.CondorDAG(log_file_xtmva + uuidtag)
     dag_xtmva.set_dag_file( 'grb_xtmva' )
-    xtmvajob  = XtmvaJob(cp,len(detector))
-    xtmvanode = XtmvaNode(xtmvajob)
+    xtmvajob  = xcondor.XtmvaJob(cp,len(detector))
+    xtmvanode = xcondor.XtmvaNode(xtmvajob)
     xtmvanode.set_retry("1")
     xtmvanode.set_name("xtmva_on_source_" + xtmvanode.get_name())
 
@@ -2633,10 +2633,10 @@ if outputType == 'seedless':
         job = xcondor.XsearchGPUJob(cp)
 
 # ---- Make instance of XmergeJob.
-mergejob = XmergeJob(cp)
+mergejob = xcondor.XmergeJob(cp)
 # ---- Put a single merge job node in mergejob.  This job will combine
 #      into a single file the output of all of the off-source analysis jobs.
-mergenode = XmergeNode(mergejob)
+mergenode = xcondor.XmergeNode(mergejob)
 if xtmvaFlag:
     xtmvanode.add_parent(mergenode)
 
@@ -2646,8 +2646,8 @@ if smartCluster == True:
   print(log_file_on_source_clustered)
   dag_clustered = pipeline.CondorDAG(log_file_on_source_clustered + uuidtag)
   dag_clustered.set_dag_file( 'grb_on_source_clustered' )
-  mergeclusteredjob = XmergeClusteredJob(cp,len(detector))
-  mergeclusterednode = XmergeClusteredNode(mergeclusteredjob)
+  mergeclusteredjob = xcondor.XmergeClusteredJob(cp,len(detector))
+  mergeclusterednode = xcondor.XmergeClusteredNode(mergeclusteredjob)
 
 # ---- Make analysis jobs for all segments (currently 1) in the on-source
 #      segment list.
@@ -2752,10 +2752,10 @@ if outputType == 'seedless':
         job = xcondor.XsearchGPUJob(cp)
 
 # ---- Make instance of XmergeJob.
-mergejob = XmergeJob(cp)
+mergejob = xcondor.XmergeJob(cp)
 # ---- Put a single merge job node in mergejob.  This job will combine
 #      into a single file the output of all of the off-source analysis jobs.
-mergenode = XmergeNode(mergejob)
+mergenode = xcondor.XmergeNode(mergejob)
 if xtmvaFlag:
     xtmvanode.add_parent(mergenode)
 
@@ -2823,10 +2823,10 @@ if outputType == 'seedless':
         job = xcondor.XsearchGPUJob(cp)
 
 # ---- Make instance of XmergeJob.
-mergejob = XmergeJob(cp)
+mergejob = xcondor.XmergeJob(cp)
 # ---- Put a single merge job node in mergejob.  This job will combine
 #      into a single file the output of all of the off-source analysis jobs.
-mergenode = XmergeNode(mergejob)
+mergenode = xcondor.XmergeNode(mergejob)
 if xtmvaFlag:
     xtmvanode.add_parent(mergenode)
 
@@ -2951,8 +2951,8 @@ if smartCluster == True:
   print >> sys.stdout, "Writing off-source clustered dag ... "
   dag_clustered = pipeline.CondorDAG(log_file_off_source_clustered + uuidtag)
   dag_clustered.set_dag_file( 'grb_off_source_clustered' )
-  mergeclusteredjob = XmergeClusteredJob(cp,len(detector))
-  mergeclusterednode = XmergeClusteredNode(mergeclusteredjob)
+  mergeclusteredjob = xcondor.XmergeClusteredJob(cp,len(detector))
+  mergeclusterednode = xcondor.XmergeClusteredNode(mergeclusteredjob)
   mergeclusterednode.set_dir_prefix("off_source/")
   mergeclusterednode.set_sn_flag("0 " + mergingCutsString)
   mergeclusterednode.set_sc_flag("1")
@@ -3025,13 +3025,13 @@ if cp.has_section('waveforms') :
             if doGPUSimulation == "true":
                 job = xcondor.XsearchGPUJob(cp)
 
-        mergejob = XmergeJob(cp)
+        mergejob = xcondor.XmergeJob(cp)
 
         if smartCluster == True:
           print >> sys.stdout, 'Writing dag for on-the-fly clustered injection set: ' + set
           dag_clustered = pipeline.CondorDAG( log_file_simulations_clustered + "_" + set + uuidtag )
           dag_clustered.set_dag_file( "grb_simulations_clustered_" + set )
-          mergeclusteredjob = XmergeClusteredJob(cp,len(detector))
+          mergeclusteredjob = xcondor.XmergeClusteredJob(cp,len(detector))
 
         # ---- Make analysis jobs for all segments in the on-source segment list.
         #      Read segment list from file.
@@ -3064,9 +3064,9 @@ if cp.has_section('waveforms') :
           if smartCluster == True:
             mergeclusterednode = []
           for injectionScale in injectionScales :
-              mergenode.append(XmergeNode(mergejob))
+              mergenode.append(xcondor.XmergeNode(mergejob))
               if smartCluster == True:
-                mergeclusterednode.append(XmergeClusteredNode(mergeclusteredjob))
+                mergeclusterednode.append(xcondor.XmergeClusteredNode(mergeclusteredjob))
           if not(reUseInj):
             # ---- Set buffer for handling long injections.
             longInjSegBuffer = 0
@@ -3168,11 +3168,11 @@ if cp.has_section('waveforms') :
           # ---- Loop over injection scales.
           scale_counter = 0
           for injectionScale in injectionScales :
-            mergenode = XmergeNode(mergejob)
+            mergenode = xcondor.XmergeNode(mergejob)
             if xtmvaFlag:
               xtmvanode.add_parent(mergenode)
             if smartCluster == True:
-              mergeclusterednode = XmergeClusteredNode(mergeclusteredjob)
+              mergeclusterednode = xcondor.XmergeClusteredNode(mergeclusteredjob)
             # Skip injection trigger production if path to already available triggers provided
             if not(reUseInj):
               # ---- Loop over segments
@@ -3370,7 +3370,7 @@ if cp.has_option('mdc','mdc_sets') :
 
         # ---- Make instance of XmergeJob. This job will merge the results files
         #      produced by the several analysis nodes.
-        mergejob = XmergeJob(cp)
+        mergejob = xcondor.XmergeJob(cp)
 
         #      Make analysis jobs for all segments in the MDC segment list.
         #      Read segment list from file.
@@ -3390,7 +3390,7 @@ if cp.has_option('mdc','mdc_sets') :
         scale_counter = 0
         for injectionScale in injectionScales :
             # ---- Merge all results for a single waveform+injection scale.
-            mergenode = XmergeNode(mergejob)
+            mergenode = xcondor.XmergeNode(mergejob)
             if xtmvaFlag:
                 xtmvanode.add_parent(mergenode)
 
