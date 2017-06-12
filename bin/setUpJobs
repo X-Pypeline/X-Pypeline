@@ -6,13 +6,15 @@
 
 # ---- Import standard modules to the python path.
 import sys, os, shutil, math, random, copy, getopt, re, string, popen2, time
-import ConfigParser, glob, operator, argparse, socket, socket, uuid
+import ConfigParser, glob, operator, argparse, socket, socket, uuid, pdb
 from glue import segments
 #from glue.segmentsUtils import fromsegwizard, tosegwizard
 from glue import pipeline
+from glue import datafind
 from numpy import loadtxt
 
-from XPypeline import xcondor
+from XPypeline import xcondor, xparseoutputtype
+from gwpy.detector import Channel
 
 def parse_commandline():
     parser = argparse.ArgumentParser(description="Script for setting up \
@@ -406,6 +408,19 @@ if cp.has_option('tags','version') :
     ini_version = cp.get('tags','version')
     print >> sys.stdout, "Parameter file CVS tag:", ini_version
 
+# ---- Check for a seed value for matlab's random number generator.
+try:
+    seed = int(cp.get('parameters','seed'))
+except:
+    seed = 931316785
+    print >> sys.stdout, "Warning: No seed specified in configuration file."
+    print >> sys.stdout, "         seed will be set to: ", seed
+
+# ---- Matlab seed can take values between 0 and 2^31-2.
+if (seed > pow(2,31)-2) or (seed < 0):
+    print >> sys.stderr,"Error: seed must have value between 0 and 2^31-2"
+    sys.exit(1)
+
 # ---- NOTE: The following reading of variables can be split up and
 #      moved into the relevant sections of the script where the
 #      variables are actually used.
@@ -423,10 +438,17 @@ onSourceBeginOffset = cp.getint('parameters','onSourceBeginOffset')
 onSourceEndOffset   = cp.getint('parameters','onSourceEndOffset')
 onSourceEndOffset   = max(onSourceEndOffset,manualEndOffset)
 onSourceTimeLength = onSourceEndOffset - onSourceBeginOffset
+outputType = cp.get('parameters','outputType')
+xparseoutputtype.parse(outputType,cp)
 jobsPerWindow=int(math.ceil(float(onSourceTimeLength)/float(blockTime-2*transientTime)))
 onSourceWindowLength=2*transientTime+jobsPerWindow*(blockTime-2*transientTime)
 minimumFrequency = cp.getint('parameters','minimumFrequency')
 maximumFrequency = cp.getint('parameters','maximumFrequency')
+
+channelListLine   = cp.get('input','channelList')
+channelList       = channelListLine.split(',')
+frameTypeListLine = cp.get('input','frameTypeList')
+frameTypeList     = frameTypeListLine.split(',')
 
 # ---- Interval of data to be analysed.
 # ---- Allow for asymmetric background analyses, if needed by the online analysis
@@ -446,72 +468,9 @@ else:
 		sys.exit(1)
 duration = int(end_time - start_time)
 
-# ---- We will copy all ifo data and mdc frame caches to the location
-#      stored in frameCacheAll.
-frameCacheAll = 'input/framecache.txt'
 
-# ---- Read [input] channel parameters.
-detectorListLine  = cp.get('input','detectorList')
-detectorList      = detectorListLine.split(',')
-virtualDetectorList = detectorList
-if cp.has_option('input','virtualDetectorList') :
-    virtualDetectorListLine   = cp.get('input','virtualDetectorList')
-    virtualDetectorList       = virtualDetectorListLine.split(',')
-    print >> sys.stdout,     " "
-    print >> sys.stdout,     "********************************************************************************"
-    print >> sys.stdout,     "  WARNING: using virtual detectors. "
-    print >> sys.stdout,     "       real detector network:", detectorList
-    print >> sys.stdout,     "    virtual detector network:", virtualDetectorList
-    print >> sys.stdout,     "  The real detector list will be used for segments, frame finding, data quality"
-    print >> sys.stdout,     "  criteria, and calibration uncertainties. The virtual detector list will be" 
-    print >> sys.stdout,     "  used for the search sky grid and determining likelihoods, lag files, and MDC" 
-    print >> sys.stdout,     "  frames. The channels.txt file will contain both lists."
-    print >> sys.stdout,     "********************************************************************************"
-    print >> sys.stdout,     " "
-channelListLine   = cp.get('input','channelList')
-channelList       = channelListLine.split(',')
-frameTypeListLine = cp.get('input','frameTypeList')
-frameTypeList     = frameTypeListLine.split(',')
-
-# ---- Variables that may or may not be defined in .ini file:
-
-# ---- Check for frame cache for real ifo data
-try:
-    dataFrameCache = cp.get('input','frameCacheFile')
-except:
-    print >> sys.stdout, "Warning: No frameCacheFile file specified in " \
-        "[input] section of configuration file."
-    print >> sys.stdout, "        A frameCache for the ifo data file will be " \
-        "generated automatically."
-    dataFrameCache = None
-
-# ---- Check for a seed value for matlab's random number generator.
-try:
-    seed = int(cp.get('parameters','seed'))
-except:
-    seed = 931316785
-    print >> sys.stdout, "Warning: No seed specified in configuration file."
-    print >> sys.stdout, "         seed will be set to: ", seed
-
-# ---- Matlab seed can take values between 0 and 2^31-2.
-if (seed > pow(2,31)-2) or (seed < 0):
-    print >> sys.stderr,"Error: seed must have value between 0 and 2^31-2"
-    sys.exit(1)
-
-# ---- Get datafind server.
-try:
-    datafind_server = cp.get('datafind','datafind_server')
-except:
-    datafind_server = os.environ['LIGO_DATAFIND_SERVER']
-
-# ---- Get datafind executable e.g., ligo_data_find.
-datafind_exec = cp.get("datafind", 'datafind_exec')
-# ---- Get segfind executable e.g., ligolw_segment_query.
-segfind_exec = cp.get("datafind", "segfind_exec")
-# ---- Get segs_from_cats executable e.g., ligolw_ligolw_segments_from_cats.
-segs_from_cats_exec = cp.get("datafind", "segs_from_cats_exec")
-# ---- Get ligolw_print executable e.g., ligolw_print.
-ligolw_print_exec = cp.get("datafind", "ligolw_print_exec")
+###### Clean start here
+pdb.set_trace()
 
 # ---- Status message.
 print >> sys.stdout, "... finished parsing parameters (ini) file."
@@ -522,12 +481,17 @@ print >> sys.stdout
 #      Validate list of detectors given.
 # -------------------------------------------------------------------------
 
-# ---- KLUDGE:TODO: Move this below automatic network selection so that we
-#      only perform this once???
+# ---- We will copy all ifo data and mdc frame caches to the location
+#      stored in frameCacheAll.
+frameCacheAll = 'input/framecache.txt'
 
 # ---- Status message.
-print >> sys.stdout, "Comparing requested network to list of known detectors ..."
+print >> sys.stdout, "Validating requested detectors and frametypes..."
+for iDet in detector:
+    connection = datafind.GWDataFindHTTPConnection()
+    cache = connection.find_frame_urls(det, frameType, startTime, stopTime, urltype='file')
 
+"""
 # ---- For each detector specified with the --detector option, compare to
 #      the list of known detectors from the .ini file.  Keep only the requested
 #      detectors and corresponding channel name and frame type.
@@ -558,137 +522,7 @@ for jj in range(0,len(keepIndex)):
 # ---- Status message.
 print >> sys.stdout, "... finished validating network.          "
 print >> sys.stdout
-
-
-# -------------------------------------------------------------------------
-#      Write Matlab-formatted file with clustering parameters
-# -------------------------------------------------------------------------
-
-# ---- xdetection is not yet set up to read and use this clustering parameters
-#      file.  Therefore, this section of setUpJobs is commented out until
-#      xdetection is able to use it.
-
-# # ---- Note: If outputType is clusters, then the parameters ini file must
-# #      contain a section [extraction] which specifies the manner in which
-# #      clustering is to be performed.
-# outputType=cp.get('parameters','outputType')
-# if outputType == 'clusters' :
-#
-#     # ---- Status message.
-#     print >> sys.stdout, "Writing Matlab-formatted clustering file ..."
-#     extractParamFileName = cp.get('parameters','extractParamFileName')
-#
-#     # ---- Parameters file for on-source analysis.
-#     f=open(extractParamFileName, 'w')
-#
-#     # ---- Write all options available in the [extraction] section to a file.
-#     extractParams = cp.options('extraction')
-#     for i in range(0,len(extractParams)) :
-#         value = cp.get('extraction',extractParams[i])
-#         f.write(extractParams[i] + ':' + value + '\n')
-#     f.close()
-#
-# # ---- Status message.
-# print >> sys.stdout, "... finished writing clustering file.     "
-# print >> sys.stdout
-
-outputType=cp.get('parameters','outputType')
-if outputType == 'seedless':
-     # ---- Status message.
-     print >> sys.stdout, "Writing Matlab-formatted clustering file ..."
-     doGPUOnSource = cp.get('seedless','doGPUOnSource')
-     doGPUOffSource = cp.get('seedless','doGPUOffSource')
-     doGPUSimulation = cp.get('seedless','doGPUSimulation')
-     doGPUUL = cp.get('seedless','doGPUUL')
-     doParallelOnSource = cp.get('seedless','doParallelOnSource')
-     doParallelOffSource = cp.get('seedless','doParallelOffSource')
-     doParallelSimulation = cp.get('seedless','doParallelSimulation')
-     doParallelUL = cp.get('seedless','doParallelUL')
-     T = cp.get('seedless','T')
-     F = cp.get('seedless','F')
-     mindur = cp.get('seedless','mindur')
-     doPCA = cp.get('seedless','doPCA')
-     pca_catalogfile = cp.get('seedless','pca_catalogfile')
-     pca_type = cp.get('seedless','pca_type')
-     doCBC = cp.get('seedless','doCBC')
-     doECBC = cp.get('seedless','doECBC')
-     doBezier = cp.get('seedless','doBezier')
-     doExponential = cp.get('seedless','doExponential')
-     doRModes = cp.get('seedless','doRModes')
-     norm = cp.get('seedless','norm')
-     savePlots = cp.get('seedless','savePlots')
-
-     f = open('input/seedless_onsource.txt','w')
-     f.write('doGPU:%s\n'%(doGPUOnSource))
-     f.write('doParallel:%s\n'%(doParallelOnSource))
-     f.write('T:%s\n'%(T))
-     f.write('F:%s\n'%(F))
-     f.write('mindur:%s\n'%(mindur))
-     f.write('doCBC:%s\n'%(doCBC))
-     f.write('doECBC:%s\n'%(doECBC))
-     f.write('doBezier:%s\n'%(doBezier))
-     f.write('doExponential:%s\n'%(doExponential))
-     f.write('doRModes:%s\n'%(doRModes))
-     f.write('doPCA:%s\n'%(doPCA))
-     f.write('pca_catalogfile:%s\n'%(pca_catalogfile))
-     f.write('pca_type:%s\n'%(pca_type))
-     f.write('norm:%s\n'%(norm))
-     f.write('savePlots:%s\n'%(savePlots))     
-     f.close()
-
-     f = open('input/seedless_offsource.txt','w')
-     f.write('doGPU:%s\n'%(doGPUOffSource))
-     f.write('doParallel:%s\n'%(doParallelOffSource))
-     f.write('T:%s\n'%(T))
-     f.write('F:%s\n'%(F))
-     f.write('mindur:%s\n'%(mindur))
-     f.write('doCBC:%s\n'%(doCBC))
-     f.write('doECBC:%s\n'%(doECBC))
-     f.write('doBezier:%s\n'%(doBezier))
-     f.write('doExponential:%s\n'%(doExponential))
-     f.write('doRModes:%s\n'%(doRModes))
-     f.write('doPCA:%s\n'%(doPCA))
-     f.write('pca_catalogfile:%s\n'%(pca_catalogfile))
-     f.write('pca_type:%s\n'%(pca_type))
-     f.write('norm:%s\n'%(norm))
-     f.write('savePlots:%s\n'%(savePlots))
-     f.close()
-
-     f = open('input/seedless_simulation.txt','w')
-     f.write('doGPU:%s\n'%(doGPUSimulation))
-     f.write('doParallel:%s\n'%(doParallelSimulation))
-     f.write('T:%s\n'%(T))
-     f.write('F:%s\n'%(F))
-     f.write('mindur:%s\n'%(mindur))
-     f.write('doCBC:%s\n'%(doCBC))
-     f.write('doECBC:%s\n'%(doECBC))
-     f.write('doBezier:%s\n'%(doBezier))
-     f.write('doExponential:%s\n'%(doExponential))
-     f.write('doRModes:%s\n'%(doRModes))
-     f.write('doPCA:%s\n'%(doPCA))
-     f.write('pca_catalogfile:%s\n'%(pca_catalogfile))
-     f.write('pca_type:%s\n'%(pca_type))
-     f.write('norm:%s\n'%(norm))
-     f.write('savePlots:%s\n'%(savePlots))
-     f.close()
-
-     f = open('input/seedless_ul.txt','w')
-     f.write('doGPU:%s\n'%(doGPUUL))
-     f.write('doParallel:%s\n'%(doParallelUL))
-     f.write('T:%s\n'%(T))
-     f.write('F:%s\n'%(F))
-     f.write('mindur:%s\n'%(mindur))
-     f.write('doCBC:%s\n'%(doCBC))
-     f.write('doECBC:%s\n'%(doECBC))
-     f.write('doBezier:%s\n'%(doBezier))
-     f.write('doExponential:%s\n'%(doExponential))
-     f.write('doRModes:%s\n'%(doRModes))
-     f.write('doPCA:%s\n'%(doPCA))
-     f.write('pca_catalogfile:%s\n'%(pca_catalogfile))
-     f.write('pca_type:%s\n'%(pca_type))
-     f.write('norm:%s\n'%(norm))
-     f.write('savePlots:%s\n'%(savePlots))
-     f.close()
+"""
 
 # -------------------------------------------------------------------------
 #      Retrieve single-IFO segment lists for analysis period.
@@ -1007,44 +841,24 @@ elif len(detector) ==1:
     likelihoodType = "likelihoodType_1det1site"
 
 elif len(detector) ==2:
-    if virtualDetector.count('H1') and virtualDetector.count('H2'):
-        print >> sys.stdout, "Two aligned ifos in network: ", virtualDetector
-        lagType = "lags_2det1site"
-        likelihoodType = "likelihoodType_2det1site"
-    else:
-        print >> sys.stdout, "Two misaligned ifos in network: ", virtualDetector
-        lagType = "lags_2det2site"
-        likelihoodType = "likelihoodType_2det2site"
+    print >> sys.stdout, "Two misaligned ifos in network: ", virtualDetector
+    lagType = "lags_2det2site"
+    likelihoodType = "likelihoodType_2det2site"
 
 elif len(detector) ==3:
-    if virtualDetector.count('H1') and virtualDetector.count('H2'):
-        print >> sys.stdout, "Three ifos at two sites: ", virtualDetector
-        lagType = "lags_3det2site"
-        likelihoodType = "likelihoodType_3det2site"
-    else:
-        print >> sys.stdout, "Three ifos at three sites: ", virtualDetector
-        lagType = "lags_3det3site"
-        likelihoodType = "likelihoodType_3det3site"
+    print >> sys.stdout, "Three ifos at three sites: ", virtualDetector
+    lagType = "lags_3det3site"
+    likelihoodType = "likelihoodType_3det3site"
 
 elif len(detector) ==4:
-    if virtualDetector.count('H1') and virtualDetector.count('H2'):
-        print >> sys.stdout, "Four ifos at three sites: ", virtualDetector
-        lagType = "lags_4det3site"
-        likelihoodType = "likelihoodType_4det3site"
-    else:
-        print >> sys.stdout, "Four ifos at four sites: ", virtualDetector
-        lagType = "lags_4det4site"
-        likelihoodType = "likelihoodType_4det4site"
+    print >> sys.stdout, "Four ifos at four sites: ", virtualDetector
+    lagType = "lags_4det4site"
+    likelihoodType = "likelihoodType_4det4site"
 
 elif len(detector) ==5:
-    if virtualDetector.count('H1') and virtualDetector.count('H2'):
-        print >> sys.stdout, "Five ifos at four sites: ", virtualDetector
-        lagType = "lags_5det4site"
-        likelihoodType = "likelihoodType_5det4site"
-    else:
-        print >> sys.stdout, "Five ifos at five sites: ", virtualDetector
-        lagType = "lags_5det5site"
-        likelihoodType = "likelihoodType_5det5site"
+    print >> sys.stdout, "Five ifos at five sites: ", virtualDetector
+    lagType = "lags_5det5site"
+    likelihoodType = "likelihoodType_5det5site"
 
 # -----------------------------------------------------------------------------
 #               Construct tilde-separated list of sites
@@ -1115,6 +929,15 @@ except:
    sys.exit(1)
 
 print >> sys.stdout, "Using likelihoods: ", likelihoodTypeStr
+
+
+
+
+
+
+
+
+####Clean to here
 
 # -----------------------------------------------------------------------------
 #      Write Matlab-formatted parameters files.
