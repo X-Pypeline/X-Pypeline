@@ -15,6 +15,7 @@ from numpy import loadtxt
 
 from XPypeline import xcondor, xparseoutputtype
 from gwpy.detector import Channel
+from gwpy.segments import DataQualityFlag
 
 def parse_commandline():
     parser = argparse.ArgumentParser(description="Script for setting up \
@@ -56,6 +57,24 @@ def parse_commandline():
                                Add detector to the network
                                """,
                                required=True, nargs='+')
+    parser.add_argument("--FAR", help=
+                        """
+                        To be used with the --search-type=allsky argument.
+                        This controls the number of background trials/jobs
+                        such that the desired FAR is achieved roughly exactly.
+                        Will warn and error if not enough coincident background
+                        to achieve desired FAR
+                        """,
+                        type=float)
+    parser.add_argument("--FAP", help=
+                        """
+                        To be used with the --search-type=sn or grb argument.
+                        This controls the number of background trials/jobs
+                        such that the desired FAP is achieved roughly exactly.
+                        Will warn and error if not enough coincident background
+                        to achieve desired FAP
+                        """,
+                        type=float)
     parser.add_argument("-e", "--sky-pos-err", help=
                         """
                         1-sigma uncertainty in sky position of GRB
@@ -258,6 +277,8 @@ offSourceInj = args.offSourceInj
 grid_sim_file = args.grid_sim_file
 smartCluster = args.smartCluster
 minimalMem = args.minimalMem
+FAR = args.FAR
+FAP = args.FAP
 
 #
 #    Naming defaults
@@ -470,7 +491,71 @@ duration = int(end_time - start_time)
 
 
 ###### Clean start here
-pdb.set_trace()
+# ---- We will copy all ifo data and mdc frame caches to the location
+#      stored in frameCacheAll.
+frameCacheAll = 'input/framecache.txt'
+
+# ---- Read [input] channel parameters.
+detectorListLine  = cp.get('input','detectorList')
+detectorList      = detectorListLine.split(',')
+virtualDetectorList = detectorList
+if cp.has_option('input','virtualDetectorList') :
+    virtualDetectorListLine   = cp.get('input','virtualDetectorList')
+    virtualDetectorList       = virtualDetectorListLine.split(',')
+    print >> sys.stdout,     " "
+    print >> sys.stdout,     "********************************************************************************"
+    print >> sys.stdout,     "  WARNING: using virtual detectors. "
+    print >> sys.stdout,     "       real detector network:", detectorList
+    print >> sys.stdout,     "    virtual detector network:", virtualDetectorList
+    print >> sys.stdout,     "  The real detector list will be used for segments, frame finding, data quality"
+    print >> sys.stdout,     "  criteria, and calibration uncertainties. The virtual detector list will be" 
+    print >> sys.stdout,     "  used for the search sky grid and determining likelihoods, lag files, and MDC" 
+    print >> sys.stdout,     "  frames. The channels.txt file will contain both lists."
+    print >> sys.stdout,     "********************************************************************************"
+    print >> sys.stdout,     " "
+channelListLine   = cp.get('input','channelList')
+channelList       = channelListLine.split(',')
+frameTypeListLine = cp.get('input','frameTypeList')
+frameTypeList     = frameTypeListLine.split(',')
+
+# ---- Variables that may or may not be defined in .ini file:
+
+# ---- Check for frame cache for real ifo data
+try:
+    dataFrameCache = cp.get('input','frameCacheFile')
+except:
+    print >> sys.stdout, "Warning: No frameCacheFile file specified in " \
+        "[input] section of configuration file."
+    print >> sys.stdout, "        A frameCache for the ifo data file will be " \
+        "generated automatically."
+    dataFrameCache = None
+
+# ---- Check for a seed value for matlab's random number generator.
+try:
+    seed = int(cp.get('parameters','seed'))
+except:
+    seed = 931316785
+    print >> sys.stdout, "Warning: No seed specified in configuration file."
+    print >> sys.stdout, "         seed will be set to: ", seed
+
+# ---- Matlab seed can take values between 0 and 2^31-2.
+if (seed > pow(2,31)-2) or (seed < 0):
+    print >> sys.stderr,"Error: seed must have value between 0 and 2^31-2"
+    sys.exit(1)
+
+# ---- Get datafind server.
+try:
+    datafind_server = cp.get('datafind','datafind_server')
+except:
+    datafind_server = os.environ['LIGO_DATAFIND_SERVER']
+# ---- Get datafind executable e.g., ligo_data_find.
+datafind_exec = cp.get("datafind", 'datafind_exec')
+# ---- Get segfind executable e.g., ligolw_segment_query.
+segfind_exec = cp.get("datafind", "segfind_exec")
+# ---- Get segs_from_cats executable e.g., ligolw_ligolw_segments_from_cats.
+segs_from_cats_exec = cp.get("datafind", "segs_from_cats_exec")
+# ---- Get ligolw_print executable e.g., ligolw_print.
+ligolw_print_exec = cp.get("datafind", "ligolw_print_exec")
 
 # ---- Status message.
 print >> sys.stdout, "... finished parsing parameters (ini) file."
@@ -481,17 +566,12 @@ print >> sys.stdout
 #      Validate list of detectors given.
 # -------------------------------------------------------------------------
 
-# ---- We will copy all ifo data and mdc frame caches to the location
-#      stored in frameCacheAll.
-frameCacheAll = 'input/framecache.txt'
+# ---- KLUDGE:TODO: Move this below automatic network selection so that we
+#      only perform this once???
 
 # ---- Status message.
-print >> sys.stdout, "Validating requested detectors and frametypes..."
-for iDet in detector:
-    connection = datafind.GWDataFindHTTPConnection()
-    cache = connection.find_frame_urls(det, frameType, startTime, stopTime, urltype='file')
+print >> sys.stdout, "Comparing requested network to list of known detectors ..."
 
-"""
 # ---- For each detector specified with the --detector option, compare to
 #      the list of known detectors from the .ini file.  Keep only the requested
 #      detectors and corresponding channel name and frame type.
@@ -522,7 +602,6 @@ for jj in range(0,len(keepIndex)):
 # ---- Status message.
 print >> sys.stdout, "... finished validating network.          "
 print >> sys.stdout
-"""
 
 # -------------------------------------------------------------------------
 #      Retrieve single-IFO segment lists for analysis period.
@@ -691,6 +770,24 @@ else:
 	    print 'Writing file: ', filename
 	    f = open(filename,"w"); tosegwizard(f,cat24veto); f.flush(); f.close()
 	    veto_seg_files.append(filename)
+
+# ---- Read in segment_lists to ScienceData object.
+for ifoIdx in range(0,len(detector)):
+    ifo = detector[ifoIdx]
+
+    # ---- Read full segment list into a ScienceData object for easy
+    #      manipulation.  Throw away science segment shorter than the
+    #      blockTime value read from the configuration file.
+    print 'Reading segment list from file ', analysis_seg_files[ifoIdx]
+    full_segment = pipeline.ScienceData()
+    full_segment.read( analysis_seg_files[ifoIdx], blockTime )
+    print '... finished reading segment list.'
+
+    # ---- Now restrict to desired analysis time range around trigger_time.
+    full_segment.intersection(analysis_segment)
+    # ---- Finally, append segment for this detector to the full list.
+    full_segment_list.append(full_segment)
+
 
 # ---- Read in segment_lists to ScienceData object.
 for ifoIdx in range(0,len(detector)):
@@ -1882,7 +1979,13 @@ if 1:
 
 
     # ---- Number of off-source events before we discard any.
-    origNumOff = len(events)
+    # This is equivalent to the number of zero and external lags
+    # mulitplied by the number of internal lags
+    circTimeSlides = 1
+    if cp.has_option('parameters','circtimeslidestep'):
+        circTimeSlides = cp.getint('parameters','circtimeslidestep')
+        circTimeSlides = cp.getint('parameters','blockTime') / circTimeSlides
+    origNumOff = len(events) * circTimeSlides
 
     # ---- Keep track of how many off-source jobs we have after
     #     discarding those with bad networks.
@@ -1892,6 +1995,13 @@ if 1:
     #      get this variable.
     if cp.has_option('background','numJobs'):
         background_numJobs = int(cp.get('background','numJobs'))
+        if background_numJobs > origNumOff:
+            print >> sys.stderr, "We have only ", origNumOff, "background jobs"
+            print >> sys.stderr, "Error: Specify more lags to get desired "\
+                "number of background jobs: numJobs = ", background_numJobs
+            sys.exit(1)
+    elif FAP or FAR:
+        background_numJobs = 100./(100.0-FAP)
         if background_numJobs > origNumOff:
             print >> sys.stderr, "We have only ", origNumOff, "background jobs"
             print >> sys.stderr, "Error: Specify more lags to get desired "\
@@ -1920,7 +2030,7 @@ if 1:
             if not(cp.has_option('background','numJobs')) or \
                 numOff < background_numJobs:
                 eventListTemp.write(events[idx])
-                numOff += 1
+                numOff += 1*circTimeSlides
 
     eventListTemp.close()
 
