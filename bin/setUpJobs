@@ -7,6 +7,7 @@
 # ---- Import standard modules to the python path.
 import sys, os, shutil, math, random, copy, getopt, re, string, popen2, time
 import ConfigParser, glob, operator, argparse, socket, socket, uuid, pdb
+import numpy as np
 from glue import segments
 #from glue.segmentsUtils import fromsegwizard, tosegwizard
 from glue import pipeline
@@ -1979,13 +1980,22 @@ if 1:
 
 
     # ---- Number of off-source events before we discard any.
-    # This is equivalent to the number of zero and external lags
-    # mulitplied by the number of internal lags
-    circTimeSlides = 1
+    # ---- This is equivalent to the number of zero and external lags
+    # ---- mulitplied by the number of internal lags
+    # See xdetection.m line 1045
+    internalSlides = 1
     if cp.has_option('parameters','circtimeslidestep'):
         circTimeSlides = cp.getint('parameters','circtimeslidestep')
-        circTimeSlides = cp.getint('parameters','blockTime') / circTimeSlides
-    origNumOff = len(events) * circTimeSlides
+        if len(detector) == 1:
+            internalSlides = 1
+        elif len(detector) == 2:
+            internalSlides = np.arange(0,blockTime-2*transientTime-circTimeSlides,circTimeSlides).size
+        elif len(detector) == 3:
+            internalSlides = np.arange(0,blockTime/2-transientTime-circTimeSlides,circTimeSlides).size
+        else:
+            raise ValueError('Circtimeslides not set up for number of detectors given')
+        
+    origNumOff = len(events) * internalSlides
 
     # ---- Keep track of how many off-source jobs we have after
     #     discarding those with bad networks.
@@ -2000,13 +2010,21 @@ if 1:
             print >> sys.stderr, "Error: Specify more lags to get desired "\
                 "number of background jobs: numJobs = ", background_numJobs
             sys.exit(1)
+
     elif FAP or FAR:
-        background_numJobs = 100./(100.0-FAP)
+        if FAP > 50.0:
+            background_numJobs = 2*(100./(100.0-FAP))
+        elif (FAP > 0) and (FAP < 1):
+            background_numJobs = 2 * (100./FAP)
+        else:
+            raise ValueError('FAP number unusual, are you sure this is what you want')
         if background_numJobs > origNumOff:
             print >> sys.stderr, "We have only ", origNumOff, "background jobs"
             print >> sys.stderr, "Error: Specify more lags to get desired "\
                 "number of background jobs: numJobs = ", background_numJobs
             sys.exit(1)
+    else:
+        background_numJobs = origNumOff
 
     # ---- Do these strings contain the ifos in the detector list.
     for idx in range(0,len(networks)):
@@ -2027,10 +2045,9 @@ if 1:
         #      in our selected network we will write out the details
         #      of the corresponding off-source event to a temporary file.
         if numIfo == len(detector):
-            if not(cp.has_option('background','numJobs')) or \
-                numOff < background_numJobs:
+            if numOff < background_numJobs:
                 eventListTemp.write(events[idx])
-                numOff += 1*circTimeSlides
+                numOff += 1*internalSlides
 
     eventListTemp.close()
 
