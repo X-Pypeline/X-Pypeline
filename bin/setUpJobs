@@ -1791,45 +1791,48 @@ if 1:
         ">", "input/time_offsets_off.txt"])
     os.system(awkCommand)
 
-    # ---- Find network for each off-source event using xnetworkselection.m.
-    network_outputFile = 'input/xnetworkselection_offsource.dat'
-
-    xnetworkselectionCall = ' '.join([ "xnetworkselection",
-        detectorStr,
-        "input/trigger_time_off.txt",
-        "input/time_offsets_off.txt",
-        cat1_segment_file_list[0],
-        cat1_segment_file_list[1],
-        cat1_segment_file_list[2],
-        cat1_segment_file_list[3],
-        cat1_segment_file_list[4],
-        cat2_segment_file_list[0],
-        cat2_segment_file_list[1],
-        cat2_segment_file_list[2],
-        cat2_segment_file_list[3],
-        cat2_segment_file_list[4],
-        network_outputFile,
-        str(onSourceBeginOffset),
-        str(onSourceEndOffset),
-        str(transientTime),
-        str(onSourceWindowLength)
-        ])
-
-    print >> sys.stdout, xnetworkselectionCall
-    os.system(xnetworkselectionCall)
-
-    # ---- Discard off-source events which do not contain the ifos in
-    #      our network.
-
     # ---- Read in event_off_source.txt
     fevents = open('input/window_off_source.txt','r')
     events = fevents.readlines()
     fevents.close()
 
-    # ---- Read in network strings from network_outputFile.
-    fnetworks = open(network_outputFile,'r')
-    networks = fnetworks.readlines()
-    fnetworks.close()
+    # ---- Find network for each off-source event using xnetworkselection.m.
+    if not cp.has_option('parameters','makeSimulatedNoise'):
+	network_outputFile = 'input/xnetworkselection_offsource.dat'
+
+	xnetworkselectionCall = ' '.join([ "xnetworkselection",
+	    detectorStr,
+	    "input/trigger_time_off.txt",
+	    "input/time_offsets_off.txt",
+	    cat1_segment_file_list[0],
+	    cat1_segment_file_list[1],
+	    cat1_segment_file_list[2],
+	    cat1_segment_file_list[3],
+	    cat1_segment_file_list[4],
+	    cat2_segment_file_list[0],
+	    cat2_segment_file_list[1],
+	    cat2_segment_file_list[2],
+	    cat2_segment_file_list[3],
+	    cat2_segment_file_list[4],
+	    network_outputFile,
+	    str(onSourceBeginOffset),
+	    str(onSourceEndOffset),
+	    str(transientTime),
+	    str(onSourceWindowLength)
+	    ])
+
+	print >> sys.stdout, xnetworkselectionCall
+	os.system(xnetworkselectionCall)
+
+	# ---- Read in network strings from network_outputFile.
+        fnetworks = open(network_outputFile,'r')
+        networks = fnetworks.readlines()
+        fnetworks.close()
+    else:
+        networks = [''.join(detector)] * len(events)
+
+    # ---- Discard off-source events which do not contain the ifos in
+    #      our network.
 
     eventListTempFilename = "input/window_off_source_temp.txt"
     eventListTemp = open(eventListTempFilename,'w')
