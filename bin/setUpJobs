@@ -15,6 +15,8 @@ from glue import datafind
 from numpy import loadtxt
 
 from XPypeline import xcondor, xparseoutputtype
+from XPypeline.skyutils import skyutils 
+from XPypeline.io import utils
 from gwpy.detector import Channel
 from gwpy.segments import DataQualityFlag
 
@@ -1597,19 +1599,9 @@ for iSeg in range(len(seg)):
     #      single sky position.
     else:
         # ---- Convert right ascension, declination to Earth-fixed coordinates.
-        print >> sys.stdout, "Calling xconvertgrbtoearth ..."
-        xconvert_command = ' '.join([
-            "xconvertgrbtoearth",
-            "input/earthfixedcoordinates" + str(iSeg) +".txt",
-            str(ra),str(decl),str(gpsBlockCenterTime)])
-        os.system(xconvert_command)
+        skyutils.radectoearth(ra, decl, gpsBlockCenterTime, filename='input/earthfixedcoordinates' + str(iSeg) + '.txt')
+        phi, theta = skyutils.radectoearth(ra, decl, gpsBlockCenterTime)
         # ---- Load earth-fixed coordinates back in.
-        fEarthFixed = open('input/earthfixedcoordinates' + str(iSeg) + '.txt','r')
-        phitheta = fEarthFixed.read()
-        fEarthFixed.close()
-        phithetaList = phitheta.split(' ')
-        phi = float(phithetaList[0])
-        theta = float(phithetaList[1])
         print >> sys.stdout, "GRB position in Earth-fixed coordinates (rad):"
         print >> sys.stdout, "    phi = ", phi
         print >> sys.stdout, "    theta = ", theta
@@ -1622,76 +1614,13 @@ for iSeg in range(len(seg)):
         skyPositionList = '[' + str(theta) + ',' + str(phi) + ']'
 
     # ---- Parameters file for on-source analysis.
-    fParam=open('input/parameters_on_source_' + str(iSeg) + '.txt', 'w')
-    # ---- First write framecache file, channel file, event file, and sky position.
-    fParam.write('channelFileName:input/channels.txt' + '\n')
-    fParam.write('frameCacheFile:' + frameCacheAll + '\n')
-    fParam.write('eventFileName:input/event_on_source.txt' + '\n')
-    fParam.write('skyPositionList:' + skyPositionList + '\n')
-    fParam.write('skyCoordinateSystem:earthfixed' + '\n')
-    fParam.write('likelihoodtype:' + likelihoodTypeStr + '\n')
-    # ---- Now write all of the other parameters from the parameters section.
-    #      We ignore the likelihoodType_* lines since this is handled above.
-    for i in range(0,len(parameters)) :
-        if not(parameters[i].startswith("likelihoodtype")):
-            value = cp.get('parameters',parameters[i])
-            if parameters[i] == "onsourceendoffset":
-                fParam.write('onsourceendoffset:' + str(onSourceEndOffset) + '\n')
-            elif parameters[i] == "circtimeslidestep":
-                continue
-            else:
-                fParam.write(parameters[i] + ':' + value + '\n')
-    if outputType == 'seedless' :
-        fParam.write('seedlessparams:input/seedless_onsource.txt\n')
-    fParam.close()
+    utils.write_onsource('input/parameters_on_source_' + str(iSeg) + '.txt', outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, parameters, onSourceEndOffset, cp)
 
     # ---- Parameters file for ul-source analysis.
-    fParam=open('input/parameters_ul_source_' + str(iSeg) + '.txt', 'w')
-    # ---- First write framecache file, channel file, event file, and sky position.
-    fParam.write('channelFileName:input/channels.txt' + '\n')
-    fParam.write('frameCacheFile:' + frameCacheAll + '\n')
-    fParam.write('eventFileName:input/event_on_source.txt' + '\n')
-    fParam.write('skyPositionList:' + skyPositionList + '\n')
-    fParam.write('skyCoordinateSystem:earthfixed' + '\n')
-    fParam.write('likelihoodtype:' + likelihoodTypeStr + '\n')
-    # ---- Now write all of the other parameters from the parameters section.
-    #      We ignore the likelihoodType_* lines since this is handled above.
-    for i in range(0,len(parameters)) :
-        if not(parameters[i].startswith("likelihoodtype") or parameters[i].endswith("ecimateRate")):
-            value = cp.get('parameters',parameters[i])
-            if parameters[i] == "onsourceendoffset":
-                fParam.write('onsourceendoffset:' + str(onSourceEndOffset) + '\n')
-            elif parameters[i] == "circtimeslidestep":
-                continue
-            else:
-                fParam.write(parameters[i] + ':' + value + '\n')
-    fParam.write('decimateRate:100\n')
-    fParam.write('superDecimateRate:100\n')
-    if outputType == 'seedless' :
-        fParam.write('seedlessparams:input/seedless_ul.txt\n')
-    fParam.close()
+    utils.write_ul_source('input/parameters_ul_source_' + str(iSeg) + '.txt',outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, parameters, onSourceEndOffset, cp)
 
     # ---- Parameters file for off-source analysis.
-    fParam=open('input/parameters_off_source_' + str(iSeg) + '.txt', 'w')
-    # ---- First write framecache file, channel file, event file, and sky position.
-    fParam.write('channelFileName:input/channels.txt' + '\n')
-    fParam.write('frameCacheFile:' + frameCacheAll + '\n')
-    fParam.write('eventFileName:input/event_off_source.txt' + '\n')
-    fParam.write('skyPositionList:' + skyPositionList + '\n')
-    fParam.write('skyCoordinateSystem:earthfixed' + '\n')
-    fParam.write('likelihoodtype:' + likelihoodTypeStr + '\n')
-    # ---- Now write all of the other parameters from the parameters section.
-    #      We ignore the likelihoodType_* lines since this is handled above.
-    for i in range(0,len(parameters)) :
-        if not(parameters[i].startswith("likelihoodtype")):
-            value = cp.get('parameters',parameters[i])
-            if parameters[i] == "onsourceendoffset":
-                fParam.write('onsourceendoffset:' + str(onSourceEndOffset) + '\n')
-            else:
-                fParam.write(parameters[i] + ':' + value + '\n')
-    if outputType == 'seedless' :
-        fParam.write('seedlessparams:input/seedless_offsource.txt\n')
-    fParam.close()
+    utils.write_offsource('input/parameters_off_source_' + str(iSeg) + '.txt', outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, parameters, onSourceEndOffset, cp)
 
     # ---- Parameter files for on-the-fly simulated waveform analyses, if requested.
     if cp.has_section('waveforms') :
@@ -1699,11 +1628,11 @@ for iSeg in range(len(seg)):
         #      files will be written.
         waveform_set = cp.options('waveforms')
         # ---- Write one parameters file for each (waveform set, injection scale) pair.
-        for set in waveform_set :
-            if cp.has_section(set) & cp.has_option(set,'injectionScales') :
+        for iwaveform in waveform_set :
+            if cp.has_section(iwaveform) & cp.has_option(iwaveform,'injectionScales') :
                 # ---- This check lets you specify different injection scales and
                 #      spacing for each waveform set.
-                injectionScalesList = cp.get(set,'injectionScales')
+                injectionScalesList = cp.get(iwaveform,'injectionScales')
                 injectionScales = injectionScalesList.split(',')
             else:
                 # ---- Otherwise, use the injection scales and spacing specified in
@@ -1712,74 +1641,7 @@ for iSeg in range(len(seg)):
                 injectionScales = injectionScalesList.split(',')
 
             # ---- If we do long injections we will have one single parameter file
-            if longInjections == True:
-              fParam=open("input/parameters_simulation_" + set + "_0_" + str(iSeg) + ".txt", 'w')
-              # ---- First write framecache file, channel file, event file, and sky position.
-              fParam.write('channelFileName:input/channels.txt' + '\n')
-              fParam.write('frameCacheFile:' + frameCacheAll + '\n')
-              fParam.write('eventFileName:input/event_inj_source.txt' + '\n')
-              fParam.write('catalogdirectory:input/' + '\n')
-              fParam.write('skyPositionList:' + skyPositionList + '\n')
-              fParam.write('skyCoordinateSystem:earthfixed' + '\n')
-              fParam.write('likelihoodtype:' + likelihoodTypeStr + '\n')
-              # ---- Now write all of the other parameters from the parameters section.
-              #      We ignore the likelihoodType_* lines since this is handled above.
-              for i in range(0,len(parameters)) :
-                  if not(parameters[i].startswith("likelihoodtype")) :
-                      value = cp.get('parameters',parameters[i])
-                      if parameters[i] == "outputtype"  and value == "clusters" and not(disableFastInjections):
-                          fParam.write('outputtype:injectionclusters\n')
-                      elif parameters[i] == "onsourceendoffset":
-                          fParam.write('onsourceendoffset:' + str(onSourceEndOffset) + '\n')
-                      elif parameters[i] == "circtimeslidestep":
-                          continue
-                      else:
-                          fParam.write(parameters[i] + ':' + value + '\n')
-
-              # ---- Write simulations info.  The specified injection file
-              #      will be written later.
-              fParam.write('injectionFileName:input/injection_' + set + '.txt' + '\n')
-              fParam.write('injectionScale:' + str(injectionScalesList[:]) + '\n')
-              # fParam.write('catalogdirectory:' + XPIPELINE_ROOT  + '/waveforms\n')
-              if outputType == 'seedless' :
-                  fParam.write('seedlessparams:input/seedless_simulation.txt\n')
-              fParam.close()
-            else:
-              # ---- If not long inj, write a separate parameter file for each injection scale.
-              scale_counter = 0
-              for injectionScale in injectionScales :
-                  fParam=open("input/parameters_simulation_" + set + "_" + str(scale_counter) + "_" + str(iSeg) + ".txt", 'w')
-                  # ---- First write framecache file, channel file, event file, and sky position.
-                  fParam.write('channelFileName:input/channels.txt' + '\n')
-                  fParam.write('frameCacheFile:' + frameCacheAll + '\n')
-                  fParam.write('eventFileName:input/event_inj_source.txt' + '\n')
-                  fParam.write('catalogdirectory:input/' + '\n')
-                  fParam.write('skyPositionList:' + skyPositionList + '\n')
-                  fParam.write('skyCoordinateSystem:earthfixed' + '\n')
-                  fParam.write('likelihoodtype:' + likelihoodTypeStr + '\n')
-                  # ---- Now write all of the other parameters from the parameters section.
-                  #      We ignore the likelihoodType_* lines since this is handled above.
-                  for i in range(0,len(parameters)) :
-                      if not(parameters[i].startswith("likelihoodtype")) :
-                          value = cp.get('parameters',parameters[i])
-                          if parameters[i] == "outputtype"  and value == "clusters" and not(disableFastInjections):
-                              fParam.write('outputtype:injectionclusters\n')
-                          elif parameters[i] == "onsourceendoffset":
-                              fParam.write('onsourceendoffset:' + str(onSourceEndOffset) + '\n')
-                          elif parameters[i] == "circtimeslidestep":
-                              continue
-                          else:
-                              fParam.write(parameters[i] + ':' + value + '\n')
-  
-                  # ---- Write simulations info.  The specified injection file
-                  #      will be written later.
-                  fParam.write('injectionFileName:input/injection_' + set + '.txt' + '\n')
-                  fParam.write('injectionScale:' + str(injectionScale) + '\n')
-                  # fParam.write('catalogdirectory:' + XPIPELINE_ROOT  + '/waveforms\n')
-                  if outputType == 'seedless' :
-                      fParam.write('seedlessparams:input/seedless_simulation.txt\n')
-                  fParam.close()
-                  scale_counter = scale_counter + 1
+            utils.write_waveforms("input/parameters_simulation_" + iwaveform + "_0_" + str(iSeg) + ".txt", outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, parameters, onSourceEndOffset, cp, injectionScalesList, disableFastInjections, iwaveform)
 
 f.close()
 fseg.close()

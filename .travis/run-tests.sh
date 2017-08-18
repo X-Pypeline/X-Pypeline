@@ -7,5 +7,5 @@ else
     _strict=""
 fi
 
-coverage run -m py.test -v -r s ${_strict} pyomega/
+coverage run -m py.test -v -r s ${_strict} XPypeline/
 coverage run --append `which setUpJobs` --help
