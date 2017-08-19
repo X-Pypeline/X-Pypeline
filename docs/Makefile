@@ -2,7 +2,7 @@
 #
 
 # You can set these variables from the command line.
-SPHINXOPTS    =
+SPHINXOPTS    = 
 SPHINXBUILD   = sphinx-build
 PAPER         =
 BUILDDIR      = _build
@@ -224,6 +224,6 @@ pseudoxml:
 
 .PHONY: apidoc
 apidoc:
-	sphinx-apidoc -o api/ ../XPypeline --no-toc --separate --no-headings --force  --verbose
+	sphinx-apidoc -o api/ ../XPypeline --no-toc --separate --no-headings --force
 	@echo
 	@echo "APIdoc run is complete."
