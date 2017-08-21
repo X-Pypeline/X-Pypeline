@@ -1244,8 +1244,6 @@ if cp.has_option('mdc','mdc_sets') :
 
 # ---- Status message.
 print >> sys.stdout, "Writing on-source event file ...          "
-import pdb
-pdb.set_trace()
 
 # ---- Now make segment lists for coincidence operation.  First determine
 #      segment list for zero lag, and verify that the on-source time is
