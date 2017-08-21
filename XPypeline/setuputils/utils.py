@@ -18,7 +18,8 @@
 
 """This module contains utility functions for setUpJobs 
 """
-from gwpy.segments import DataQualityDict, SegmentList, Segment
+from gwpy.segments import DataQualityDict, SegmentList, DataQualityFlag
+import operator
 
 def validate_segments(ifos, start, end, cp):
     """determine analysis ready segments during requested analysis time
@@ -53,7 +54,6 @@ def validate_segments(ifos, start, end, cp):
             f.close()
             analysis_seg_files.append('segments_{0}.txt'.format(ifo))
     else:
-        vdf = DataQualityDict.from_veto_definer_file(cp.get('segfind', 'segment-file'))
         for ifo in ifos:
             if cp.has_option(ifo,'segment-list'):
                 if not os.path.isfile(cp.get(ifo,'segment-list')):
@@ -61,7 +61,7 @@ def validate_segments(ifos, start, end, cp):
                                      'the segment file in ini file '
                                      'as it does not exist. '
                                      'If you want to use a '
-                                     'supplied file please provide one.'
+                                     'supplied file please provide one.')
                 else:
                     analysis_seg_files.append(cp.get(ifo,'segment-list'))
             else:
@@ -72,18 +72,19 @@ def validate_segments(ifos, start, end, cp):
                 vdf = DataQualityDict.from_veto_definer_file(cp.get('segfind', 'veto-file'))
 
                 # Query for cat 1 flags
-                vdf.populate(segments=analysis_ready)
+                vdf.populate(segments=analysis_ready.active)
                 cat = [1]
-                segs = reduce(operator.or_, [f.active for f in vdf if f.ifo == ifo and f.category in cat], SegmentList())
+                segs = reduce(operator.or_, [f.active for f in vdf.values() if f.ifo == ifo and f.category in cat], SegmentList())
 
                 # ---- Write out cat1 veto to text file.
                 filename_cat1 = "input/" + ifo +  "-veto-cat1.txt"
                 segs.write(filename_cat1)
 
-                # Subtract analysis ready time from cat 1 veto
-                analysis_ready_minus_cat1 = analysis_ready.in_segmentlist(~segs.active)
+                # Subtract cat 1 veto from analysis_ready
+                analysis_ready_minus_cat1 = analysis_ready.active - segs
                 # Save new segment list to file
                 filename_analysis_ready_minus_cat1 = "input/" + ifo + "_science_cat1.txt"
+                analysis_ready_minus_cat1.write(filename_analysis_ready_minus_cat1)
                 analysis_seg_files.append(filename_analysis_ready_minus_cat1)
 
     return analysis_seg_files
@@ -126,7 +127,7 @@ def validate_vetos(ifos, start, end, cp):
                                      'the veto file in ini file '
                                      'as it does not exist. '
                                      'If you want to use a '
-                                     'supplied file please provide one.'
+                                     'supplied file please provide one.')
                 else:
                     veto_seg_files.append(cp.get(ifo,'veto-list'))
             else:
@@ -134,14 +135,14 @@ def validate_vetos(ifos, start, end, cp):
                 analysis_ready = DataQualityFlag.query('{0}:DMT-ANALYSIS_READY:1'.format(ifo), start, end)
                 # Query for vetos
                 vdf = DataQualityDict.from_veto_definer_file(cp.get('segfind', 'veto-file'))
-                vdf.populate(segments=analysis_ready)
+                vdf.populate(segments=analysis_ready.active)
                 cat  = [2, 4]
                 for iCat in cat:
-                    segs = reduce(operator.or_, [f.active for f in vdf if f.ifo == ifo and f.category in iCat], SegmentList())
+                    segs = reduce(operator.or_, [f.active for f in vdf.values() if f.ifo == ifo and f.category == iCat], SegmentList())
                     filename = "input/" + ifo +  "-veto-cat{0}.txt".format(iCat)
                     segs.write(filename)
 
-                segs = reduce(operator.or_, [f.active for f in vdf if f.ifo == ifo and f.category in cat], SegmentList())
+                segs = reduce(operator.or_, [f.active for f in vdf.values() if f.ifo == ifo and f.category in cat], SegmentList())
                 filename = "input/" + ifo + "_cat24veto.txt"
                 segs.write(filename)
                 veto_seg_files.append(filename)

@@ -494,6 +494,8 @@ channelListLine   = cp.get('input','channelList')
 channelList       = channelListLine.split(',')
 frameTypeListLine = cp.get('input','frameTypeList')
 frameTypeList     = frameTypeListLine.split(',')
+detectorListLine  = cp.get('input','detectorList')
+detectorList      = detectorListLine.split(',')
 
 # ---- Interval of data to be analysed.
 # ---- Allow for asymmetric background analyses, if needed by the online analysis
@@ -513,6 +515,21 @@ else:
 	sys.exit(1)
 duration = int(end_time - start_time)
 
+
+# ---- We will copy all ifo data and mdc frame caches to the location
+#      stored in frameCacheAll.
+frameCacheAll = 'input/framecache.txt'
+
+# ---- Check for frame cache for real ifo data
+try:
+    dataFrameCache = cp.get('input','frameCacheFile')
+except:
+    print >> sys.stdout, "Warning: No frameCacheFile file specified in " \
+        "[input] section of configuration file."
+    print >> sys.stdout, "        A frameCache for the ifo data file will be " \
+        "generated automatically."
+    dataFrameCache = None
+
 # ---- Check for a seed value for matlab's random number generator.
 try:
     seed = int(cp.get('parameters','seed'))
@@ -531,6 +548,45 @@ print >> sys.stdout, "... finished parsing parameters (ini) file."
 print >> sys.stdout
 
 # -------------------------------------------------------------------------
+#      Validate list of detectors given.
+# -------------------------------------------------------------------------
+
+# ---- KLUDGE:TODO: Move this below automatic network selection so that we
+#      only perform this once???
+
+# ---- Status message.
+print >> sys.stdout, "Comparing requested network to list of known detectors ..."
+
+# ---- For each detector specified with the --detector option, compare to
+#      the list of known detectors from the .ini file.  Keep only the requested
+#      detectors and corresponding channel name and frame type.
+#      KLUDGE:TODO: Should exit with error message if any of the detectors
+#      is not recognized.
+# ---- Indices of the detectors requested for this analysis.
+keepIndex = []
+for i in range(0,len(detector)) :
+    for ii in range(0,len(detectorList)) :
+        if detector[i] == detectorList[ii] :
+            keepIndex.append(ii)
+# ---- Sort indices so that order matches that used in ini file.
+keepIndex.sort()
+# ---- We now have a list of the indices of the detectors requested for the
+#      analysis.  Keep only these.  Note that we over-write the 'detector'
+#      list because we want to make sure the order matches the channel and
+#      frameType lists.
+detector  = []
+channel   = []
+frameType = []
+for jj in range(0,len(keepIndex)):
+    detector.append(detectorList[keepIndex[jj]])
+    channel.append(channelList[keepIndex[jj]])
+    frameType.append(frameTypeList[keepIndex[jj]])
+
+# ---- Status message.
+print >> sys.stdout, "... finished validating network.          "
+print >> sys.stdout
+
+# -------------------------------------------------------------------------
 #      Retrieve single-IFO segment lists for analysis period.
 # -------------------------------------------------------------------------
 
@@ -543,11 +599,14 @@ time_range_string = '1 ' + str(start_time) + ' ' + str(end_time) + ' ' + str(dur
 f.write(time_range_string)
 f.close()
 
+# ---- Read full analysis time range back in to a ScienceData object for easy manipulation.
+analysis_segment = pipeline.ScienceData()
+
 # ---- Prepare storage for full segment lists.
 full_segment_list = []
 # ---- Prepare storage for lists of analysis and veto segment filenames.
-analysis_seg_files = setuputils.validate_segments((detector, start_time, end_time, cp)
-veto_seg_files     = setuputils.validate_vetos(detector, start_time, end_time, cp)
+analysis_seg_files = setuputils.validate_segments(detector, start_time, end_time, cp)
+veto_seg_files = setuputils.validate_vetos(detector, start_time, end_time, cp)
 
 # ---- Read in segment_lists to ScienceData object.
 for ifoIdx in range(0,len(detector)):
@@ -574,7 +633,7 @@ for ifoIdx in range(0,len(detector)):
 #      statement since we need these to test the off-source segments.
 # ---- Get cat1 and cat2 segment files for all 5 ifos.
 #      Use 'None' when no file exists.
-all_detectors = ['H1', 'H2', 'L1', 'G1', 'V1']
+all_detectors = lal.cached_detector_by_prefix.keys()
 cat1_segment_file_list = []
 cat2_segment_file_list = []
 for ifo in all_detectors:
@@ -698,22 +757,22 @@ elif len(detector) ==1:
     likelihoodType = "likelihoodType_1det1site"
 
 elif len(detector) ==2:
-    print >> sys.stdout, "Two misaligned ifos in network: ", virtualDetector
+    print >> sys.stdout, "Two misaligned ifos in network: ", detector
     lagType = "lags_2det2site"
     likelihoodType = "likelihoodType_2det2site"
 
 elif len(detector) ==3:
-    print >> sys.stdout, "Three ifos at three sites: ", virtualDetector
+    print >> sys.stdout, "Three ifos at three sites: ", detector
     lagType = "lags_3det3site"
     likelihoodType = "likelihoodType_3det3site"
 
 elif len(detector) ==4:
-    print >> sys.stdout, "Four ifos at four sites: ", virtualDetector
+    print >> sys.stdout, "Four ifos at four sites: ", detector
     lagType = "lags_4det4site"
     likelihoodType = "likelihoodType_4det4site"
 
 elif len(detector) ==5:
-    print >> sys.stdout, "Five ifos at five sites: ", virtualDetector
+    print >> sys.stdout, "Five ifos at five sites: ", detector
     lagType = "lags_5det5site"
     likelihoodType = "likelihoodType_5det5site"
 
@@ -723,9 +782,9 @@ elif len(detector) ==5:
 
 # ---- Initialise tilde-separated list of sites.
 siteStrTilde = ''
-for iDet in range(0,len(virtualDetector)):
+for iDet in range(0,len(detector)):
    # ---- Get name of current site from current (virtual) detector.
-   siteTemp = virtualDetector[iDet][0]
+   siteTemp = detector[iDet][0]
    # ---- Add current site to list only if does not already appear in it.
    if siteStrTilde.count(siteTemp)==0:
       siteStrTilde = '~'.join([siteStrTilde,siteTemp])
@@ -879,7 +938,7 @@ print >> sys.stdout, "Writing Matlab-formatted channel file ...      "
 #      and virtual channel name to the channels file to be read by xdetection.
 f=open('input/channels.txt', 'w')
 for i in range(0,len(detector)) :
-    f.write(detector[i] + ':' + channel[i] + ' ' + frameType[i] + ' ' + virtualDetector[i] + ':' + channel[i] + '\n')
+    f.write(detector[i] + ':' + channel[i] + ' ' + frameType[i] + ' ' + detector[i] + ':' + channel[i] + '\n')
 f.close()
 
 # ---- Status message.
@@ -977,14 +1036,14 @@ if cp.has_option('mdc','mdc_sets') :
                     if not mdcFrameCache:
                         # ---- Status message.
                         print >> sys.stdout, "Writing MDC framecache file for " \
-                            "mdcset: " + set + ", ifo: " + virtualDetector[i] + " ..."
+                            "mdcset: " + set + ", ifo: " + detector[i] + " ..."
                         # ---- Clear away any pre-existing mdcframecache files.
                         os.system('rm -f mdcframecache_temp.txt')
 
                         # ---- Construct dataFind command.
                         dataFindCommand = ' '.join([datafind_exec,
                         "--server", datafind_server,
-                        "--observatory",virtualDetector[i][0],
+                        "--observatory",detector[i][0],
                         "--type",mdcFrameType[i],
                         "--gps-start-time", str(start_time),
                         "--gps-end-time",str(end_time),
@@ -1185,6 +1244,8 @@ if cp.has_option('mdc','mdc_sets') :
 
 # ---- Status message.
 print >> sys.stdout, "Writing on-source event file ...          "
+import pdb
+pdb.set_trace()
 
 # ---- Now make segment lists for coincidence operation.  First determine
 #      segment list for zero lag, and verify that the on-source time is
