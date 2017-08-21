@@ -9,14 +9,19 @@ import sys, os, shutil, math, random, copy, getopt, re, string, popen2, time
 import ConfigParser, glob, operator, argparse, socket, socket, uuid, pdb
 import numpy as np
 from glue import segments
-#from glue.segmentsUtils import fromsegwizard, tosegwizard
 from glue import pipeline
 from glue import datafind
 from numpy import loadtxt
 
+import lal
+
+import json
+
 from XPypeline import xcondor, xparseoutputtype
 from XPypeline.skyutils import skyutils 
-from XPypeline.io import utils
+from XPypeline.io import utils as ioutils
+from XPypeline.setuputils import utils as setuputils
+
 from gwpy.detector import Channel
 from gwpy.segments import DataQualityFlag
 
@@ -283,6 +288,19 @@ minimalMem = args.minimalMem
 FAR = args.FAR
 FAP = args.FAP
 
+
+#
+#    Validating inputs
+#
+
+for iDet in detector:
+    if not iDet in lal.cached_detector_by_prefix.keys():
+        raise ValueError('One of the detectors '
+                        'supplied at command line is not '
+                        'a valid detector. Valid detectors '
+                        'include {0}'.format(
+                        lal.cached_detector_by_prefix.keys()))
+
 #
 #    Naming defaults
 #
@@ -451,10 +469,13 @@ if (seed > pow(2,31)-2) or (seed < 0):
 
 # ---- Read needed variables from [parameters] and [background] sections.
 background_period = cp.getint('background','backgroundPeriod')
+
 if cp.has_option('parameters','doAsymmetricBackground') :
     doAsymmetricBackground   = cp.getint('parameters','doAsymmetricBackground')
+
 if cp.has_option('parameters','backgroundAsymmetryFactor') :
     backgroundAsymmetryFactor = cp.getfloat('parameters', 'backgroundAsymmetryFactor')
+
 blockTime         =  cp.getint('parameters','blockTime')
 whiteningTime     =  cp.getfloat('parameters','whiteningTime')
 transientTime     =  4 * whiteningTime
@@ -464,7 +485,7 @@ onSourceEndOffset   = max(onSourceEndOffset,manualEndOffset)
 onSourceTimeLength = onSourceEndOffset - onSourceBeginOffset
 outputType = cp.get('parameters','outputType')
 xparseoutputtype.parse(outputType,cp)
-jobsPerWindow=int(math.ceil(float(onSourceTimeLength)/float(blockTime-2*transientTime)))
+jobsPerWindow = int(math.ceil(float(onSourceTimeLength)/float(blockTime-2*transientTime)))
 onSourceWindowLength=2*transientTime+jobsPerWindow*(blockTime-2*transientTime)
 minimumFrequency = cp.getint('parameters','minimumFrequency')
 maximumFrequency = cp.getint('parameters','maximumFrequency')
@@ -478,60 +499,19 @@ frameTypeList     = frameTypeListLine.split(',')
 # ---- Allow for asymmetric background analyses, if needed by the online analysis
 # ---- Flag to be read from ini file
 if doAsymmetricBackground == 0:
-	print >> sys.stdout, "Running analysis with symmetric background"
-	start_time = int(trigger_time - background_period / 2)
-	end_time = int(trigger_time + background_period / 2)
+    print >> sys.stdout, "Running analysis with symmetric background"
+    start_time = int(trigger_time - background_period / 2)
+    end_time = int(trigger_time + background_period / 2)
 # ---- introduce fractional background asymmetry
 else:
-	if backgroundAsymmetryFactor < 1.0:
-		print >> sys.stdout, "CAUTION: Running analysis with asymmetric background"
-        	start_time = int(trigger_time - background_period*backgroundAsymmetryFactor)
-        	end_time = int(trigger_time + background_period*(1.0 - backgroundAsymmetryFactor))
-	else:
-		print >> sys.stderr, "ERROR: Running analysis with asymmetric background but with wrong fractional asymmetry. backgroundAsymmetryFactor should be less than 1.0"
-		sys.exit(1)
+    if backgroundAsymmetryFactor < 1.0:
+        print >> sys.stdout, "CAUTION: Running analysis with asymmetric background"
+        start_time = int(trigger_time - background_period*backgroundAsymmetryFactor)
+        end_time = int(trigger_time + background_period*(1.0 - backgroundAsymmetryFactor))
+    else:
+        print >> sys.stderr, "ERROR: Running analysis with asymmetric background but with wrong fractional asymmetry. backgroundAsymmetryFactor should be less than 1.0"
+	sys.exit(1)
 duration = int(end_time - start_time)
-
-
-###### Clean start here
-# ---- We will copy all ifo data and mdc frame caches to the location
-#      stored in frameCacheAll.
-frameCacheAll = 'input/framecache.txt'
-
-# ---- Read [input] channel parameters.
-detectorListLine  = cp.get('input','detectorList')
-detectorList      = detectorListLine.split(',')
-virtualDetectorList = detectorList
-if cp.has_option('input','virtualDetectorList') :
-    virtualDetectorListLine   = cp.get('input','virtualDetectorList')
-    virtualDetectorList       = virtualDetectorListLine.split(',')
-    print >> sys.stdout,     " "
-    print >> sys.stdout,     "********************************************************************************"
-    print >> sys.stdout,     "  WARNING: using virtual detectors. "
-    print >> sys.stdout,     "       real detector network:", detectorList
-    print >> sys.stdout,     "    virtual detector network:", virtualDetectorList
-    print >> sys.stdout,     "  The real detector list will be used for segments, frame finding, data quality"
-    print >> sys.stdout,     "  criteria, and calibration uncertainties. The virtual detector list will be" 
-    print >> sys.stdout,     "  used for the search sky grid and determining likelihoods, lag files, and MDC" 
-    print >> sys.stdout,     "  frames. The channels.txt file will contain both lists."
-    print >> sys.stdout,     "********************************************************************************"
-    print >> sys.stdout,     " "
-channelListLine   = cp.get('input','channelList')
-channelList       = channelListLine.split(',')
-frameTypeListLine = cp.get('input','frameTypeList')
-frameTypeList     = frameTypeListLine.split(',')
-
-# ---- Variables that may or may not be defined in .ini file:
-
-# ---- Check for frame cache for real ifo data
-try:
-    dataFrameCache = cp.get('input','frameCacheFile')
-except:
-    print >> sys.stdout, "Warning: No frameCacheFile file specified in " \
-        "[input] section of configuration file."
-    print >> sys.stdout, "        A frameCache for the ifo data file will be " \
-        "generated automatically."
-    dataFrameCache = None
 
 # ---- Check for a seed value for matlab's random number generator.
 try:
@@ -546,64 +526,8 @@ if (seed > pow(2,31)-2) or (seed < 0):
     print >> sys.stderr,"Error: seed must have value between 0 and 2^31-2"
     sys.exit(1)
 
-# ---- Get datafind server.
-try:
-    datafind_server = cp.get('datafind','datafind_server')
-except:
-    datafind_server = os.environ['LIGO_DATAFIND_SERVER']
-# ---- Get datafind executable e.g., ligo_data_find.
-datafind_exec = cp.get("datafind", 'datafind_exec')
-# ---- Get segfind executable e.g., ligolw_segment_query.
-segfind_exec = cp.get("datafind", "segfind_exec")
-# ---- Get segs_from_cats executable e.g., ligolw_ligolw_segments_from_cats.
-segs_from_cats_exec = cp.get("datafind", "segs_from_cats_exec")
-# ---- Get ligolw_print executable e.g., ligolw_print.
-ligolw_print_exec = cp.get("datafind", "ligolw_print_exec")
-
 # ---- Status message.
 print >> sys.stdout, "... finished parsing parameters (ini) file."
-print >> sys.stdout
-
-
-# -------------------------------------------------------------------------
-#      Validate list of detectors given.
-# -------------------------------------------------------------------------
-
-# ---- KLUDGE:TODO: Move this below automatic network selection so that we
-#      only perform this once???
-
-# ---- Status message.
-print >> sys.stdout, "Comparing requested network to list of known detectors ..."
-
-# ---- For each detector specified with the --detector option, compare to
-#      the list of known detectors from the .ini file.  Keep only the requested
-#      detectors and corresponding channel name and frame type.
-#      KLUDGE:TODO: Should exit with error message if any of the detectors
-#      is not recognized.
-# ---- Indices of the detectors requested for this analysis.
-keepIndex = []
-for i in range(0,len(detector)) :
-    for ii in range(0,len(detectorList)) :
-        if detector[i] == detectorList[ii] :
-            keepIndex.append(ii)
-# ---- Sort indices so that order matches that used in ini file.
-keepIndex.sort()
-# ---- We now have a list of the indices of the detectors requested for the
-#      analysis.  Keep only these.  Note that we over-write the 'detector'
-#      list because we want to make sure the order matches the channel and
-#      frameType lists.
-detector  = []
-virtualDetector  = []
-channel   = []
-frameType = []
-for jj in range(0,len(keepIndex)):
-    detector.append(detectorList[keepIndex[jj]])
-    virtualDetector.append(virtualDetectorList[keepIndex[jj]])
-    channel.append(channelList[keepIndex[jj]])
-    frameType.append(frameTypeList[keepIndex[jj]])
-
-# ---- Status message.
-print >> sys.stdout, "... finished validating network.          "
 print >> sys.stdout
 
 # -------------------------------------------------------------------------
@@ -618,179 +542,12 @@ f=open('input/gps_range.txt', 'w')
 time_range_string = '1 ' + str(start_time) + ' ' + str(end_time) + ' ' + str(duration) + '\n'
 f.write(time_range_string)
 f.close()
-# ---- Read full analysis time range back in to a ScienceData object for easy manipulation.
-analysis_segment = pipeline.ScienceData()
-analysis_segment.read( 'input/gps_range.txt', blockTime )
 
 # ---- Prepare storage for full segment lists.
 full_segment_list = []
 # ---- Prepare storage for lists of analysis and veto segment filenames.
-analysis_seg_files = []
-veto_seg_files     = []
-
-# If simulating noise skip all segment and veto related stuff
-if cp.has_option('parameters','makeSimulatedNoise'):
-    for ifoIdx in range(0,len(detector)):
-            ifo = detector[ifoIdx]
-            print 'Making simulated noise, creating temp seg file'
-            background_duration = cp.getint('background','backgroundPeriod')
-            startOfSeg = int(trigger_time) - background_duration/2 -1000
-            endOfSeg = int(trigger_time) + background_duration/2 +1000
-            f = open('segments_{0}.txt'.format(ifo),'w')
-            f.write('0 {0} {1} {2}'.format(startOfSeg, endOfSeg ,endOfSeg - startOfSeg))
-            f.close()
-            analysis_seg_files.append('segments_{0}.txt'.format(ifo))
-            veto_seg_files.append("None")
-
-else:
-    # ---- If generateSegs ==0 then user should have supplied segment-list and
-    #      veto-list for each ifo used.
-    if int(cp.get('segfind','generateSegs'))==0:
-	# ---- Loop over ifos we are considering.
-	for ifoIdx in range(0,len(detector)):
-	    ifo = detector[ifoIdx]
-
-	    print 'Retrieving analysis segment list for ', ifo
-	    # ---- Get name of segment file and check that it exists.
-	    analysis_seg_files.append(cp.get(ifo,'segment-list'))
-	    if not os.path.isfile(analysis_seg_files[ifoIdx]):
-		print >> sys.stderr,"Error: non existent segment list file: ", \
-		    analysis_seg_files[ifoIdx]
-		sys.exit(1)
-
-	    print 'Retrieving veto segment list for ', ifo
-	    # ---- Get name of veto file and check that it exists.
-	    if cp.has_option(ifo, "veto-list"):
-		veto_seg_files.append(cp.get(ifo, "veto-list"))
-		if not os.path.isfile(veto_seg_files[ifoIdx]):
-		    print >> sys.stderr,"Error: non existent veto list file: ", \
-			veto_seg_files[ifoIdx]
-		    sys.exit(1)
-	    else:
-		veto_seg_files.append("None")
-
-    # ---- If generateSegs ~= 0 then we will generate segment-list and veto-list
-    #      for each ifo.
-    else:
-	print 'Generating veto segment lists for all ifos '
-	# ---- Set output dir for cat 1,2,3,4,5 veto files
-	segs_from_cats_output_dir = "input/"
-	if not(segs_from_cats_output_dir.endswith('/')):
-	    segs_from_cats_output_dir = segs_from_cats_output_dir + "/"
-
-	# ---- Run segs_from_cats_exec to determine cat 1,2,3,4,5 vetos
-	segs_from_cats_call = ' '.join([ segs_from_cats_exec,
-	    "--segment-url", cp.get("segfind", "segment-url"),
-	    "--veto-file", cp.get("segfind", "veto-file"),
-	    "--gps-start-time", str(start_time),
-	    "--gps-end-time", str(end_time),
-	    "--output-dir", segs_from_cats_output_dir,
-	    "--separate-categories"])
-	if cp.has_option("segfind","useDMTFile"): 
-	    if int(cp.get("segfind","useDMTFile")):
-		segs_from_cats_call = ' '.join([segs_from_cats_call, "--dmt-file"])
-	print >> sys.stdout, segs_from_cats_call
-	os.system(segs_from_cats_call)
-
-	for ifoIdx in range(0,len(detector)):
-	    ifo = detector[ifoIdx]
-
-	    vetoTags = [1,2,4]
-	    for catIdx in vetoTags:
-
-		# ---- Construct name of veto files.
-		vetocat_filename = ''.join([segs_from_cats_output_dir,ifo,
-		    "-VETOTIME_CAT",str(catIdx),"-",str(start_time),"-",str(duration)])
-		vetocat_filename_XML = vetocat_filename + ".xml"
-		vetocat_filename_TXT = ''.join(["input/",ifo,"-veto-cat",str(catIdx),".txt"])
-
-		# ---- Check file exists.
-		if not(os.path.isfile(vetocat_filename_XML)):
-		    print >> sys.stderr, "Error: Problem creating veto file:", \
-			vetocat_filename_XML
-		    sys.exit(1)
-
-		# ---- Convert XML file to TXT format.
-		segsToTxtCall = ' '.join([ ligolw_print_exec,
-		    "--table segment --column start_time --column end_time",
-		    "--delimiter ' '",
-		    vetocat_filename_XML,
-		    "| awk '{print NR  \" \" $1 \" \" $2 \" \" $2-$1}' >",
-		    vetocat_filename_TXT ])
-		os.system(segsToTxtCall)
-
-	    print 'Generating science segment list for ', ifo
-	    seg_filename     = ''.join(["input/",ifo,"-seg"])
-	    seg_filename_XML = ''.join([seg_filename,".xml"])
-	    seg_filename_TXT = ''.join([seg_filename,".txt"])
-
-	    segFindCommand = ' '.join([segfind_exec,
-		"--query-segments",
-		"--segment-url", cp.get("segfind", "segment-url"),
-		"--gps-start-time", str(start_time),
-		"--gps-end-time", str(end_time),
-		"--include-segments", cp.get(ifo, "include-segments"),
-		"--output-file", seg_filename_XML ])
-	    if cp.has_option("segfind","useDMTFile"): 
-		if int(cp.get("segfind","useDMTFile")):
-		    segFindCommand = ' '.join([segFindCommand, "--dmt-file"])
-	    print >> sys.stdout, segFindCommand
-	    os.system(segFindCommand);
-	    print '... finished generating segment list.'
-
-	    print 'Converting segment list from XML to TXT file: '
-	    segsToTxtCall = ' '.join([ ligolw_print_exec,
-		"--table segment",
-		"--column start_time",
-		"--column end_time",
-		"--delimiter",
-		"' '",
-		seg_filename_XML,
-		"| awk '{print NR  \" \" $1 \" \" $2 \" \" $2-$1}' >",
-		seg_filename_TXT ])
-	    os.system(segsToTxtCall)
-	    print '... finished converting segment list to TXT file.'
-
-	    # ---- Read in science and veto segments.
-	    sciseg   = fromsegwizard(open(seg_filename_TXT)); sciseg.coalesce()
-	    cat1veto = fromsegwizard(open("input/"+ifo+"-veto-cat1.txt")); cat1veto.coalesce()
-	    cat2veto = fromsegwizard(open("input/"+ifo+"-veto-cat2.txt")); cat2veto.coalesce()
-	    cat4veto = fromsegwizard(open("input/"+ifo+"-veto-cat4.txt")); cat4veto.coalesce()
-
-	    # ---- Subtract cat1veto flags from the science segments.
-	    sciseg_cat1 = sciseg - cat1veto; sciseg_cat1.coalesce()
-
-	    # ---- Write out newly constructed segment list.
-	    filename = ''.join(["input/",ifo,"_science_cat1.txt"])
-	    print 'Writing file: ', filename
-	    f = open(filename,"w"); tosegwizard(f,sciseg_cat1); f.flush(); f.close()
-	    analysis_seg_files.append(filename)
-
-	    # ---- Add cat2veto and cat4veto segments for each ifo.
-	    cat24veto = cat2veto + cat4veto; cat24veto.coalesce()
-	    # ---- Write out newly constructed veto list.
-	    filename = ''.join(["input/",ifo,"_cat24veto.txt"])
-	    print 'Writing file: ', filename
-	    f = open(filename,"w"); tosegwizard(f,cat24veto); f.flush(); f.close()
-	    veto_seg_files.append(filename)
-
-# ---- Read in segment_lists to ScienceData object.
-for ifoIdx in range(0,len(detector)):
-    ifo = detector[ifoIdx]
-
-    # ---- Read full segment list into a ScienceData object for easy
-    #      manipulation.  Throw away science segment shorter than the
-    #      blockTime value read from the configuration file.
-    print 'Reading segment list from file ', analysis_seg_files[ifoIdx]
-    full_segment = pipeline.ScienceData()
-    full_segment.read( analysis_seg_files[ifoIdx], blockTime )
-    print '... finished reading segment list.'
-
-    # ---- Now restrict to desired analysis time range around trigger_time.
-    full_segment.intersection(analysis_segment)
-    # ---- Finally, append segment for this detector to the full list.
-    full_segment_list.append(full_segment)
-
+analysis_seg_files = setuputils.validate_segments((detector, start_time, end_time, cp)
+veto_seg_files     = setuputils.validate_vetos(detector, start_time, end_time, cp)
 
 # ---- Read in segment_lists to ScienceData object.
 for ifoIdx in range(0,len(detector)):
@@ -1614,13 +1371,13 @@ for iSeg in range(len(seg)):
         skyPositionList = '[' + str(theta) + ',' + str(phi) + ']'
 
     # ---- Parameters file for on-source analysis.
-    utils.write_onsource('input/parameters_on_source_' + str(iSeg) + '.txt', outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, parameters, onSourceEndOffset, cp)
+    ioutils.write_onsource('input/parameters_on_source_' + str(iSeg) + '.txt', outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, parameters, onSourceEndOffset, cp)
 
     # ---- Parameters file for ul-source analysis.
-    utils.write_ul_source('input/parameters_ul_source_' + str(iSeg) + '.txt',outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, parameters, onSourceEndOffset, cp)
+    ioutils.write_ul_source('input/parameters_ul_source_' + str(iSeg) + '.txt',outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, parameters, onSourceEndOffset, cp)
 
     # ---- Parameters file for off-source analysis.
-    utils.write_offsource('input/parameters_off_source_' + str(iSeg) + '.txt', outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, parameters, onSourceEndOffset, cp)
+    ioutils.write_offsource('input/parameters_off_source_' + str(iSeg) + '.txt', outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, parameters, onSourceEndOffset, cp)
 
     # ---- Parameter files for on-the-fly simulated waveform analyses, if requested.
     if cp.has_section('waveforms') :
@@ -1641,7 +1398,7 @@ for iSeg in range(len(seg)):
                 injectionScales = injectionScalesList.split(',')
 
             # ---- If we do long injections we will have one single parameter file
-            utils.write_waveforms("input/parameters_simulation_" + iwaveform + "_0_" + str(iSeg) + ".txt", outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, parameters, onSourceEndOffset, cp, injectionScalesList, disableFastInjections, iwaveform)
+            ioutils.write_waveforms("input/parameters_simulation_" + iwaveform + "_0_" + str(iSeg) + ".txt", outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, parameters, onSourceEndOffset, cp, injectionScalesList, disableFastInjections, iwaveform)
 
 f.close()
 fseg.close()
