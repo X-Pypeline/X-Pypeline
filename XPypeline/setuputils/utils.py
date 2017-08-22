@@ -21,7 +21,7 @@
 from gwpy.segments import DataQualityDict, SegmentList, DataQualityFlag
 import operator
 
-def validate_segments(ifos, start, end, cp):
+def validate_segments(ifos, start, end, cp, trigger_time=None):
     """determine analysis ready segments during requested analysis time
     Parameters
     ----------
@@ -33,6 +33,8 @@ def validate_segments(ifos, start, end, cp):
     end : `float`, `~gwpy.time.LIGOTimeGPS`
 
     cp : `object` ConfigParser object
+
+    trigger_time
 
     Returns
     -------
