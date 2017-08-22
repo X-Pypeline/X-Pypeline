@@ -17,11 +17,11 @@ import lal
 
 import json
 
-from XPypeline import xcondor, xparseoutputtype, log
+from XPypeline import xcondor, xparseoutputtype
 from XPypeline.skyutils import skyutils 
 from XPypeline.io import utils as ioutils
 from XPypeline.setuputils import utils as setuputils
-from XPypeline.setuputils import xnetworkselection
+from XPypeline.setuputils import xnetworkselection, log
 
 from gwpy.detector import Channel
 from gwpy.segments import SegmentList, Segment
@@ -352,30 +352,30 @@ logger.info("####################################################")
 logger.info("\n")
 logger.info("Parsed input arguments:")
 logger.info("\n")
-logger.info(    "     parameters file:", params_file)
-logger.info(    "        trigger time:", trigger_time)
-logger.info(    "        trigger name:", grb_name)
-logger.info(    "     right ascension:", ra)
-logger.info(    "         declination:", decl)
-logger.info(    "         sky pos err:", sky_pos_err)
+logger.info("     parameters file: {0}".format(params_file))
+logger.info("        trigger time: {0}".format(trigger_time))
+logger.info("        trigger name: {0}".format(grb_name))
+logger.info("     right ascension: {0}".format(ra))
+logger.info("         declination: {0}".format(decl))
+logger.info("         sky pos err: {0}".format(sky_pos_err))
 if injdistrib:
-    logger.info("          injdistrib:", injdistrib)
+    logger.info("          injdistrib: {0}".format(injdistrib))
 if ra2 and decl2 and sky_pos_err2:
-    logger.info("   right ascension 2:", ra2)
-    logger.info("       declination 2:", decl2)
-    logger.info("       sky pos err 2:", sky_pos_err2)
+    logger.info("   right ascension 2: {0}".format(ra2))
+    logger.info("       declination 2: {0}".format(decl2))
+    logger.info("       sky pos err 2: {0}".format(sky_pos_err2))
 if injdistrib2:
-    logger.info("         injdistrib2:", injdistrib2)
-logger.info(    "    detector network:", detector)
+    logger.info("         injdistrib2: {0}".format(injdistrib2))
+logger.info("    detector network: {0}".format(detector))
 if network_selection:
     logger.info("   network selection: automatic")
-logger.info(    "            mdc path:", mdc_path)
-logger.info(    "           grid type:", grid_type)
+logger.info("            mdc path: {0}".format(mdc_path))
+logger.info("           grid type: {0}".format(grid_type))
 if grid_type == 'file':
-    logger.info("       grid sim file:", grid_sim_file)
-logger.info(    "     condor priority:", condorPriority)
+    logger.info("       grid sim file: {0}".format(grid_sim_file))
+logger.info("     condor priority: {0}".format(condorPriority))
 if mergingCutsPath:
-    logger.info("   merging cuts from:", mergingCutsPat)
+    logger.info("   merging cuts from: {0}".format(mergingCutsPat))
 if atlasFlag:
     logger.info("    running on atlas: yes")
 if xtmvaFlag:
@@ -417,7 +417,6 @@ except: pass  # -- Kludge: should probably fail with error message.
 
 # ---- Find files which define merging cuts
 mergingCutsString = ""
-print mergingCutsPath
 if mergingCutsPath:
     preCutFile = glob.glob(mergingCutsPath + '/*xmake_args_tuned_pre.txt')
     cutFile = glob.glob(mergingCutsPath + '/*xmake_args_tuned.txt')
@@ -436,7 +435,8 @@ logger.info("Parsing parameters (ini) file ...")
 
 # ---- Check the params_file exists
 if not os.path.isfile(params_file):
-    logger.critical("Error: non existent parameter file: ", params_file)
+    logger.critical("Non existent parameter file: {0}".format(params_file))
+    raise ValueError("Misspelled or non-existent ini file")
 
 # Set some ini file defaults
 doAsymmetricBackground    = 0
@@ -448,7 +448,7 @@ cp.read(params_file)
 
 if cp.has_option('tags','version') :
     ini_version = cp.get('tags','version')
-    logger.info("Parameter file CVS tag:", ini_version)
+    logger.info("Parameter file CVS tag: {0}".format(ini_version))
 
 # ---- Check for a seed value for matlab's random number generator.
 try:
@@ -456,11 +456,11 @@ try:
 except:
     seed = 931316785
     logger.warning("Warning: No seed specified in configuration file.")
-    logger.warning("         seed will be set to: ", seed)
+    logger.warning("         seed will be set to: {0}".format(seed))
 
 # ---- Matlab seed can take values between 0 and 2^31-2.
 if (seed > pow(2,31)-2) or (seed < 0):
-    logger.critical("Error: seed must have value between 0 and 2^31-2"
+    logger.critical("Seed must have value between 0 and 2^31-2")
 
 # ---- NOTE: The following reading of variables can be split up and
 #      moved into the relevant sections of the script where the
@@ -522,9 +522,9 @@ frameCacheAll = 'input/framecache.txt'
 try:
     dataFrameCache = cp.get('input','frameCacheFile')
 except:
-    logger.warning("Warning: No frameCacheFile file specified in " \
+    logger.warning("Warning: No frameCacheFile file specified in "
         "[input] section of configuration file.")
-    logger.warning("        A frameCache for the ifo data file will be " \
+    logger.warning("        A frameCache for the ifo data file will be "
         "generated automatically.")
     dataFrameCache = None
 
@@ -534,7 +534,7 @@ try:
 except:
     seed = 931316785
     logger.warning("Warning: No seed specified in configuration file.")
-    logger.warning("         seed will be set to: ", seed)
+    logger.warning("         seed will be set to: {0}".format(seed))
 
 # ---- Matlab seed can take values between 0 and 2^31-2.
 if (seed > pow(2,31)-2) or (seed < 0):
@@ -590,8 +590,13 @@ analysis_segment = SegmentList([Segment(start_time, end_time)])
 
 # ---- Prepare storage for full segment lists.
 full_segment_list = []
-# ---- Prepare storage for lists of analysis and veto segment filenames.
-analysis_seg_files = setuputils.validate_segments(detector, start_time, end_time, cp)
+if cp.has_option('parameters','makeSimulatedNoise'):
+    # ---- Prepare storage for lists of analysis and veto segment filenames.
+    analysis_seg_files = setuputils.validate_segments(detector, start_time, end_time, cp, trigger_time)
+else:
+    # ---- Prepare storage for lists of analysis and veto segment filenames.
+    analysis_seg_files = setuputils.validate_segments(detector, start_time, end_time, cp)
+
 veto_seg_files = setuputils.validate_vetos(detector, start_time, end_time, cp)
 
 # ---- Read in segment_lists to ScienceData object.
@@ -600,7 +605,7 @@ for (iFile, ifo) in zip(analysis_seg_files, detector):
     # ---- Read full segment list into gwpy
     #      Throw away science segment shorter than the
     #      blockTime value read from the configuration file.
-    logger.info('Reading segment list from file ', iFile)
+    logger.info('Reading segment list from file {0}'.format(iFile))
     full_segment = SegmentList.read(iFile)
     logger.info('... finished reading segment list.')
     logger.info('Checking for segments less than {0}.'.format(blockTime))
@@ -631,7 +636,6 @@ for ifo in all_detectors:
         cat1_segment_file_list.append("None")
         cat24_segment_file_list.append("None")
 
-pdb.set_trace()
 # ---- Write string listing detectors
 detectorStr = ''
 detectorStrTilde = ''
@@ -641,7 +645,7 @@ for ifo in detector:
 detectorStrTilde = detectorStrTilde[0:len(detectorStrTilde)-1]
 
 if network_selection and blockTime < 256:
-    logger.critical( "Network selection does not currently ", \
+    logger.critical( "Network selection does not currently "
         "work for blockTimes < 256s \n")
 
 if network_selection :
@@ -684,27 +688,27 @@ if len(detector) ==0:
     logger.critical("No ifos in network!!!")
 
 elif len(detector) ==1:
-    logger.info("One ifo in network: ", detector)
+    logger.info("One ifo in network: {0}".format(detector))
     lagType = []
     likelihoodType = "likelihoodType_1det1site"
 
 elif len(detector) ==2:
-    logger.info("Two misaligned ifos in network: ", detector)
+    logger.info("Two misaligned ifos in network: {0}".format(detector))
     lagType = "lags_2det2site"
     likelihoodType = "likelihoodType_2det2site"
 
 elif len(detector) ==3:
-    logger.info("Three ifos at three sites: ", detector)
+    logger.info("Three ifos at three sites: {0}".format(detector))
     lagType = "lags_3det3site"
     likelihoodType = "likelihoodType_3det3site"
 
 elif len(detector) ==4:
-    logger.info("Four ifos at four sites: ", detector)
+    logger.info("Four ifos at four sites: {0}".format(detector))
     lagType = "lags_4det4site"
     likelihoodType = "likelihoodType_4det4site"
 
 elif len(detector) ==5:
-    logger.info("Five ifos at five sites: ", detector)
+    logger.info("Five ifos at five sites: {0}".format(detector))
     lagType = "lags_5det5site"
     likelihoodType = "likelihoodType_5det5site"
 
@@ -757,11 +761,11 @@ if lagType:
 
     if lagFile:
         if not os.path.isfile(lagFile):
-            logger.critical("Error: non existant lag file: ",lagFile)
+            logger.critical("Error: non existant lag file: {0}".format(lagFile))
 else:
     lagFile = None
 
-logger.info("Using lag file: ", lagFile)
+logger.info("Using lag file: {0}".format(lagFile))
 
 
 # -----------------------------------------------------------------------------
@@ -771,10 +775,10 @@ logger.info("Using lag file: ", lagFile)
 try:
    likelihoodTypeStr =  cp.get('parameters',likelihoodType)
 except:
-   logger.critical( "Error: required likelihoodType not specified in " \
+   logger.critical( "Error: required likelihoodType not specified in "
       "configuration file.")
 
-logger.info("Using likelihoods: ", likelihoodTypeStr)
+logger.info("Using likelihoods: {0}".format(likelihoodTypeStr))
 
 # -------------------------------------------------------------------------
 #      Write channel file.
@@ -837,7 +841,7 @@ if int(cp.get('input','usexchooseskylocations')) and sky_pos_err:
     skyPosFilename_trigger = 'input/sky_positions_trigger_time.txt'
 
     if grid_type == 'line':
-        logger.info("Calling xchooseskylocations1 to generate ", skyPosFilename_trigger)
+        logger.info("Calling xchooseskylocations1 to generate {0}".format(skyPosFilename_trigger))
         xchooseskylocationsCall = ' '.join([ "xchooseskylocations1",
                                             str(ra),
                                             str(decl),
@@ -853,7 +857,7 @@ if int(cp.get('input','usexchooseskylocations')) and sky_pos_err:
         os.system(xchooseskylocationsCall)
    
     elif grid_type == 'timedelay':
-        logger.info("Calling xchoosetimedelays to generate ", skyPosFilename_trigger)
+        logger.info("Calling xchoosetimedelays to generate {0}".format(skyPosFilename_trigger))
         xchoosetimedelaysCall = ' '.join([ "xchoosetimedelays",
                                             str(ra),
                                             str(decl),
@@ -867,7 +871,7 @@ if int(cp.get('input','usexchooseskylocations')) and sky_pos_err:
         os.system(xchoosetimedelaysCall)
 
     elif grid_type == 'healpix' or grid_type == 'circular':
-        logger.info("Calling xmakeskygrid to generate ", skyPosFilename_trigger)
+        logger.info("Calling xmakeskygrid to generate {0}".format(skyPosFilename_trigger))
         if ra2 and decl2 and sky_pos_err2:
             ra_str = str(ra) + "~" + str(ra2)
             decl_str = str(decl) + "~" + str(decl2)
@@ -884,7 +888,7 @@ if int(cp.get('input','usexchooseskylocations')) and sky_pos_err:
         os.system(xmakeskygridCall)
 
     elif grid_type == 'file':
-        logger.info("Calling xconvertfilegrid to generate ", skyPosFilename_trigger)
+        logger.info("Calling xconvertfilegrid to generate {0}".format(skyPosFilename_trigger))
         xconvertfilegridCall = ' '.join(['xconvertfilegrid',str(sky_pos_err),str(trigger_time),skyPosFilename_trigger])
         logger.info(xconvertfilegridCall)
         os.system(xconvertfilegridCall)
@@ -893,10 +897,10 @@ if int(cp.get('input','usexchooseskylocations')) and sky_pos_err:
         logger.critical("IPN grids are currently unsupported. Please use circular or line instead.")
 
     elif grid_type == 'opt':
-        logger.critical("Optimized position grids are currently unsupported. Please use circular or line instead."
+        logger.critical("Optimized position grids are currently unsupported. Please use circular or line instead.")
 
     else:
-        logger.critical("Choice of sky position grid is unrecognized. Please use circular or line."
+        logger.critical("Choice of sky position grid is unrecognized. Please use circular or line.")
 
 
 seg = coincidence_segment[0]
@@ -919,18 +923,18 @@ for iSeg in range(len(seg)):
     #      file.
     if int(cp.get('input','usexchooseskylocations')) and sky_pos_err:
         skyPosFilename = 'input/sky_positions_' + str(iSeg) + '.txt'
-        logger.info("Calling xconvertskylocations to generate ", skyPosFilename
+        logger.info("Calling xconvertskylocations to generate {0}".format(skyPosFilename))
         xconvertskylocationsCall = ' '.join([ "xconvertskylocations",
             str(skyPosFilename_trigger),
             str(trigger_time),
             str(gpsBlockCenterTime),
             skyPosFilename])
-        logger.info(xconvertskylocationsCall
+        logger.info(xconvertskylocationsCall)
         os.system(xconvertskylocationsCall)
 
         # ---- Check that the output file has been created.
         if not os.path.isfile(skyPosFilename):
-            logger.critical("Error creating ", skyPosFilename)
+            logger.critical("Error creating {0}".format(skyPosFilename))
 
         # ---- Count number of sky positions.
         numSky = len(open(skyPosFilename).readlines())
@@ -946,9 +950,9 @@ for iSeg in range(len(seg)):
         skyutils.radectoearth(ra, decl, gpsBlockCenterTime, filename='input/earthfixedcoordinates' + str(iSeg) + '.txt')
         phi, theta = skyutils.radectoearth(ra, decl, gpsBlockCenterTime)
         # ---- Load earth-fixed coordinates back in.
-        logger.info("GRB position in Earth-fixed coordinates (rad):"
-        logger.info("    phi = ", phi
-        logger.info("    theta = ", theta
+        logger.info("GRB position in Earth-fixed coordinates (rad):")
+        logger.info("    phi = {0}".format(phi))
+        logger.info("    theta = {0}".format(theta))
 
         # ---- Set number of sky positions.
         numSky = 1
@@ -966,7 +970,7 @@ for iSeg in range(len(seg)):
     #      one injections file.
 
     # ---- Status message.
-    logger.info("Writing Matlab-formatted parameter files ..."
+    logger.info("Writing Matlab-formatted parameter files ...")
 
     # ---- Parameters file for on-source analysis.
     ioutils.write_onsource('input/parameters_on_source_' + str(iSeg) + '.txt', outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, parameters, onSourceEndOffset, cp)
@@ -1002,8 +1006,7 @@ f.close()
 fseg.close()
 
 # ---- Status message.
-logger.info("... finished writing on-source event file."
-logger.info(" ")
+logger.info("... finished writing on-source event file.")
 
 # ---- Append to summary file.
 sfile = open(summary_file,'a')
@@ -1022,8 +1025,7 @@ if cp.has_option('mdc','mdc_sets') :
     ioutils.write_mdc(filename, outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, parameters, onSourceEndOffset, cp, injectionScalesList, disableFastInjections, waveform)
 
 # ---- Status message.
-logger.info("... finished writing parameter files.     "
-logger.info(" ")
+logger.info("... finished writing parameter files.     ")
 
 
 # -------------------------------------------------------------------------
@@ -1031,11 +1033,10 @@ logger.info(" ")
 # -------------------------------------------------------------------------
 
 if catalog_dir:
-    logger.info("Copying waveform catalogs to input/ ..."
+    logger.info("Copying waveform catalogs to input/ ...")
     cpCommand = ' '.join(['cp ' + catalog_dir + '/*.mat input/'])
     os.system(cpCommand)
-    logger.info("... finished copying waveform catalogs."
-    logger.info(" ")
+    logger.info("... finished copying waveform catalogs.")
 
 
 # -------------------------------------------------------------------------
@@ -1043,7 +1044,7 @@ if catalog_dir:
 # -------------------------------------------------------------------------
 
 # ---- Status message.
-logger.info("Writing off-source event file ...          "
+logger.info("Writing off-source event file ...          ")
 
 # ---- First remove the on-source times from all detector segment lists.
 off_source_segment = copy.deepcopy(on_source_segment)
@@ -1056,11 +1057,10 @@ for det in full_segment_list:
 # -------------------------------------------------------------------------
 
 if catalog_dir:
-    logger.info("Copying waveform catalogs to input/ ..."
+    logger.info("Copying waveform catalogs to input/ ...")
     cpCommand = ' '.join(['cp ' + catalog_dir + '/*.mat input/'])
     os.system(cpCommand)
-    logger.info("... finished copying waveform catalogs."
-    logger.info(" ")
+    logger.info("... finished copying waveform catalogs.")
 
 # ---- Keep track of number of off-source events.
 numOff = 0
@@ -1095,9 +1095,9 @@ if lagFile:
         # ---- Extract time lag for each detector.
         lags = line.split(None)
         if len(lags) != len(detector):
-            logger.critical("the lag file should have number of " \
-            "columns equal to the the number of detectors we are analysing. " \
-            " Lag file: ", lagFile)
+            logger.critical("the lag file should have number of "
+            "columns equal to the the number of detectors we are analysing. "
+            " Lag file: 0{}".format(lagFile))
 
         # ---- Make a time-lagged copy of the segment lists.
         lag_full_segment_list = copy.deepcopy(full_segment_list)
@@ -1126,8 +1126,7 @@ if lagFile:
     f.close()
 
 # ---- Status message.
-logger.info("... finished writing off-source event file."
-logger.info(" ")
+logger.info("... finished writing off-source event file.")
 
 # -----------------------------------------------------------------------------
 #      Read in off-source event file and check each event passes meets our
@@ -1136,7 +1135,7 @@ logger.info(" ")
 if 1:
 # KLUDGE so that we don't have to reindent the code below
 
-    logger.info("Applying network criteria to our off-source events."
+    logger.info("Applying network criteria to our off-source events.")
 
     # ---- Get triggerTimes and timeOffsets for each off-source event.
 
@@ -1191,7 +1190,7 @@ if 1:
 	    str(onSourceWindowLength)
 	    ])
 
-	logger.info(xnetworkselectionCall
+	logger.info(xnetworkselectionCall)
 	os.system(xnetworkselectionCall)
 
 	# ---- Read in network strings from network_outputFile.
@@ -1209,9 +1208,8 @@ if 1:
 
     # ---- Check events and networks list have the same length.
     if not(len(events) == len(networks)):
-        logger.critical("off-source networks and events lists "\
+        logger.critical("off-source networks and events lists "
             "should have the same length")
-        sys.exit(1)
 
 
     # ---- Number of off-source events before we discard any.
@@ -1241,9 +1239,9 @@ if 1:
     if cp.has_option('background','numJobs'):
         background_numJobs = int(cp.get('background','numJobs'))
         if background_numJobs > origNumOff:
-            logger.critical( "We have only ", origNumOff, "background jobs")
-            logger.critical( "Specify more lags to get desired "\
-                "number of background jobs: numJobs = ", background_numJobs)
+            logger.critical( "We have only " + origNumOff + " background jobs")
+            logger.critical( "Specify more lags to get desired "
+                "number of background jobs: numJobs = {0}".format(background_numJobs))
 
     elif FAP or FAR:
         if FAP > 50.0:
@@ -1253,9 +1251,9 @@ if 1:
         else:
             logger.critical('FAP number unusual, are you sure this is what you want')
         if background_numJobs > origNumOff:
-            logger.critical( "We have only ", origNumOff, "background jobs")
-            logger.critical( "Specify more lags to get desired "\
-                "number of background jobs: numJobs = ", background_numJobs)
+            logger.critical( "We have only " +  origNumOff + " background jobs")
+            logger.critical( "Specify more lags to get desired "
+                "number of background jobs: numJobs = {0}".format(background_numJobs))
     else:
         background_numJobs = origNumOff
 
@@ -1292,9 +1290,8 @@ if 1:
         'input/window_off_source.txt'])
     os.system(mvCommand)
 
-    logger.info("We retain the " + str(numOff) + " jobs from a total of " + \
-        str(origNumOff) + " off-source jobs that satisfy " \
-        "our network criteria.\n")
+    logger.info("We retain the " + str(numOff) +  " jobs from a total of "
+        + str(origNumOff) + " off-source jobs that satisfy " + "our network criteria.")
 
 # ---- Append to summary file.
 sfile = open(summary_file,'a')
@@ -1306,8 +1303,8 @@ sfile.close()
 if cp.has_option('background','numJobs'):
     background_numJobs = int(cp.get('background','numJobs'))
     if numOff < background_numJobs:
-        logger.critical( "Specify more lags to get desired "\
-            "number of background jobs: numJobs = ", background_numJobs)
+        logger.critical("Specify more lags to get desired "\
+            "number of background jobs: numJobs = {0}".format( background_numJobs))
 
 # ---- Split window list into event list
 fwin = open('input/window_off_source.txt','r')
@@ -1333,7 +1330,7 @@ fev.close()
 if dataFrameCache:
     # ---- check the frameCache specified actually exists
     if not os.path.isfile(dataFrameCache):
-        logger.critical("non existant framecache: ",dataFrameCache)
+        logger.critical("non existant framecache: {0}".format(dataFrameCache))
 
     # ---- if the specified mdc frame cache exists then concat it other frame caches
     command = 'cat ' + dataFrameCache + '  >> ' + frameCacheAll
@@ -1433,7 +1430,7 @@ else:
             # ---- Identify any overlap between missing frames and full_segment_list
             gaps_segments.intersection(full_segment_list[i])
             if gaps_segments:
-                logger.critical("missing frames in ", detector[i])
+                logger.critical("missing frames in {0}".format(detector[i]))
                 for jj in range(gaps_segments.__len__()):
                     time_range_string = str(jj) + ' ' + \
                         str(gaps_segments.__getitem__(jj).start()) \
@@ -1499,7 +1496,7 @@ if cp.has_section('waveforms') :
             injectionInterval_num = int(injectionInterval_num/2)
         else:
             logger.critical("Error: injectionInterval == 0")
-            sys.exit(1)
+
         injectionInterval = str(injectionInterval_num)
     logger.info("Making injection files ...")
     for set in waveform_set :
@@ -2553,7 +2550,7 @@ if cp.has_option('mdc','mdc_sets') :
         #      Read segment list from file.
         segFileName = 'input/segment_' + set +  '.txt'
         if not os.path.isfile(segFileName):
-            logger.critical("Error: non existant segment file: ",segFileName)
+            logger.critical("Error: non existant segment file: {0}".format(segFileName))
 
         segmentList = []
         segmentList = pipeline.ScienceData()
