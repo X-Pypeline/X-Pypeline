@@ -666,8 +666,8 @@ if network_selection :
 
     network_outputFile = 'input/xnetworkselection_onsource.txt'
 
-    channel, frameType, full_segment_list, detector = 
-        xnetworkselection.main(detector, "input/trigger_time.txt",
+    channel, frameType, full_segment_list, detector = xnetworkselection.main(
+                               detector, "input/trigger_time.txt",
                                "input/time_offsets.txt",
                                cat1_segment_file_list,
                                cat24_segment_file_list,
