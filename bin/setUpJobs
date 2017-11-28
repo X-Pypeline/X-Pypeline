@@ -264,7 +264,7 @@ mergingCutsPath = args.mergingCutsPath
 grid_type = args.grid_type
 grb_name = args.grb_name
 params_file = args.params_file
-trigger_time = args.trigger_time
+trigger_time = round(args.trigger_time)
 ra = args.ra
 decl = args.decl
 sky_pos_err = args.sky_pos_err
@@ -590,6 +590,7 @@ analysis_segment = SegmentList([Segment(start_time, end_time)])
 
 # ---- Prepare storage for full segment lists.
 full_segment_list = []
+
 if cp.has_option('parameters','makeSimulatedNoise'):
     # ---- Prepare storage for lists of analysis and veto segment filenames.
     analysis_seg_files = setuputils.validate_segments(detector, start_time, end_time, cp, trigger_time)
@@ -673,6 +674,48 @@ if network_selection :
                                onSourceEndOffset,
                                transientTime,
                                onSourceWindowLength)
+
+# -------------------------------------------------------------------------
+#    Make coincidence segment list for on-source, zero-lag segment.
+# -------------------------------------------------------------------------
+
+# ---- Status message.
+logger.info("Writing on-source event file ...          ")
+
+# Here we calculate and create a setgment of the actual on source window of the analysis. This is not necessarily the same as the size of the onsource coincident segment which relates to the requested blockTime. 
+on_source_start_time = int(trigger_time + onSourceBeginOffset - transientTime)
+on_source_end_time = int(trigger_time + onSourceEndOffset + transientTime)
+on_source_window = SegmentList([Segment(on_source_start_time, on_source_end_time)])
+
+# Here we create the on source segment
+on_source_window_segment = SegmentList([Segment(on_source_start_time, on_source_start_time + onSourceWindowLength)])
+on_source_window_segment.write('input/on_source_interval.txt')
+
+coincidence_off_source = reduce(operator.or_, full_segment_list)
+coincidence_on_source = on_source_window_segment or coincidence_off_source
+
+if args.search_type == 'grb':
+    # For GRB search make sure coincident on-source fully overlaps  with on-source window(i.e. there are no holes with it and the newly made coincident on-source segment.
+
+    if not on_source_window in coincidence_on_source:
+        logging.critical("Error: on-source period is not a coincidence segment of the specified network.")
+        sys.exit(1)
+
+    # Write on_source_window to file
+    fwin = open('input/window_on_source.txt', 'w')
+    fwin.write(str(int(trigger_time)) + ' 0' * len(detector) +'\n')
+    fwin.close()
+
+
+# ---- Split coincidence segment list into "chunks".
+coincidence_on_source_segment_chunks = setuputils.make_chunks(coincidence_on_source, blockTime, 2*transientTime)
+
+coincidence_on_source_segment_chunks.write('input/segment_on_source.txt')
+
+on_source_event_file = open('input/event_on_source.txt', 'a+')
+for iseg in coincidence_on_source_segment_chunks:
+    SegmentList(iseg).write(on_source_event_file)
+
 
 # -------------------------------------------------------------------------
 #      Choose appropriate likelihoods and lags for this network.

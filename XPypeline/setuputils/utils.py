@@ -18,8 +18,26 @@
 
 """This module contains utility functions for setUpJobs 
 """
-from gwpy.segments import DataQualityDict, SegmentList, DataQualityFlag
+from gwpy.segments import Segment, DataQualityDict, SegmentList, DataQualityFlag
 import operator
+
+def query_veto_definer_file(ifo, start, end, cp):
+    # Obtain segments that are analysis ready
+    analysis_ready = DataQualityFlag.query('{0}:DMT-ANALYSIS_READY:1'.format(ifo), start, end)
+    # Define the start and stop time of analysis ready
+    analysis_ready_start = analysis_ready.active.extent()[0]
+    analysis_ready_end = analysis_ready.active.extent()[1]
+    # Query for vetos found during this time.
+    vdf = DataQualityDict.from_veto_definer_file(cp.get('segfind', 'veto-file'), analysis_ready_start, analysis_ready_end)
+    # Populate only for analysis ready segments.
+    vdf.populate(segments=analysis_ready.active)
+
+    return vdf
+
+
+def filter_for_cat_type(vdf, ifo, cat):
+    return reduce(operator.or_, [f.active for f in vdf.values() if f.ifo == ifo and f.category in cat], SegmentList())
+   
 
 def validate_segments(ifos, start, end, cp, trigger_time=None):
     """determine analysis ready segments during requested analysis time
@@ -67,20 +85,19 @@ def validate_segments(ifos, start, end, cp, trigger_time=None):
                 else:
                     analysis_seg_files.append(cp.get(ifo,'segment-list'))
             else:
-                # Obtain segments that are analysis ready
-                analysis_ready = DataQualityFlag.query('{0}:DMT-ANALYSIS_READY:1'.format(ifo), start, end)
+                # Query for veto definer file
+                vdf = query_veto_definer_file(ifo, start, end, cp) 
 
-                # Query veto-definer file
-                vdf = DataQualityDict.from_veto_definer_file(cp.get('segfind', 'veto-file'))
-
-                # Query for cat 1 flags
-                vdf.populate(segments=analysis_ready.active)
-                cat = [1]
-                segs = reduce(operator.or_, [f.active for f in vdf.values() if f.ifo == ifo and f.category in cat], SegmentList())
+                # Filter for cat1 vetos
+                segs = filter_for_cat_type(vdf, ifo, [1])
 
                 # ---- Write out cat1 veto to text file.
                 filename_cat1 = "input/" + ifo +  "-veto-cat1.txt"
                 segs.write(filename_cat1)
+
+                # Compute analysis ready segments in order to
+                # subtract out cat1 vetos
+                analysis_ready = DataQualityFlag.query('{0}:DMT-ANALYSIS_READY:1'.format(ifo), start, end)
 
                 # Subtract cat 1 veto from analysis_ready
                 analysis_ready_minus_cat1 = analysis_ready.active - segs
@@ -133,20 +150,38 @@ def validate_vetos(ifos, start, end, cp):
                 else:
                     veto_seg_files.append(cp.get(ifo,'veto-list'))
             else:
-                # Obtain segments that are analysis ready
-                analysis_ready = DataQualityFlag.query('{0}:DMT-ANALYSIS_READY:1'.format(ifo), start, end)
-                # Query for vetos
-                vdf = DataQualityDict.from_veto_definer_file(cp.get('segfind', 'veto-file'))
-                vdf.populate(segments=analysis_ready.active)
-                cat  = [2, 4]
+                # Query for veto definer file
+                vdf = query_veto_definer_file(ifo, start, end, cp)
+
+                # Filter for cat24 vetos
+                cat = [2, 4]
                 for iCat in cat:
-                    segs = reduce(operator.or_, [f.active for f in vdf.values() if f.ifo == ifo and f.category == iCat], SegmentList())
+                    segs = filter_for_cat_type(vdf, ifo, [iCat])
                     filename = "input/" + ifo +  "-veto-cat{0}.txt".format(iCat)
                     segs.write(filename)
 
-                segs = reduce(operator.or_, [f.active for f in vdf.values() if f.ifo == ifo and f.category in cat], SegmentList())
+                segs = filter_for_cat_type(vdf, ifo, cat)
                 filename = "input/" + ifo + "_cat24veto.txt"
                 segs.write(filename)
                 veto_seg_files.append(filename)
                 
     return veto_seg_files
+
+
+def make_chunks(segment, length=0, overlap=0):
+    """ 
+    Divides the science segment into chunks of length seconds overlapped by 
+    overlap seconds. 
+    when generating chunks 
+    """
+    time_left = abs(segment)
+    start = segment.extent()[0]
+    increment = length - overlap
+    chunks = []
+    while time_left >= length:
+        end = start + length
+        chunks.append(Segment(start,end))
+        start += increment
+        time_left -= increment
+    
+    return SegmentList(chunks)
