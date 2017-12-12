@@ -20,8 +20,9 @@
 """
 
 
-def write_onsource(filename, outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, parameters, onSourceEndOffset, cp):
+def write_onsource(filename, outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, cp):
 
+    parameters = cp.options('parameters')
     # ---- Parameters file for on-source analysis.
     fParam=open(filename, 'w')
     # ---- First write framecache file, channel file, event file, and sky position.
@@ -47,8 +48,9 @@ def write_onsource(filename, outputType, frameCacheAll, skyPositionList, likelih
     fParam.close()
 
 
-def write_ul_source(filename, outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, parameters, onSourceEndOffset, cp):
+def write_ul_source(filename, outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, cp):
 
+    parameters = cp.options('parameters')
     # ---- Parameters file for ul-source analysis.
     fParam=open(filename, 'w')
     # ---- First write framecache file, channel file, event file, and sky position.
@@ -76,7 +78,9 @@ def write_ul_source(filename, outputType, frameCacheAll, skyPositionList, likeli
     fParam.close()
 
 
-def write_offsource(filename, outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, parameters, onSourceEndOffset, cp):
+def write_offsource(filename, outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, cp):
+
+    parameters = cp.options('parameters')
     # ---- Parameters file for off-source analysis.
     fParam=open(filename, 'w')
     # ---- First write framecache file, channel file, event file, and sky position.
@@ -100,40 +104,44 @@ def write_offsource(filename, outputType, frameCacheAll, skyPositionList, likeli
     fParam.close()
 
 
-def write_waveforms(filename, outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, parameters, onSourceEndOffset, cp, injectionScalesList, disableFastInjections, waveform):
-              fParam=open(filename, 'w')
-              # ---- First write framecache file, channel file, event file, and sky position.
-              fParam.write('channelFileName:input/channels.txt' + '\n')
-              fParam.write('frameCacheFile:' + frameCacheAll + '\n')
-              fParam.write('eventFileName:input/event_inj_source.txt' + '\n')
-              fParam.write('catalogdirectory:input/' + '\n')
-              fParam.write('skyPositionList:' + skyPositionList + '\n')
-              fParam.write('skyCoordinateSystem:earthfixed' + '\n')
-              fParam.write('likelihoodtype:' + likelihoodTypeStr + '\n')
-              # ---- Now write all of the other parameters from the parameters section.
-              #      We ignore the likelihoodType_* lines since this is handled above.
-              for i in range(0,len(parameters)) :
-                  if not(parameters[i].startswith("likelihoodtype")) :
-                      value = cp.get('parameters',parameters[i])
-                      if parameters[i] == "outputtype"  and value == "clusters" and not(disableFastInjections):
-                          fParam.write('outputtype:injectionclusters\n')
-                      elif parameters[i] == "onsourceendoffset":
-                          fParam.write('onsourceendoffset:' + str(onSourceEndOffset) + '\n')
-                      elif parameters[i] == "circtimeslidestep":
-                          continue
-                      else:
-                          fParam.write(parameters[i] + ':' + value + '\n')
+def write_waveforms(filename, outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, cp, injectionScalesList, disableFastInjections, waveform):
 
-              # ---- Write simulations info.  The specified injection file
-              #      will be written later.
-              fParam.write('injectionFileName:input/injection_' + waveform + '.txt' + '\n')
-              fParam.write('injectionScale:' + str(injectionScalesList[:]) + '\n')
-              # fParam.write('catalogdirectory:' + XPIPELINE_ROOT  + '/waveforms\n')
-              if outputType == 'seedless' :
-                  fParam.write('seedlessparams:input/seedless_simulation.txt\n')
-              fParam.close()
+    parameters = cp.options('parameters')
+    fParam=open(filename, 'w')
+    # ---- First write framecache file, channel file, event file, and sky position.
+    fParam.write('channelFileName:input/channels.txt' + '\n')
+    fParam.write('frameCacheFile:' + frameCacheAll + '\n')
+    fParam.write('eventFileName:input/event_inj_source.txt' + '\n')
+    fParam.write('catalogdirectory:input/' + '\n')
+    fParam.write('skyPositionList:' + skyPositionList + '\n')
+    fParam.write('skyCoordinateSystem:earthfixed' + '\n')
+    fParam.write('likelihoodtype:' + likelihoodTypeStr + '\n')
+    # ---- Now write all of the other parameters from the parameters section.
+    #      We ignore the likelihoodType_* lines since this is handled above.
+    for i in range(0,len(parameters)) :
+      if not(parameters[i].startswith("likelihoodtype")) :
+          value = cp.get('parameters',parameters[i])
+          if parameters[i] == "outputtype"  and value == "clusters" and not(disableFastInjections):
+              fParam.write('outputtype:injectionclusters\n')
+          elif parameters[i] == "onsourceendoffset":
+              fParam.write('onsourceendoffset:' + str(onSourceEndOffset) + '\n')
+          elif parameters[i] == "circtimeslidestep":
+              continue
+          else:
+              fParam.write(parameters[i] + ':' + value + '\n')
 
-def write_mdc(filename, outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, parameters, onSourceEndOffset, cp, injectionScalesList, disableFastInjections, waveform):
+    # ---- Write simulations info.  The specified injection file
+    #      will be written later.
+    fParam.write('injectionFileName:input/injection_' + waveform + '.txt' + '\n')
+    fParam.write('injectionScale:' + str(injectionScalesList[:]) + '\n')
+    # fParam.write('catalogdirectory:' + XPIPELINE_ROOT  + '/waveforms\n')
+    if outputType == 'seedless' :
+      fParam.write('seedlessparams:input/seedless_simulation.txt\n')
+    fParam.close()
+
+def write_mdc(filename, outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, cp, injectionScalesList, disableFastInjections, waveform):
+
+    parameters = cp.options('parameters')
     # ---- Read [mdc] sets and injection scales.  If mdc_sets is empty or specifies
     #      unknown MDC sets then the script will have already exited when trying to
     #      write the mdcchannel file above.

@@ -581,6 +581,33 @@ for jj in range(0,len(keepIndex)):
 # ---- Status message.
 logger.info("... finished validating network.          ")
 
+logger.info("... checking if framecache exists ...     ")
+# ---- If dataFrameCache is specified and exists we will add it to frameCacheAll
+if dataFrameCache:
+    logger.info("... framecache does exists ...     ")
+    # ---- check the frameCache specified actually exists
+    if not os.path.isfile(dataFrameCache):
+        logger.critical("non existant framecache: {0}".format(dataFrameCache))
+
+    # ---- if the specified mdc frame cache exists then concat it other frame caches
+    command = 'cat ' + dataFrameCache + '  >> ' + frameCacheAll
+    os.system(command)
+else: 
+    # ---- Status message.
+    logger.info("... framecache does NOT exists ...     ")
+    logger.info("Writing framecache file for ifo data...")
+    f = open(frameCacheAll, 'w')
+    f.close()
+    connection = datafind.GWDataFindHTTPConnection()
+    for (iframetype, idet) in zip(frameType, detector):
+        logger.info("Writing framecache file for detector {0} and frameType {1}...".format(idet, iframetype))
+        cache = connection.find_frame_urls(idet.strip('1')[0], iframetype, start_time, end_time, urltype='file')
+        cache.tofile(open(frameCacheAll, 'a+'))
+
+    # ---- Status message.
+    logger.info("... finished writing framecache file for ifo data")
+
+
 # -------------------------------------------------------------------------
 #      Retrieve single-IFO segment lists for analysis period.
 # -------------------------------------------------------------------------
@@ -625,25 +652,17 @@ for (iFile, ifo) in zip(analysis_seg_files, detector):
 # ---- Get cat1 and cat24 segment files for all ifos used.
 #      Use 'None' when no file exists.
 all_detectors = lal.cached_detector_by_prefix.keys()
-cat1_segment_file_list = []
-cat24_segment_file_list = []
+cat1_segment_file_list = {}
+cat24_segment_file_list = {}
 for ifo in all_detectors:
     try:
         # ----- Did we consider current ifo.
         idx = detector.index(ifo)
-        cat1_segment_file_list.append(analysis_seg_files[idx])
-        cat24_segment_file_list.append(veto_seg_files[idx])
+        cat1_segment_file_list[ifo] = analysis_seg_files[idx]
+        cat24_segment_file_list[ifo] = veto_seg_files[idx]
     except (ValueError):
-        cat1_segment_file_list.append("None")
-        cat24_segment_file_list.append("None")
-
-# ---- Write string listing detectors
-detectorStr = ''
-detectorStrTilde = ''
-for ifo in detector:
-    detectorStr = detectorStr + ifo
-    detectorStrTilde = detectorStrTilde + ifo + '~'
-detectorStrTilde = detectorStrTilde[0:len(detectorStrTilde)-1]
+        cat1_segment_file_list[ifo] = "None"
+        cat24_segment_file_list[ifo] = "None"
 
 if network_selection and blockTime < 256:
     logger.critical( "Network selection does not currently "
@@ -675,57 +694,67 @@ if network_selection :
                                transientTime,
                                onSourceWindowLength)
 
-# -------------------------------------------------------------------------
-#    Make coincidence segment list for on-source, zero-lag segment.
-# -------------------------------------------------------------------------
 
-# ---- Status message.
-logger.info("Writing on-source event file ...          ")
+logger.info('Based on valid network creating Tilde string useful for reading in MATLAB...')
+# -----------------------------------------------------------------------------
+#               Construct tilde-separated list of sites
+# -----------------------------------------------------------------------------
 
-# Here we calculate and create a setgment of the actual on source window of the analysis. This is not necessarily the same as the size of the onsource coincident segment which relates to the requested blockTime. 
-on_source_start_time = int(trigger_time + onSourceBeginOffset - transientTime)
-on_source_end_time = int(trigger_time + onSourceEndOffset + transientTime)
-on_source_window = SegmentList([Segment(on_source_start_time, on_source_end_time)])
+# ---- Initialise tilde-separated list of sites.
+siteStrTilde = ''
+for iDet in range(0,len(detector)):
+   # ---- Get name of current site from current (virtual) detector.
+   siteTemp = detector[iDet][0]
+   # ---- Add current site to list only if does not already appear in it.
+   if siteStrTilde.count(siteTemp)==0:
+      siteStrTilde = '~'.join([siteStrTilde,siteTemp])
 
-# Here we create the on source segment
-on_source_window_segment = SegmentList([Segment(on_source_start_time, on_source_start_time + onSourceWindowLength)])
-on_source_window_segment.write('input/on_source_interval.txt')
+# ---- Remove preceding tilde.
+siteStrTilde = siteStrTilde[1:len(siteStrTilde)]
 
-coincidence_off_source = reduce(operator.or_, full_segment_list)
-coincidence_on_source = on_source_window_segment or coincidence_off_source
-
-if args.search_type == 'grb':
-    # For GRB search make sure coincident on-source fully overlaps  with on-source window(i.e. there are no holes with it and the newly made coincident on-source segment.
-
-    if not on_source_window in coincidence_on_source:
-        logging.critical("Error: on-source period is not a coincidence segment of the specified network.")
-        sys.exit(1)
-
-    # Write on_source_window to file
-    fwin = open('input/window_on_source.txt', 'w')
-    fwin.write(str(int(trigger_time)) + ' 0' * len(detector) +'\n')
-    fwin.close()
-
-
-# ---- Split coincidence segment list into "chunks".
-coincidence_on_source_segment_chunks = setuputils.make_chunks(coincidence_on_source, blockTime, 2*transientTime)
-
-coincidence_on_source_segment_chunks.write('input/segment_on_source.txt')
-
-on_source_event_file = open('input/event_on_source.txt', 'a+')
-for iseg in coincidence_on_source_segment_chunks:
-    SegmentList(iseg).write(on_source_event_file)
-
-
-# -------------------------------------------------------------------------
-#      Choose appropriate likelihoods and lags for this network.
-# -------------------------------------------------------------------------
+# ---- Write string listing detectors
+detectorStr = ''
+detectorStrTilde = ''
+for ifo in detector:
+    detectorStr = detectorStr + ifo
+    detectorStrTilde = detectorStrTilde + ifo + '~'
+detectorStrTilde = detectorStrTilde[0:len(detectorStrTilde)-1]
 
 # ---- Append to summary file.
 sfile = open(summary_file,'a')
 sfile.write('\t' + detectorStr)
 sfile.close()
 
+# ---- Real frame type, for reading frames.
+frameTypeStrTilde = ''
+for frameTypeName in frameType:
+  frameTypeStrTilde = frameTypeStrTilde + frameTypeName + '~'
+frameTypeStrTilde = frameTypeStrTilde[0:len(frameTypeStrTilde)-1]
+
+# -------------------------------------------------------------------------
+#      Write channel file.
+# -------------------------------------------------------------------------
+
+# ---- Status message.
+logger.info("Writing Matlab-formatted channel file ...      ")
+
+# ---- For each detector, write the corresponding channel name, frame type,
+#      and virtual channel name to the channels file to be read by xdetection.
+f=open('input/channels.txt', 'w')
+for i in range(0,len(detector)) :
+    f.write(detector[i] + ':' + channel[i] + ' ' + frameType[i] + ' ' + detector[i] + ':' + channel[i] + '\n')
+f.close()
+
+# ---- Status message.
+logger.info("... finished writing channel file.        ")
+
+
+logger.info('Based on valid network selecting ini file params, '
+            'such as lagType and likelihoodType.')
+
+# -------------------------------------------------------------------------
+#      Choose appropriate likelihoods and lags for this network.
+# -------------------------------------------------------------------------
 
 if len(detector) ==0:
     logger.critical("No ifos in network!!!")
@@ -754,40 +783,6 @@ elif len(detector) ==5:
     logger.info("Five ifos at five sites: {0}".format(detector))
     lagType = "lags_5det5site"
     likelihoodType = "likelihoodType_5det5site"
-
-# -----------------------------------------------------------------------------
-#               Construct tilde-separated list of sites
-# -----------------------------------------------------------------------------
-
-# ---- Initialise tilde-separated list of sites.
-siteStrTilde = ''
-for iDet in range(0,len(detector)):
-   # ---- Get name of current site from current (virtual) detector.
-   siteTemp = detector[iDet][0]
-   # ---- Add current site to list only if does not already appear in it.
-   if siteStrTilde.count(siteTemp)==0:
-      siteStrTilde = '~'.join([siteStrTilde,siteTemp])
-
-# ---- Remove preceding tilde.
-siteStrTilde = siteStrTilde[1:len(siteStrTilde)]
-
-# -----------------------------------------------------------------------------
-#               Construct tilde-separated list of detectors
-# -----------------------------------------------------------------------------
-
-# ---- Real detector list: for reading frames, segments, etc.
-detectorStr = ''
-detectorStrTilde = ''
-for ifo in detector:
-   detectorStr = detectorStr + ifo
-   detectorStrTilde = detectorStrTilde + ifo + '~'
-detectorStrTilde = detectorStrTilde[0:len(detectorStrTilde)-1]
-
-# ---- Real frame type, for reading frames.
-frameTypeStrTilde = ''
-for frameTypeName in frameType:
-  frameTypeStrTilde = frameTypeStrTilde + frameTypeName + '~'
-frameTypeStrTilde = frameTypeStrTilde[0:len(frameTypeStrTilde)-1]
 
 # -----------------------------------------------------------------------------
 #         Having figured out network read in appropriate lag file.
@@ -824,36 +819,15 @@ except:
 logger.info("Using likelihoods: {0}".format(likelihoodTypeStr))
 
 # -------------------------------------------------------------------------
-#      Write channel file.
-# -------------------------------------------------------------------------
-
-# ---- Status message.
-logger.info("Writing Matlab-formatted channel file ...      ")
-
-# ---- For each detector, write the corresponding channel name, frame type,
-#      and virtual channel name to the channels file to be read by xdetection.
-f=open('input/channels.txt', 'w')
-for i in range(0,len(detector)) :
-    f.write(detector[i] + ':' + channel[i] + ' ' + frameType[i] + ' ' + detector[i] + ':' + channel[i] + '\n')
-f.close()
-
-# ---- Status message.
-logger.info("... finished writing channel file.        ")
-
-# -------------------------------------------------------------------------
 #    Make coincidence segment list for on-source, zero-lag segment.
 # -------------------------------------------------------------------------
 
 # ---- Status message.
 logger.info("Writing on-source event file ...          ")
 
-# ---- Now make segment lists for coincidence operation.  First determine
-#      segment list for zero lag, and verify that the on-source time is
-#      contained by a segment, else quit with error.
-# ---- On source period: +/- minimumSegmentLength / 2 around trigger time.
+# Here we calculate and create a setgment of the actual on source window of the analysis. This is not necessarily the same as the size of the onsource coincident segment which relates to the requested blockTime. 
 on_source_start_time = int(trigger_time + onSourceBeginOffset - transientTime)
 on_source_end_time = int(trigger_time + onSourceEndOffset + transientTime)
-
 on_source_window = SegmentList([Segment(on_source_start_time, on_source_end_time)])
 
 # check that on-source segment overlaps with science segments
@@ -864,197 +838,180 @@ for seg in full_segment_list:
         print "coincidence period:", seg.start, " ", seg.end
         sys.exit(1)
 
-# ---- At this point, the ScienceData object on_source_segment contains the
-#      on-source zero-lag segment.  Write this to the on-source event file.
-f=open('input/event_on_source.txt', 'w')
-fseg = open('input/segment_on_source.txt', 'w')
+# Here we create the on source segment
+on_source_window_segment = SegmentList([Segment(on_source_start_time, on_source_start_time + onSourceWindowLength)])
+on_source_window_segment.write('input/on_source_interval.txt')
 
+# Make a set of segments for the off_source jobs
+offsource_full_segment_list = copy.deepcopy(full_segment_list)
+offsource_full_segment_list = [iseg - on_source_window_segment for iseg in offsource_full_segment_list]
+for iseglist in offsource_full_segment_list:
+    for iseg in range(len(iseglist)):
+        iseglist[iseg] = Segment(iseglist[iseg])
+        
+
+coincidence_off_source = reduce(operator.or_, offsource_full_segment_list)
+coincidence_on_source = on_source_window_segment or reduce(operator.or_, full_segment_list)
+
+# ---- Split coincidence segment list into "chunks".
+coincidence_on_source_segment_chunks = setuputils.make_chunks(coincidence_on_source, blockTime, 2*transientTime)
+
+coincidence_on_source_segment_chunks.write('input/segment_on_source.txt')
+
+# Write on_source_window to file
 fwin = open('input/window_on_source.txt', 'w')
 fwin.write(str(int(trigger_time)) + ' 0' * len(detector) +'\n')
 fwin.close()
 
-# ---- Split coincidence segment list into "chunks".
-coincidence_segment.make_chunks(blockTime,2*transientTime)
-if len(coincidence_segment) > 1:
-    print "Error: The on source segment should not have holes? This one seem to have holes inside."
-    sys.exit(1)
+if args.search_type == 'grb':
+    # For GRB search make sure coincident on-source fully overlaps  with on-source window(i.e. there are no holes with it and the newly made coincident on-source segment.
+    if not on_source_window in coincidence_on_source:
+        logging.critical("Error: on-source period is not a coincidence segment of the specified network.")
+        sys.exit(1)
 
-# ---- Generate sky positions for patch about ra, dec at trigger_time.
-if int(cp.get('input','usexchooseskylocations')) and sky_pos_err:
-    skyPosFilename_trigger = 'input/sky_positions_trigger_time.txt'
-
-    if grid_type == 'line':
-        logger.info("Calling xchooseskylocations1 to generate {0}".format(skyPosFilename_trigger))
-        xchooseskylocationsCall = ' '.join([ "xchooseskylocations1",
-                                            str(ra),
-                                            str(decl),
-                                            str(trigger_time),
-                                            str(sky_pos_err),
-                                            cp.get('input','numSigmaSkyPos'),
-                                            siteStrTilde,
-                                            cp.get('input','delayTol'),
-                                            skyPosFilename_trigger,
-                                            '0'])
-
-        logger.info(xchooseskylocationsCall)
-        os.system(xchooseskylocationsCall)
-   
-    elif grid_type == 'timedelay':
-        logger.info("Calling xchoosetimedelays to generate {0}".format(skyPosFilename_trigger))
-        xchoosetimedelaysCall = ' '.join([ "xchoosetimedelays",
-                                            str(ra),
-                                            str(decl),
-                                            str(trigger_time),
-                                            siteStrTilde,
-                                            cp.get('input','delayTol'),
-                                            skyPosFilename_trigger,
-                                            '0'])
-
-        logger.info(xchoosetimedelaysCall)
-        os.system(xchoosetimedelaysCall)
-
-    elif grid_type == 'healpix' or grid_type == 'circular':
-        logger.info("Calling xmakeskygrid to generate {0}".format(skyPosFilename_trigger))
-        if ra2 and decl2 and sky_pos_err2:
-            ra_str = str(ra) + "~" + str(ra2)
-            decl_str = str(decl) + "~" + str(decl2)
-            sky_pos_err_str = str(sky_pos_err) + "~" + str(sky_pos_err2)
-        else:
+    # We must choose a sky grid and then loop over the on source segments with this selected grid and shift the grid slightly for each on source chunk as the earth has rotated
+    # slightly for each chunk. We then proceed to do the same things with the injects and off source
+    # ---- Generate sky positions for patch about ra, dec at trigger_time.
+    if int(cp.get('input','usexchooseskylocations')) and sky_pos_err:
+        skyPosFilename_trigger = 'input/sky_positions_trigger_time.txt'
+        if grid_type == 'healpix' or grid_type == 'circular':
+            logger.info("Calling xmakeskygrid to generate {0}".format(skyPosFilename_trigger))
             ra_str = str(ra)
             decl_str = str(decl)
             sky_pos_err_str = str(sky_pos_err)
-        xmakeskygridCall = ' '.join([ "xmakeskygrid", ra_str, decl_str,
-            str(trigger_time), sky_pos_err_str, cp.get('input','numSigmaSkyPos'),
-            siteStrTilde, cp.get('input','delayTol'), skyPosFilename_trigger,
-            grid_type, '0'])
-        logger.info(xmakeskygridCall)
-        os.system(xmakeskygridCall)
+            xmakeskygridCall = ' '.join([ "xmakeskygrid", ra_str, decl_str,
+                str(trigger_time), sky_pos_err_str, cp.get('input','numSigmaSkyPos'),
+                siteStrTilde, cp.get('input','delayTol'), skyPosFilename_trigger,
+                grid_type, '0'])
+            logger.info(xmakeskygridCall)
+            os.system(xmakeskygridCall)
 
-    elif grid_type == 'file':
-        logger.info("Calling xconvertfilegrid to generate {0}".format(skyPosFilename_trigger))
-        xconvertfilegridCall = ' '.join(['xconvertfilegrid',str(sky_pos_err),str(trigger_time),skyPosFilename_trigger])
-        logger.info(xconvertfilegridCall)
-        os.system(xconvertfilegridCall)
+        elif grid_type == 'file':
+            logger.info("Calling xconvertfilegrid to generate {0}".format(skyPosFilename_trigger))
+            xconvertfilegridCall = ' '.join(['xconvertfilegrid',str(sky_pos_err),str(trigger_time),skyPosFilename_trigger])
+            logger.info(xconvertfilegridCall)
+            os.system(xconvertfilegridCall)
 
-    elif grid_type == 'ipn':
-        logger.critical("IPN grids are currently unsupported. Please use circular or line instead.")
-
-    elif grid_type == 'opt':
-        logger.critical("Optimized position grids are currently unsupported. Please use circular or line instead.")
-
-    else:
-        logger.critical("Choice of sky position grid is unrecognized. Please use circular or line.")
+        else:
+            logger.critical("Choice of sky position grid is unrecognized. Please use circular or line.")
 
 
-seg = coincidence_segment[0]
-for iSeg in range(len(seg)):
-    # ---- Write event to event file.
-    time_range_string = str((seg.__getitem__(iSeg).start() + \
-                            seg.__getitem__(iSeg).end()) / 2) + \
-                            ' 0' * len(detector)  + '\n'
-    f.write(time_range_string)
-    # ---- Write segment to segment file.
-    time_range_string = '0 ' + str(int(seg.__getitem__(iSeg).start())) \
-                        + ' ' + str(int(seg.__getitem__(iSeg).end())) \
-                        + ' ' + str(int(seg.__getitem__(iSeg).end() \
-                        - seg.__getitem__(iSeg).start())) + '\n'
-    fseg.write(time_range_string)
-    gpsBlockCenterTime = (seg.__getitem__(iSeg).start()+seg.__getitem__(iSeg).end())/2
+    f = open('input/event_on_source.txt', 'w')
+    fseg = open('input/segment_on_source.txt', 'w')
+    # For each on source segment choose the sky locations
+    for iSeg in range(len(coincidence_on_source_segment_chunks)):
+        # ---- Write event to event file.
+        time_range_string = str((coincidence_on_source_segment_chunks[iSeg].start + \
+                                coincidence_on_source_segment_chunks[iSeg].end) / 2) + \
+                                ' 0' * len(detector)  + '\n'
+        f.write(time_range_string)
+        # ---- Write segment to segment file.
+        time_range_string = '0 ' + str(int(coincidence_on_source_segment_chunks[iSeg].start)) \
+                            + ' ' + str(int(coincidence_on_source_segment_chunks[iSeg].end)) \
+                            + ' ' + str(int(coincidence_on_source_segment_chunks[iSeg].end \
+                            - coincidence_on_source_segment_chunks[iSeg].start)) + '\n'
+        fseg.write(time_range_string)
 
-    # ---- If user has set usexchooseskylocations flag to 1 in params file we now
-    #      compute a list of sky positions we need to search and write these to a
-    #      file.
-    if int(cp.get('input','usexchooseskylocations')) and sky_pos_err:
-        skyPosFilename = 'input/sky_positions_' + str(iSeg) + '.txt'
-        logger.info("Calling xconvertskylocations to generate {0}".format(skyPosFilename))
-        xconvertskylocationsCall = ' '.join([ "xconvertskylocations",
-            str(skyPosFilename_trigger),
-            str(trigger_time),
-            str(gpsBlockCenterTime),
-            skyPosFilename])
-        logger.info(xconvertskylocationsCall)
-        os.system(xconvertskylocationsCall)
 
-        # ---- Check that the output file has been created.
-        if not os.path.isfile(skyPosFilename):
-            logger.critical("Error creating {0}".format(skyPosFilename))
+        gpsBlockCenterTime = (coincidence_on_source_segment_chunks[iSeg].start + coincidence_on_source_segment_chunks[iSeg].end)/2
 
-        # ---- Count number of sky positions.
-        numSky = len(open(skyPosFilename).readlines())
+        # ---- If user has set usexchooseskylocations flag to 1 in params file we now
+        #      compute a list of sky positions we need to search and write these to a
+        #      file.
+        if int(cp.get('input','usexchooseskylocations')) and sky_pos_err:
+            skyPosFilename = 'input/sky_positions_' + str(iSeg) + '.txt'
+            logger.info("Calling xconvertskylocations to generate {0}".format(skyPosFilename))
+            xconvertskylocationsCall = ' '.join([ "xconvertskylocations",
+                str(skyPosFilename_trigger),
+                str(trigger_time),
+                str(gpsBlockCenterTime),
+                skyPosFilename])
+            logger.info(xconvertskylocationsCall)
+            os.system(xconvertskylocationsCall)
 
-        # ---- Set skyPositionList arg that will be written to matlab format
-        #      parameters files.
-        skyPositionList = skyPosFilename
+            # ---- Check that the output file has been created.
+            if not os.path.isfile(skyPosFilename):
+                logger.critical("Error creating {0}".format(skyPosFilename))
 
-    # ---- If user has not specified a sky position error we will search only a
-    #      single sky position.
-    else:
-        # ---- Convert right ascension, declination to Earth-fixed coordinates.
-        skyutils.radectoearth(ra, decl, gpsBlockCenterTime, filename='input/earthfixedcoordinates' + str(iSeg) + '.txt')
-        phi, theta = skyutils.radectoearth(ra, decl, gpsBlockCenterTime)
-        # ---- Load earth-fixed coordinates back in.
-        logger.info("GRB position in Earth-fixed coordinates (rad):")
-        logger.info("    phi = {0}".format(phi))
-        logger.info("    theta = {0}".format(theta))
+            # ---- Count number of sky positions.
+            numSky = len(open(skyPosFilename).readlines())
 
-        # ---- Set number of sky positions.
-        numSky = 1
+            # ---- Set skyPositionList arg that will be written to matlab format
+            #      parameters files.
+            skyPositionList = skyPosFilename
 
-        # ---- Set skyPositionList arg that will be written to matlab format
-        #      parameters files.
-        skyPositionList = '[' + str(theta) + ',' + str(phi) + ']'
+        # ---- If user has not specified a sky position error we will search only a
+        #      single sky position.
+        else:
+            # ---- Convert right ascension, declination to Earth-fixed coordinates.
+            skyutils.radectoearth(ra, decl, gpsBlockCenterTime, filename='input/earthfixedcoordinates' + str(iSeg) + '.txt')
+            phi, theta = skyutils.radectoearth(ra, decl, gpsBlockCenterTime)
+            # ---- Load earth-fixed coordinates back in.
+            logger.info("GRB position in Earth-fixed coordinates (rad):")
+            logger.info("    phi = {0}".format(phi))
+            logger.info("    theta = {0}".format(theta))
 
-    # -----------------------------------------------------------------------------
-    #      Write Matlab-formatted parameters files.
-    # -----------------------------------------------------------------------------
+            # ---- Set number of sky positions.
+            numSky = 1
 
-    # ---- We will write three sets of parameters files:  one on-source file,
-    #      one off-source file, and (for each waveform set and injection scale)
-    #      one injections file.
+            # ---- Set skyPositionList arg that will be written to matlab format
+            #      parameters files.
+            skyPositionList = '[' + str(theta) + ',' + str(phi) + ']'
+
+
+        # -----------------------------------------------------------------------------
+        #      Write Matlab-formatted parameters files.
+        # -----------------------------------------------------------------------------
+
+        # ---- We will write three sets of parameters files:  one on-source file,
+        #      one off-source file, and (for each waveform set and injection scale)
+        #      one injections file.
+
+        # ---- Status message.
+        logger.info("Writing Matlab-formatted parameter files ...")
+
+        # ---- Parameters file for on-source analysis.
+        ioutils.write_onsource('input/parameters_on_source_' + str(iSeg) + '.txt', outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, cp)
+
+        # ---- Parameters file for ul-source analysis.
+        ioutils.write_ul_source('input/parameters_ul_source_' + str(iSeg) + '.txt',outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, cp)
+
+        # ---- Parameters file for off-source analysis.
+        ioutils.write_offsource('input/parameters_off_source_' + str(iSeg) + '.txt', outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, cp)
+
+        # ---- Parameter files for on-the-fly simulated waveform analyses, if requested.
+        if cp.has_section('waveforms') :
+            # ---- Read [injection] parameters.  If waveform_set is empty then no
+            #      files will be written.
+            waveform_set = cp.options('waveforms')
+            # ---- Write one parameters file for each (waveform set, injection scale) pair.
+            for iwaveform in waveform_set :
+                if cp.has_section(iwaveform) & cp.has_option(iwaveform,'injectionScales') :
+                    # ---- This check lets you specify different injection scales and
+                    #      spacing for each waveform set.
+                    injectionScalesList = cp.get(iwaveform,'injectionScales')
+                    injectionScales = injectionScalesList.split(',')
+                else:
+                    # ---- Otherwise, use the injection scales and spacing specified in
+                    #      the [injection] section.
+                    injectionScalesList = cp.get('injection','injectionScales')
+                    injectionScales = injectionScalesList.split(',')
+
+                # ---- If we do long injections we will have one single parameter file
+                ioutils.write_waveforms("input/parameters_simulation_" + iwaveform + "_0_" + str(iSeg) + ".txt", outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, cp, injectionScalesList, disableFastInjections, iwaveform)
+
+
+    f.close()
+    fseg.close()
+
+    # ---- Append to summary file.
+    sfile = open(summary_file,'a')
+    sfile.write('\t' + str(numSky))
+    sfile.close()
 
     # ---- Status message.
-    logger.info("Writing Matlab-formatted parameter files ...")
+    logger.info("... finished writing on-source event file.")
 
-    # ---- Parameters file for on-source analysis.
-    ioutils.write_onsource('input/parameters_on_source_' + str(iSeg) + '.txt', outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, parameters, onSourceEndOffset, cp)
-
-    # ---- Parameters file for ul-source analysis.
-    ioutils.write_ul_source('input/parameters_ul_source_' + str(iSeg) + '.txt',outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, parameters, onSourceEndOffset, cp)
-
-    # ---- Parameters file for off-source analysis.
-    ioutils.write_offsource('input/parameters_off_source_' + str(iSeg) + '.txt', outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, parameters, onSourceEndOffset, cp)
-
-    # ---- Parameter files for on-the-fly simulated waveform analyses, if requested.
-    if cp.has_section('waveforms') :
-        # ---- Read [injection] parameters.  If waveform_set is empty then no
-        #      files will be written.
-        waveform_set = cp.options('waveforms')
-        # ---- Write one parameters file for each (waveform set, injection scale) pair.
-        for iwaveform in waveform_set :
-            if cp.has_section(iwaveform) & cp.has_option(iwaveform,'injectionScales') :
-                # ---- This check lets you specify different injection scales and
-                #      spacing for each waveform set.
-                injectionScalesList = cp.get(iwaveform,'injectionScales')
-                injectionScales = injectionScalesList.split(',')
-            else:
-                # ---- Otherwise, use the injection scales and spacing specified in
-                #      the [injection] section.
-                injectionScalesList = cp.get('injection','injectionScales')
-                injectionScales = injectionScalesList.split(',')
-
-            # ---- If we do long injections we will have one single parameter file
-            ioutils.write_waveforms("input/parameters_simulation_" + iwaveform + "_0_" + str(iSeg) + ".txt", outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, parameters, onSourceEndOffset, cp, injectionScalesList, disableFastInjections, iwaveform)
-
-f.close()
-fseg.close()
-
-# ---- Status message.
-logger.info("... finished writing on-source event file.")
-
-# ---- Append to summary file.
-sfile = open(summary_file,'a')
-sfile.write('\t' + str(numSky))
-sfile.close()
 
 # -------------------------------------------------------------------------
 #      Determine MDCs to process, write mdcChannelFiles.
@@ -1089,43 +1046,23 @@ if catalog_dir:
 # ---- Status message.
 logger.info("Writing off-source event file ...          ")
 
-# ---- First remove the on-source times from all detector segment lists.
-off_source_segment = copy.deepcopy(on_source_segment)
-off_source_segment.invert()
-for det in full_segment_list:
-    det.intersection(off_source_segment)
-
-# -------------------------------------------------------------------------
-#    Copy waveform catalogs (if specified) to input/.
-# -------------------------------------------------------------------------
-
-if catalog_dir:
-    logger.info("Copying waveform catalogs to input/ ...")
-    cpCommand = ' '.join(['cp ' + catalog_dir + '/*.mat input/'])
-    os.system(cpCommand)
-    logger.info("... finished copying waveform catalogs.")
-
 # ---- Keep track of number of off-source events.
 numOff = 0
 
+# ---- Split coincidence segment list into "chunks".
+coincidence_off_source_segment_chunks = setuputils.make_chunks(coincidence_off_source, onSourceWindowLength, 2*transientTime)
+
 # ---- Make event list and segment list files for the zero-lag off-source times.
 f = open('input/window_off_source.txt', 'w')
-# ---- Make a temporary copy of the segment lists.
-lag_full_segment_list = copy.deepcopy(full_segment_list)
+
 # ---- List of lags for each detector (0 in this case)
 line = ' 0' * len(detector)
-# ---- Now take coincidence of segment lists.
-lag_coincidence_list = copy.deepcopy(lag_full_segment_list[0])
-for i in range(1,len(detector)):
-    lag_coincidence_list.intersection(lag_full_segment_list[i])
-# ---- Split coincidence segment list into "chunks".
-lag_coincidence_list.make_chunks(onSourceWindowLength,2*transientTime)
-for seg in lag_coincidence_list:
-    for i in range(len(seg)):
-        # ---- Write event to event file.
-        time_range_string = str(int(seg.__getitem__(i).start() - \
-                                  onSourceBeginOffset + transientTime) ) + line + '\n'
-        f.write(time_range_string)
+
+for iSeg in range(len(coincidence_off_source_segment_chunks)):
+    # ---- Write event to event file.
+    time_range_string = str(int(coincidence_off_source_segment_chunks[iSeg].start - \
+                              onSourceBeginOffset + transientTime)) + line + '\n'
+    f.write(time_range_string)
 f.close()
 
 # ---- Now open lag file (if any) and write event file for all non-zero lags.
@@ -1133,7 +1070,7 @@ f.close()
 #      Lag file will have one lag per detector; any of them may be zero.
 if lagFile:
     f = open('input/window_off_source.txt', 'a')
-    lag_list = open(lagFile,mode='r')
+    lag_list = open(lagFile, mode='r')
     for line in lag_list:
         # ---- Extract time lag for each detector.
         lags = line.split(None)
@@ -1143,29 +1080,22 @@ if lagFile:
             " Lag file: 0{}".format(lagFile))
 
         # ---- Make a time-lagged copy of the segment lists.
-        lag_full_segment_list = copy.deepcopy(full_segment_list)
+        lag_full_segment_list = copy.deepcopy(offsource_full_segment_list) 
         # ---- Time shift segment list of each detector.
-        for i in range(len(detector)):
-            for seg in lag_full_segment_list[i]:
-                seg.set_start(seg.start()-int(lags[i]))  # -- SUBTRACT lag
-                seg.set_end(seg.end()-int(lags[i]))  # -- SUBTRACT lag
-        # # ---- Sanity check: dump segments for each ifo to screen.
-        # print
-        # print "List of analysis segments for each detector", detector, ":"
-        # for det_list in lag_full_segment_list:
-        #     for seg in det_list:
-        #         print seg.start(), seg.end()
-        # ---- Now take coincidence of time-lagged segment lists.
-        lag_coincidence_list = copy.deepcopy(lag_full_segment_list[0])
-        for i in range(1,len(detector)):
-            lag_coincidence_list.intersection(lag_full_segment_list[i])
+        for iseglist in range(len(lag_full_segment_list)):
+            for iseg in range(len(lag_full_segment_list[iseglist])):
+                lag_full_segment_list[iseglist][iseg] = lag_full_segment_list[iseglist][iseg].shift(int(lags[iseglist]))
+
+        coincidence_off_source_lag = reduce(operator.or_, lag_full_segment_list)
+
         # ---- Split coincidence segment list into "chunks".
-        lag_coincidence_list.make_chunks(onSourceWindowLength,2*transientTime)
-        for seg in lag_coincidence_list:
-            for i in range(len(seg)):
-                time_range_string = str(int(seg.__getitem__(i).start() - \
-                                            onSourceBeginOffset + transientTime) ) + ' ' + line
-                f.write(time_range_string)
+        lag_coincidence_off_source_segment_chunks = setuputils.make_chunks(coincidence_off_source_lag, onSourceWindowLength, 2*transientTime)
+
+        for iSeg in range(len(lag_coincidence_off_source_segment_chunks)):
+            # ---- Write event to event file.
+            time_range_string = str(int(lag_coincidence_off_source_segment_chunks[iSeg].start - \
+                                      onSourceBeginOffset + transientTime)) +  ' ' + line
+            f.write(time_range_string)
     f.close()
 
 # ---- Status message.
@@ -1216,16 +1146,16 @@ if 1:
 	    detectorStr,
 	    "input/trigger_time_off.txt",
 	    "input/time_offsets_off.txt",
-	    cat1_segment_file_list[0],
-	    cat1_segment_file_list[1],
-	    cat1_segment_file_list[2],
-	    cat1_segment_file_list[3],
-	    cat1_segment_file_list[4],
-	    cat2_segment_file_list[0],
-	    cat2_segment_file_list[1],
-	    cat2_segment_file_list[2],
-	    cat2_segment_file_list[3],
-	    cat2_segment_file_list[4],
+	    cat1_segment_file_list['H1'],
+	    "None",
+	    cat1_segment_file_list['L1'],
+	    cat1_segment_file_list['G1'],
+	    cat1_segment_file_list['V1'],
+            cat24_segment_file_list['H1'],
+            "None",
+            cat24_segment_file_list['L1'],
+            cat24_segment_file_list['G1'],
+            cat24_segment_file_list['V1'],
 	    network_outputFile,
 	    str(onSourceBeginOffset),
 	    str(onSourceEndOffset),
@@ -1364,131 +1294,6 @@ for window in windowList:
         time_range_string = time_range_string + '\n'
         fev.write(time_range_string)
 fev.close()
-
-# -----------------------------------------------------------------------------
-#                   Find data frames, if necessary.
-# -----------------------------------------------------------------------------
-
-# ---- If dataFrameCache is specified and exists we will add it to frameCacheAll
-if dataFrameCache:
-    # ---- check the frameCache specified actually exists
-    if not os.path.isfile(dataFrameCache):
-        logger.critical("non existant framecache: {0}".format(dataFrameCache))
-
-    # ---- if the specified mdc frame cache exists then concat it other frame caches
-    command = 'cat ' + dataFrameCache + '  >> ' + frameCacheAll
-    os.system(command)
-
-# ---- If dataFrameCache is not specified in the config file, then call dataFind
-#      for each detector, and convert to readframedata-formatted framecache file.
-else:
-    # ---- Status message.
-    logger.info("Writing framecache file for ifo data...")
-    os.system('rm -f framecache_temp.txt')
-    # ---- Loop over detectors.
-    for i in range(0,len(detector)):
-        # ---- Construct dataFind command.
-        dataFindCommand = ' '.join([datafind_exec, \
-        "--server", datafind_server, \
-        "--observatory", detector[i][0], \
-        "--type", frameType[i], \
-        "--gps-start-time", str(start_time),  \
-        "--gps-end-time", str(end_time),    \
-        "--url-type file", "--gaps", "--lal-cache > lalcache.txt 2> ligo_data_find.err"])
-        # ---- Issue dataFind command.
-        print "calling dataFind:", dataFindCommand
-        os.system(dataFindCommand)
-        os.system('cat ligo_data_find.err')
-        print "... finished call to dataFind."
-        # ---- Convert lalframecache file to readframedata format.
-        print "calling convertlalcache:"
-        os.system('convertlalcache.pl lalcache.txt framecache_temp.txt')
-        os.system('cat framecache_temp.txt >> ' + frameCacheAll)
-        print "... finished call to convertlalcache."
-
-        # ---- Read stderr log of ligo_data_find to see if there are any gaps in the frames.
-        f = open('ligo_data_find.err','r')
-        gaps_str=f.read()
-        f.close()
-        # ---- Note: the format of the ligo_data_find.err file depends on which data find executable 
-        #      we are using. If we're using ligo_data_find then the error file is always non-empty, 
-        #      due to a deprecation warning message. Strip this out before checking for gaps.
-        if datafind_exec=='ligo_data_find':
-            # ---- File contains two lines of the form 
-            #        Warning: ligo_data_find has been deprecated in favour of gw_data_find, please consider using that executable, which takes the same arguments, and returnes the same results
-            #        missing segments: [segment(866386702, 866393054), ..., segment(866477785, 866488107)]
-            #      The code below is not expecting the warning message. Strip it out before 
-            #      continuing.
-            logger.info("Attempting to parse gaps file for ligo_data_find")
-            os.system('awk \'{ if (NR>1) print $0 }\' ligo_data_find.err > ligo_data_find_trimmed.err')
-            os.system('mv ligo_data_find_trimmed.err ligo_data_find.err')
-            # ---- Re-read error file -- it may be empty (the warning may have been the only line).
-            f = open('ligo_data_find.err','r')
-            gaps_str=f.read()
-            f.close()
-        os.system('rm ligo_data_find.err')
-
-        # ---- Check to see if any of the missing frames overlap with our analysis segments. 
-        #      If they do, remove the times with missing frames from the segment lists.
-        if gaps_str:
-            # ---- The format of the ligo_data_find.err file depends on which data find executable 
-            #      we are using. Check which it is and act appropriately.
-            if datafind_exec=='ligo_data_find':
-                # ---- (trimmed) File contains one line of the form 
-                #          missing segments: [segment(866386702, 866393054), ..., segment(866477785, 866488107)]
-                # ---- Now proceed in confidence.
-                gaps_str = gaps_str.replace('segment','segments.segment')
-                # ---- Strip out segment list from the strerr log of ligo_data_find
-                gaps_segments_str = 'segments.segmentlist(' + gaps_str[ gaps_str.index('[') : gaps_str.index(']')+1 ] + ')'
-                # ---- Read gap segments into segment list
-                gaps_segments = eval(gaps_segments_str)
-                gaps_segments.coalesce()
-                # ---- Need to write out these gap segments so we can read them
-                #      in again as ScienceData object, we really should choose
-                #      one type of segment object and use it everywhere.
-                f = open("gaps.txt","w"); tosegwizard(f,gaps_segments); f.flush(); f.close()
-            elif datafind_exec=='gw_data_find':
-                # ---- File is of the form 
-                #        Missing segments:
-                #        866386702.000000 866393054.000000
-                #        866396828.000000 866404754.000000
-                #        866410903.000000 866412664.000000
-                #        866413722.000000 866415440.000000
-                #        866477785.000000 866488107.000000
-                #      Use awk to turn this into a file with the segwizard format of gaps.txt generated above.
-                awkcmdfile_str = '{ if (NR==1) print \"# seg start stop duration\"; else if ($2==int($2)) print NR-2, int($1), int($2), int($2)-int($1); else print NR-2, int($1), int($2)+1, int($2)-int($1)+1}'
-                awkfile = open('./awkfile','w')
-                awkfile.write(awkcmdfile_str)
-                awkfile.close()
-                os.system('awk -f awkfile ligo_data_find.err > gaps.txt')
-                os.system('rm awkfile')
-            else :
-                logger.critical("Do not know how to process gaps file produced by " + datafind_exec)
-            # ---- Need to write out these gap segments so we can read them
-            #      in again as ScienceData object, we really should choose
-            #      one type of segment object and use it everywhere.
-            gaps_segments = pipeline.ScienceData()
-            gaps_segments.read( 'gaps.txt', 0 )
-            os.system('rm gaps.txt')
-            # ---- Identify any overlap between missing frames and full_segment_list
-            gaps_segments.intersection(full_segment_list[i])
-            if gaps_segments:
-                logger.critical("missing frames in {0}".format(detector[i]))
-                for jj in range(gaps_segments.__len__()):
-                    time_range_string = str(jj) + ' ' + \
-                        str(gaps_segments.__getitem__(jj).start()) \
-                        + ' ' + str(gaps_segments.__getitem__(jj).end())  \
-                        + ' ' + str(gaps_segments.__getitem__(jj).end() \
-                        -gaps_segments.__getitem__(jj).start())
-                    print time_range_string
-                sys.exit(1)
-
-    # ---- Clean up.
-    os.system('rm -f framecache_temp.txt lalcache.txt')
-    # ---- Set dataFrameCache variable to point to our new file.
-    dataFrameCache = frameCacheAll
-    # ---- Status message.
-    logger.info("... finished writing framecache file for ifo data")
 
 # -------------------------------------------------------------------------
 #      Write injection files for on-the-fly simulations, if needed.

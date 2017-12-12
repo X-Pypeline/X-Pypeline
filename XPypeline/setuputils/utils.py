@@ -174,14 +174,16 @@ def make_chunks(segment, length=0, overlap=0):
     overlap seconds. 
     when generating chunks 
     """
-    time_left = abs(segment)
-    start = segment.extent()[0]
-    increment = length - overlap
     chunks = []
-    while time_left >= length:
-        end = start + length
-        chunks.append(Segment(start,end))
-        start += increment
-        time_left -= increment
-    
+    for iseg in segment:
+        segtemp = SegmentList([iseg])
+        time_left = abs(segtemp)
+        start = segtemp.extent()[0]
+        increment = length - overlap
+        while time_left >= length:
+            end = start + length
+            chunks.append(Segment(start, end))
+            start += increment
+            time_left -= increment
+        
     return SegmentList(chunks)
