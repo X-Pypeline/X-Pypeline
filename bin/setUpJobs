@@ -499,18 +499,23 @@ detectorList      = detectorListLine.split(',')
 # ---- Interval of data to be analysed.
 # ---- Allow for asymmetric background analyses, if needed by the online analysis
 # ---- Flag to be read from ini file
-if doAsymmetricBackground == 0:
-    logger.info("Running analysis with symmetric background")
-    start_time = int(trigger_time - background_period / 2)
-    end_time = int(trigger_time + background_period / 2)
-# ---- introduce fractional background asymmetry
-else:
-    if backgroundAsymmetryFactor < 1.0:
-        logger.warning("Running analysis with asymmetric background")
-        start_time = int(trigger_time - background_period*backgroundAsymmetryFactor)
-        end_time = int(trigger_time + background_period*(1.0 - backgroundAsymmetryFactor))
+if args.search == 'grb':
+    if doAsymmetricBackground == 0:
+        logger.info("Running analysis with symmetric background")
+        start_time = int(trigger_time - background_period / 2)
+        end_time = int(trigger_time + background_period / 2)
+    # ---- introduce fractional background asymmetry
     else:
-        logger.critical( "Running analysis with asymmetric background but with wrong fractional asymmetry. backgroundAsymmetryFactor should be less than 1.0")
+        if backgroundAsymmetryFactor < 1.0:
+            logger.warning("Running analysis with asymmetric background")
+            start_time = int(trigger_time - background_period*backgroundAsymmetryFactor)
+            end_time = int(trigger_time + background_period*(1.0 - backgroundAsymmetryFactor))
+        else:
+            logger.critical( "Running analysis with asymmetric background but with wrong fractional asymmetry. backgroundAsymmetryFactor should be less than 1.0")
+elif args.search == 'sn':
+    start_time = int(trigger_time + onSourceBeginOffset - transientTime)
+    end_time = int(trigger_time + onSourceEndOffset + transientTime)
+
 duration = int(end_time - start_time)
 
 
@@ -850,8 +855,8 @@ for iseglist in offsource_full_segment_list:
         iseglist[iseg] = Segment(iseglist[iseg])
         
 
-coincidence_off_source = reduce(operator.or_, offsource_full_segment_list)
-coincidence_on_source = on_source_window_segment or reduce(operator.or_, full_segment_list)
+coincidence_off_source = reduce(operator.and_, offsource_full_segment_list)
+coincidence_on_source = on_source_window_segment or reduce(operator.and_, full_segment_list)
 
 # ---- Split coincidence segment list into "chunks".
 coincidence_on_source_segment_chunks = setuputils.make_chunks(coincidence_on_source, blockTime, 2*transientTime)
@@ -1082,11 +1087,11 @@ if lagFile:
         # ---- Make a time-lagged copy of the segment lists.
         lag_full_segment_list = copy.deepcopy(offsource_full_segment_list) 
         # ---- Time shift segment list of each detector.
-        for iseglist in range(len(lag_full_segment_list)):
-            for iseg in range(len(lag_full_segment_list[iseglist])):
-                lag_full_segment_list[iseglist][iseg] = lag_full_segment_list[iseglist][iseg].shift(int(lags[iseglist]))
+        for idet in range(len(detector)):
+            for isegments in range(len(lag_full_segment_list[idet])):
+                lag_full_segment_list[idet][isegments] = lag_full_segment_list[idet][isegments].shift(-int(lags[idet]))
 
-        coincidence_off_source_lag = reduce(operator.or_, lag_full_segment_list)
+        coincidence_off_source_lag = reduce(operator.and_, lag_full_segment_list)
 
         # ---- Split coincidence segment list into "chunks".
         lag_coincidence_off_source_segment_chunks = setuputils.make_chunks(coincidence_off_source_lag, onSourceWindowLength, 2*transientTime)
