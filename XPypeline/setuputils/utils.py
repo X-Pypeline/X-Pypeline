@@ -168,7 +168,7 @@ def validate_vetos(ifos, start, end, cp):
     return veto_seg_files
 
 
-def make_chunks(segment, length=0, overlap=0):
+def make_chunks(segment, length, overlap=0):
     """ 
     Divides the science segment into chunks of length seconds overlapped by 
     overlap seconds. 
@@ -185,5 +185,5 @@ def make_chunks(segment, length=0, overlap=0):
             chunks.append(Segment(start, end))
             start += increment
             time_left -= increment
-        
+
     return SegmentList(chunks)

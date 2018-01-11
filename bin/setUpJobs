@@ -291,6 +291,10 @@ FAP = args.FAP
 
 logger = log.Logger('X-Pypline')
 
+if ra2 and decl2 and sky_pos_err2:
+    raise ValueError('New setup script no longer supports supplying two sky locations due '
+                     'the amount of extra lines of code it requires.')
+
 
 #
 #    Validating inputs
@@ -347,7 +351,10 @@ else:
 # -------------------------------------------------------------------------
 
 logger.info("####################################################")
-logger.info("#              X-GRB Search Pipeline               #")
+if args.search_type == 'grb':
+    logger.info("#              X-GRB Search Pipeline               #")
+if args.search_type == 'sn':
+    logger.info("#              X-SN Search Pipeline               #")
 logger.info("####################################################")
 logger.info("\n")
 logger.info("Parsed input arguments:")
@@ -360,12 +367,6 @@ logger.info("         declination: {0}".format(decl))
 logger.info("         sky pos err: {0}".format(sky_pos_err))
 if injdistrib:
     logger.info("          injdistrib: {0}".format(injdistrib))
-if ra2 and decl2 and sky_pos_err2:
-    logger.info("   right ascension 2: {0}".format(ra2))
-    logger.info("       declination 2: {0}".format(decl2))
-    logger.info("       sky pos err 2: {0}".format(sky_pos_err2))
-if injdistrib2:
-    logger.info("         injdistrib2: {0}".format(injdistrib2))
 logger.info("    detector network: {0}".format(detector))
 if network_selection:
     logger.info("   network selection: automatic")
@@ -499,7 +500,7 @@ detectorList      = detectorListLine.split(',')
 # ---- Interval of data to be analysed.
 # ---- Allow for asymmetric background analyses, if needed by the online analysis
 # ---- Flag to be read from ini file
-if args.search == 'grb':
+if args.search_type == 'grb':
     if doAsymmetricBackground == 0:
         logger.info("Running analysis with symmetric background")
         start_time = int(trigger_time - background_period / 2)
@@ -512,7 +513,7 @@ if args.search == 'grb':
             end_time = int(trigger_time + background_period*(1.0 - backgroundAsymmetryFactor))
         else:
             logger.critical( "Running analysis with asymmetric background but with wrong fractional asymmetry. backgroundAsymmetryFactor should be less than 1.0")
-elif args.search == 'sn':
+elif args.search_type == 'sn':
     start_time = int(trigger_time + onSourceBeginOffset - transientTime)
     end_time = int(trigger_time + onSourceEndOffset + transientTime)
 
@@ -847,21 +848,33 @@ for seg in full_segment_list:
 on_source_window_segment = SegmentList([Segment(on_source_start_time, on_source_start_time + onSourceWindowLength)])
 on_source_window_segment.write('input/on_source_interval.txt')
 
-# Make a set of segments for the off_source jobs
-offsource_full_segment_list = copy.deepcopy(full_segment_list)
-offsource_full_segment_list = [iseg - on_source_window_segment for iseg in offsource_full_segment_list]
-for iseglist in offsource_full_segment_list:
-    for iseg in range(len(iseglist)):
-        iseglist[iseg] = Segment(iseglist[iseg])
-        
+if args.search_type == 'grb':
+    # Make a set of segments for the off_source jobs
+    offsource_full_segment_list = copy.deepcopy(full_segment_list)
+    offsource_full_segment_list = [iseg - on_source_window_segment for iseg in offsource_full_segment_list]
+    for iseglist in offsource_full_segment_list:
+        for iseg in range(len(iseglist)):
+            iseglist[iseg] = Segment(iseglist[iseg])
+            
 
-coincidence_off_source = reduce(operator.and_, offsource_full_segment_list)
-coincidence_on_source = on_source_window_segment or reduce(operator.and_, full_segment_list)
+    coincidence_off_source = reduce(operator.and_, offsource_full_segment_list)
+    coincidence_on_source = on_source_window_segment or reduce(operator.and_, full_segment_list)
 
 # ---- Split coincidence segment list into "chunks".
-coincidence_on_source_segment_chunks = setuputils.make_chunks(coincidence_on_source, blockTime, 2*transientTime)
+    coincidence_on_source_segment_chunks = setuputils.make_chunks(coincidence_on_source, blockTime, 2*transientTime)
+elif args.search_type == 'sn':
+    # If SN then on source and off source are the same soo....
+    offsource_full_segment_list = copy.deepcopy(full_segment_list)
+    coincidence_on_source = reduce(operator.and_, full_segment_list)
+    coincidence_off_source = reduce(operator.and_, full_segment_list)
+    coincidence_on_source_segment_chunks = setuputils.make_chunks(coincidence_on_source, blockTime, 2*transientTime)
+    # Make use of unused data
+    if abs(coincidence_on_source - coincidence_on_source_segment_chunks):
+        coincidence_on_source_segment_chunks.append(Segment(Segment(coincidence_on_source.extent()).end - blockTime, Segment(coincidence_on_source.extent()).end))
+
 
 coincidence_on_source_segment_chunks.write('input/segment_on_source.txt')
+
 
 # Write on_source_window to file
 fwin = open('input/window_on_source.txt', 'w')
@@ -901,28 +914,31 @@ if args.search_type == 'grb':
             logger.critical("Choice of sky position grid is unrecognized. Please use circular or line.")
 
 
-    f = open('input/event_on_source.txt', 'w')
-    fseg = open('input/segment_on_source.txt', 'w')
-    # For each on source segment choose the sky locations
-    for iSeg in range(len(coincidence_on_source_segment_chunks)):
-        # ---- Write event to event file.
-        time_range_string = str((coincidence_on_source_segment_chunks[iSeg].start + \
-                                coincidence_on_source_segment_chunks[iSeg].end) / 2) + \
-                                ' 0' * len(detector)  + '\n'
-        f.write(time_range_string)
-        # ---- Write segment to segment file.
-        time_range_string = '0 ' + str(int(coincidence_on_source_segment_chunks[iSeg].start)) \
-                            + ' ' + str(int(coincidence_on_source_segment_chunks[iSeg].end)) \
-                            + ' ' + str(int(coincidence_on_source_segment_chunks[iSeg].end \
-                            - coincidence_on_source_segment_chunks[iSeg].start)) + '\n'
-        fseg.write(time_range_string)
+f = open('input/event_on_source.txt', 'w')
+fseg = open('input/segment_on_source.txt', 'w')
+# For each on source segment choose the sky locations
+for iSeg in range(len(coincidence_on_source_segment_chunks)):
+    # ---- Write event to event file.
+    time_range_string = str((float(coincidence_on_source_segment_chunks[iSeg].start) + \
+                            float(coincidence_on_source_segment_chunks[iSeg].end)) / 2) + \
+                            ' 0' * len(detector)  + '\n'
+    f.write(time_range_string)
+    # ---- Write segment to segment file.
+    time_range_string = '0 ' + str(int(coincidence_on_source_segment_chunks[iSeg].start)) \
+                        + ' ' + str(int(coincidence_on_source_segment_chunks[iSeg].end)) \
+                        + ' ' + str(int(coincidence_on_source_segment_chunks[iSeg].end \
+                        - coincidence_on_source_segment_chunks[iSeg].start)) + '\n'
+    fseg.write(time_range_string)
 
 
-        gpsBlockCenterTime = (coincidence_on_source_segment_chunks[iSeg].start + coincidence_on_source_segment_chunks[iSeg].end)/2
+    gpsBlockCenterTime = (float(coincidence_on_source_segment_chunks[iSeg].start) + float(coincidence_on_source_segment_chunks[iSeg].end))/2
+
+    if args.search_type == 'grb':
 
         # ---- If user has set usexchooseskylocations flag to 1 in params file we now
         #      compute a list of sky positions we need to search and write these to a
         #      file.
+
         if int(cp.get('input','usexchooseskylocations')) and sky_pos_err:
             skyPosFilename = 'input/sky_positions_' + str(iSeg) + '.txt'
             logger.info("Calling xconvertskylocations to generate {0}".format(skyPosFilename))
@@ -963,59 +979,75 @@ if args.search_type == 'grb':
             #      parameters files.
             skyPositionList = '[' + str(theta) + ',' + str(phi) + ']'
 
+    elif args.search_type == 'sn':
 
-        # -----------------------------------------------------------------------------
-        #      Write Matlab-formatted parameters files.
-        # -----------------------------------------------------------------------------
+        # ---- Convert right ascension, declination to Earth-fixed coordinates.
+        skyutils.radectoearth(ra, decl, gpsBlockCenterTime, filename='input/earthfixedcoordinates' + str(iSeg) + '.txt')
+        phi, theta = skyutils.radectoearth(ra, decl, gpsBlockCenterTime)
+        # ---- Load earth-fixed coordinates back in.
+        logger.info("GRB position in Earth-fixed coordinates (rad):")
+        logger.info("    phi = {0}".format(phi))
+        logger.info("    theta = {0}".format(theta))
 
-        # ---- We will write three sets of parameters files:  one on-source file,
-        #      one off-source file, and (for each waveform set and injection scale)
-        #      one injections file.
+        # ---- Set number of sky positions.
+        numSky = 1
 
-        # ---- Status message.
-        logger.info("Writing Matlab-formatted parameter files ...")
+        # ---- Set skyPositionList arg that will be written to matlab format
+        #      parameters files.
+        skyPositionList = '[' + str(theta) + ',' + str(phi) + ']'
 
-        # ---- Parameters file for on-source analysis.
-        ioutils.write_onsource('input/parameters_on_source_' + str(iSeg) + '.txt', outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, cp)
+    # -----------------------------------------------------------------------------
+    #      Write Matlab-formatted parameters files.
+    # -----------------------------------------------------------------------------
 
-        # ---- Parameters file for ul-source analysis.
-        ioutils.write_ul_source('input/parameters_ul_source_' + str(iSeg) + '.txt',outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, cp)
-
-        # ---- Parameters file for off-source analysis.
-        ioutils.write_offsource('input/parameters_off_source_' + str(iSeg) + '.txt', outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, cp)
-
-        # ---- Parameter files for on-the-fly simulated waveform analyses, if requested.
-        if cp.has_section('waveforms') :
-            # ---- Read [injection] parameters.  If waveform_set is empty then no
-            #      files will be written.
-            waveform_set = cp.options('waveforms')
-            # ---- Write one parameters file for each (waveform set, injection scale) pair.
-            for iwaveform in waveform_set :
-                if cp.has_section(iwaveform) & cp.has_option(iwaveform,'injectionScales') :
-                    # ---- This check lets you specify different injection scales and
-                    #      spacing for each waveform set.
-                    injectionScalesList = cp.get(iwaveform,'injectionScales')
-                    injectionScales = injectionScalesList.split(',')
-                else:
-                    # ---- Otherwise, use the injection scales and spacing specified in
-                    #      the [injection] section.
-                    injectionScalesList = cp.get('injection','injectionScales')
-                    injectionScales = injectionScalesList.split(',')
-
-                # ---- If we do long injections we will have one single parameter file
-                ioutils.write_waveforms("input/parameters_simulation_" + iwaveform + "_0_" + str(iSeg) + ".txt", outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, cp, injectionScalesList, disableFastInjections, iwaveform)
-
-
-    f.close()
-    fseg.close()
-
-    # ---- Append to summary file.
-    sfile = open(summary_file,'a')
-    sfile.write('\t' + str(numSky))
-    sfile.close()
+    # ---- We will write three sets of parameters files:  one on-source file,
+    #      one off-source file, and (for each waveform set and injection scale)
+    #      one injections file.
 
     # ---- Status message.
-    logger.info("... finished writing on-source event file.")
+    logger.info("Writing Matlab-formatted parameter files ...")
+
+    # ---- Parameters file for on-source analysis.
+    ioutils.write_onsource('input/parameters_on_source_' + str(iSeg) + '.txt', outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, cp)
+
+    # ---- Parameters file for ul-source analysis.
+    ioutils.write_ul_source('input/parameters_ul_source_' + str(iSeg) + '.txt',outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, cp)
+
+    # ---- Parameters file for off-source analysis.
+    ioutils.write_offsource('input/parameters_off_source_' + str(iSeg) + '.txt', outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, cp)
+
+    # ---- Parameter files for on-the-fly simulated waveform analyses, if requested.
+    if cp.has_section('waveforms') :
+        # ---- Read [injection] parameters.  If waveform_set is empty then no
+        #      files will be written.
+        waveform_set = cp.options('waveforms')
+        # ---- Write one parameters file for each (waveform set, injection scale) pair.
+        for iwaveform in waveform_set :
+            if cp.has_section(iwaveform) & cp.has_option(iwaveform,'injectionScales') :
+                # ---- This check lets you specify different injection scales and
+                #      spacing for each waveform set.
+                injectionScalesList = cp.get(iwaveform,'injectionScales')
+                injectionScales = injectionScalesList.split(',')
+            else:
+                # ---- Otherwise, use the injection scales and spacing specified in
+                #      the [injection] section.
+                injectionScalesList = cp.get('injection','injectionScales')
+                injectionScales = injectionScalesList.split(',')
+
+            # ---- If we do long injections we will have one single parameter file
+            ioutils.write_waveforms("input/parameters_simulation_" + iwaveform + "_0_" + str(iSeg) + ".txt", outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, cp, injectionScalesList, disableFastInjections, iwaveform)
+
+
+f.close()
+fseg.close()
+
+# ---- Append to summary file.
+sfile = open(summary_file,'a')
+sfile.write('\t' + str(numSky))
+sfile.close()
+
+# ---- Status message.
+logger.info("... finished writing on-source event file.")
 
 
 # -------------------------------------------------------------------------
@@ -1054,27 +1086,37 @@ logger.info("Writing off-source event file ...          ")
 # ---- Keep track of number of off-source events.
 numOff = 0
 
-# ---- Split coincidence segment list into "chunks".
-coincidence_off_source_segment_chunks = setuputils.make_chunks(coincidence_off_source, onSourceWindowLength, 2*transientTime)
+if args.search_type == 'grb':
+    #If this is a grb search we can use some of the background in zero lag to build stats. Otherwise if
+    # it is sn or allsky then all of the zero lag "background" or "offsource" is used for the on_source trials.
+    #Therefore, we can only use lags to generate off source trials for those.
 
-# ---- Make event list and segment list files for the zero-lag off-source times.
-f = open('input/window_off_source.txt', 'w')
+    # ---- Split coincidence segment list into "chunks".
+    coincidence_off_source_segment_chunks = setuputils.make_chunks(coincidence_off_source, onSourceWindowLength, 2*transientTime)
 
-# ---- List of lags for each detector (0 in this case)
-line = ' 0' * len(detector)
+    # ---- Make event list and segment list files for the zero-lag off-source times.
+    f = open('input/window_off_source.txt', 'w')
 
-for iSeg in range(len(coincidence_off_source_segment_chunks)):
-    # ---- Write event to event file.
-    time_range_string = str(int(coincidence_off_source_segment_chunks[iSeg].start - \
-                              onSourceBeginOffset + transientTime)) + line + '\n'
-    f.write(time_range_string)
-f.close()
+    # ---- List of lags for each detector (0 in this case)
+    line = ' 0' * len(detector)
+
+    for iSeg in range(len(coincidence_off_source_segment_chunks)):
+        # ---- Write event to event file.
+        time_range_string = str(int(coincidence_off_source_segment_chunks[iSeg].start - \
+                                  onSourceBeginOffset + transientTime)) + line + '\n'
+        f.write(time_range_string)
+    f.close()
 
 # ---- Now open lag file (if any) and write event file for all non-zero lags.
 # ---- We'll supply network dependent-defaults.
 #      Lag file will have one lag per detector; any of them may be zero.
 if lagFile:
-    f = open('input/window_off_source.txt', 'a')
+    if args.search_type == 'grb':
+        f = open('input/window_off_source.txt', 'a')
+    elif args.search_type == 'sn':
+        f = open('input/event_off_source.txt', 'w')
+        fseg = open('input/segment_off_source.txt', 'w')
+
     lag_list = open(lagFile, mode='r')
     for line in lag_list:
         # ---- Extract time lag for each detector.
@@ -1093,15 +1135,40 @@ if lagFile:
 
         coincidence_off_source_lag = reduce(operator.and_, lag_full_segment_list)
 
-        # ---- Split coincidence segment list into "chunks".
-        lag_coincidence_off_source_segment_chunks = setuputils.make_chunks(coincidence_off_source_lag, onSourceWindowLength, 2*transientTime)
+        if args.search_type == 'grb':
+            lag_coincidence_off_source_segment_chunks = setuputils.make_chunks(coincidence_off_source_lag, onSourceWindowLength, 2*transientTime)
+            for iSeg in range(len(lag_coincidence_off_source_segment_chunks)):
+                # ---- Write event to event file.
+                time_range_string = str(int(lag_coincidence_off_source_segment_chunks[iSeg].start - \
+                                          onSourceBeginOffset + transientTime)) +  ' ' + line
+                f.write(time_range_string)
 
-        for iSeg in range(len(lag_coincidence_off_source_segment_chunks)):
-            # ---- Write event to event file.
-            time_range_string = str(int(lag_coincidence_off_source_segment_chunks[iSeg].start - \
-                                      onSourceBeginOffset + transientTime)) +  ' ' + line
-            f.write(time_range_string)
-    f.close()
+        elif args.search_type == 'sn':
+            # ---- Split coincidence segment list into "chunks".
+            lag_coincidence_off_source_segment_chunks = setuputils.make_chunks(coincidence_off_source_lag, blockTime, 2*transientTime)
+            # If this is a SN search then we want to make an additonal segment using any unused segment data.
+            if abs(coincidence_off_source_lag - lag_coincidence_off_source_segment_chunks):
+                lag_coincidence_off_source_segment_chunks.append(Segment(Segment(coincidence_off_source_lag.extent()).end - blockTime, Segment(coincidence_off_source_lag.extent()).end))
+
+            for iSeg in range(len(lag_coincidence_off_source_segment_chunks)):
+                # ---- Write event to event file.
+                time_range_string = str((int(lag_coincidence_off_source_segment_chunks[iSeg].start) \
+                    + int(lag_coincidence_off_source_segment_chunks[iSeg].end)) / 2) 
+                time_range_string = time_range_string + ' ' + line
+                f.write(time_range_string)
+                # ---- Write segment to segment file.
+                time_range_string = '0 ' + str(int(lag_coincidence_off_source_segment_chunks[iSeg].start)) \
+                    + ' ' + str(int(lag_coincidence_off_source_segment_chunks[iSeg].end)) \
+                    + ' ' + str(int(lag_coincidence_off_source_segment_chunks[iSeg].end) \
+                    - int(lag_coincidence_off_source_segment_chunks[iSeg].start)) + '\n'
+                fseg.write(time_range_string)
+                numOff = numOff + 1
+
+    if args.search_type == 'grb':
+        f.close()
+    elif args.search_type == 'sn':
+        f.close()
+        fseg.close()
 
 # ---- Status message.
 logger.info("... finished writing off-source event file.")
@@ -1110,7 +1177,7 @@ logger.info("... finished writing off-source event file.")
 #      Read in off-source event file and check each event passes meets our
 #                            network criteria.
 # -----------------------------------------------------------------------------
-if 1:
+if args.search_type == 'grb':
 # KLUDGE so that we don't have to reindent the code below
 
     logger.info("Applying network criteria to our off-source events.")
@@ -1145,33 +1212,33 @@ if 1:
 
     # ---- Find network for each off-source event using xnetworkselection.m.
     if not cp.has_option('parameters','makeSimulatedNoise'):
-	network_outputFile = 'input/xnetworkselection_offsource.dat'
+        network_outputFile = 'input/xnetworkselection_offsource.dat'
 
-	xnetworkselectionCall = ' '.join([ "xnetworkselection",
-	    detectorStr,
-	    "input/trigger_time_off.txt",
-	    "input/time_offsets_off.txt",
-	    cat1_segment_file_list['H1'],
-	    "None",
-	    cat1_segment_file_list['L1'],
-	    cat1_segment_file_list['G1'],
-	    cat1_segment_file_list['V1'],
+        xnetworkselectionCall = ' '.join([ "xnetworkselection",
+            detectorStr,
+            "input/trigger_time_off.txt",
+            "input/time_offsets_off.txt",
+            cat1_segment_file_list['H1'],
+            "None",
+            cat1_segment_file_list['L1'],
+            cat1_segment_file_list['G1'],
+            cat1_segment_file_list['V1'],
             cat24_segment_file_list['H1'],
             "None",
             cat24_segment_file_list['L1'],
             cat24_segment_file_list['G1'],
             cat24_segment_file_list['V1'],
-	    network_outputFile,
-	    str(onSourceBeginOffset),
-	    str(onSourceEndOffset),
-	    str(transientTime),
-	    str(onSourceWindowLength)
-	    ])
+            network_outputFile,
+            str(onSourceBeginOffset),
+            str(onSourceEndOffset),
+            str(transientTime),
+            str(onSourceWindowLength)
+            ])
 
-	logger.info(xnetworkselectionCall)
-	os.system(xnetworkselectionCall)
+        logger.info(xnetworkselectionCall)
+        os.system(xnetworkselectionCall)
 
-	# ---- Read in network strings from network_outputFile.
+        # ---- Read in network strings from network_outputFile.
         fnetworks = open(network_outputFile,'r')
         networks = fnetworks.readlines()
         fnetworks.close()
@@ -1271,34 +1338,39 @@ if 1:
     logger.info("We retain the " + str(numOff) +  " jobs from a total of "
         + str(origNumOff) + " off-source jobs that satisfy " + "our network criteria.")
 
+    # ---- If we do not have the required number of off-source jobs tell
+    #      the user and exit.
+    if cp.has_option('background','numJobs'):
+        background_numJobs = int(cp.get('background','numJobs'))
+        if numOff < background_numJobs:
+            logger.critical("Specify more lags to get desired "\
+                "number of background jobs: numJobs = {0}".format( background_numJobs))
+
+    # ---- Split window list into event list
+    fwin = open('input/window_off_source.txt','r')
+    windowList = fwin.readlines()
+    fwin.close()
+
+    fev = open('input/event_off_source.txt','w')
+    for window in windowList:
+        windowWord=window.split()
+        for iJob in range(jobsPerWindow):
+            time_range_string = str(float(windowWord[0])+onSourceBeginOffset+(blockTime-2*transientTime)*(0.5+iJob))
+            for iWord in range(1,len(windowWord)):
+                time_range_string = time_range_string + ' ' + windowWord[iWord]
+            time_range_string = time_range_string + '\n'
+            fev.write(time_range_string)
+    fev.close()
+
+elif args.search_type == 'sn':
+    logger.info("We retain the " + str(numOff) +  " jobs from a total of "
+        + str(numOff) + " off-source jobs that satisfy " + "our network criteria.")
+
 # ---- Append to summary file.
 sfile = open(summary_file,'a')
 sfile.write('\t' + str(numOff))
 sfile.close()
 
-# ---- If we do not have the required number of off-source jobs tell
-#      the user and exit.
-if cp.has_option('background','numJobs'):
-    background_numJobs = int(cp.get('background','numJobs'))
-    if numOff < background_numJobs:
-        logger.critical("Specify more lags to get desired "\
-            "number of background jobs: numJobs = {0}".format( background_numJobs))
-
-# ---- Split window list into event list
-fwin = open('input/window_off_source.txt','r')
-windowList = fwin.readlines()
-fwin.close()
-
-fev = open('input/event_off_source.txt','w')
-for window in windowList:
-    windowWord=window.split()
-    for iJob in range(jobsPerWindow):
-        time_range_string = str(float(windowWord[0])+onSourceBeginOffset+(blockTime-2*transientTime)*(0.5+iJob))
-        for iWord in range(1,len(windowWord)):
-            time_range_string = time_range_string + ' ' + windowWord[iWord]
-        time_range_string = time_range_string + '\n'
-        fev.write(time_range_string)
-fev.close()
 
 # -------------------------------------------------------------------------
 #      Write injection files for on-the-fly simulations, if needed.
@@ -1341,16 +1413,7 @@ if cp.has_section('waveforms') :
     injectionInterval = cp.get('injection','injectionInterval')
     # ---- If we have second error circle, then adjust injectionInterval by a
     #      factor of 2 to put half the injections in each circle.
-    if ra2 and decl2:
-        injectionInterval_num = float(injectionInterval)
-        if injectionInterval_num > 0:
-            injectionInterval_num = 2 * injectionInterval_num
-        elif injectionInterval_num < 0:
-            injectionInterval_num = int(injectionInterval_num/2)
-        else:
-            logger.critical("Error: injectionInterval == 0")
 
-        injectionInterval = str(injectionInterval_num)
     logger.info("Making injection files ...")
     for set in waveform_set :
         waveforms = cp.get('waveforms',set)
@@ -1366,83 +1429,28 @@ if cp.has_section('waveforms') :
   	# ---- setUpJobs script that was here before [SARAH]
         else:
             # ---- Construct command to make injection file for this waveform set.
-            if ra2 and decl2:
-            # ---- Call injection code twice, once for each error circle.
-                # ---- Command to make injection file for first error circle.
-                # ---- Wrap waveforms string in single quotes to escape any ; characters, 
-                #      which are used for generating random injection parameters.
-                tmpwaveforms = ''.join(["'", waveforms, "'"]) 
-                make_injection_file_command = ' '.join(["xmakegrbinjectionfile",
-                "circle1.txt", tmpwaveforms,
-                injTimeRangeStr,
-                injTimeOffsetStr,
-                injectionInterval, str(ra), str(decl), str(seed), grid_type, grid_sim_file ])
-                # ---- Issue command to make injection file for this waveform set.
-                print >>  sys.stdout, "make_injection_file_command:", make_injection_file_command
-                os.system(make_injection_file_command)
-                # ---- Make and issue command to jitter injection file.
-                #      Note that for the two-circle case we assume the sky position
-                #      to be lognormal distributed.  If injdistrib, injdistrib2 are
-                #      not specified then no jittering is done.
-                if injdistrib:
-                    jitter_injection_command = ' '.join(["xjitterinjectionskypositions",
-                    "circle1.txt",
-                    "circle1.txt",
-                    injdistrib ])
-                print >>  sys.stdout, "    Jittering: ", "circle1.txt"
+            # ---- Wrap waveforms string in single quotes to escape any ; characters, 
+            #      which are used for generating random injection parameters.
+            tmpwaveforms = ''.join(["'", waveforms, "'"]) 
+            make_injection_file_command = ' '.join(["xmakegrbinjectionfile",
+            injfilename, tmpwaveforms,
+            injTimeRangeStr,
+            injTimeOffsetStr,
+            injectionInterval, str(ra), str(decl), str(seed), grid_type, grid_sim_file ])
+            # ---- Issue command to make injection file for this waveform set.
+            # ---- We'll overwrite this file later with miscalibrated and/or
+            #      jittered versions, if desired.
+            print >>  sys.stdout, "    Writing :", injfilename
+            print >>  sys.stdout, make_injection_file_command
+            os.system(make_injection_file_command)
+            if injdistrib:
+                jitter_injection_command = ' '.join(["xjitterinjectionskypositions",
+                injfilename,
+                injfilename,
+                injdistrib ])
+                print >>  sys.stdout, "    Jittering: ", injfilename
                 print >>  sys.stdout, jitter_injection_command
                 os.system(jitter_injection_command)
-                # ---- Command to make injection file for second error circle.
-                # ---- Wrap waveforms string in single quotes to escape any ; characters, 
-                #      which are used for generating random injection parameters.
-                tmpwaveforms = ''.join(["'", waveforms, "'"]) 
-                make_injection_file_command = ' '.join(["xmakegrbinjectionfile",
-                "circle2.txt", tmpwaveforms,
-                injTimeRangeStr,
-                injTimeOffsetStr,
-                injectionInterval, str(ra2), str(decl2), str(seed+1), grid_type, grid_sim_file ])
-                # ---- Issue command to make injection file for this waveform set.
-                print >>  sys.stdout, "make_injection_file_command:", make_injection_file_command
-                os.system(make_injection_file_command)
-                # ---- Make and issue command to jitter injection file.
-                #      Note that for the two-circle case we assume the sky position
-                #      to be lognormal distributed.  If injdistrib, injdistrib2 are
-                #      not specified then no jittering is done.
-                if injdistrib2:
-                    jitter_injection_command = ' '.join(["xjitterinjectionskypositions",
-                    "circle2.txt",
-                    "circle2.txt",
-                    injdistrib2 ])
-                    print >>  sys.stdout, "    Jittering: ", "circle2.txt"
-                    print >>  sys.stdout, jitter_injection_command
-                    os.system(jitter_injection_command)
-                # ---- Combine into a single file.
-                combine_command = ' '.join(["sort -m circle1.txt circle2.txt >", injfilename ])
-                os.system(combine_command)
-                os.system("rm circle1.txt circle2.txt")
-            else:
-                # ---- Wrap waveforms string in single quotes to escape any ; characters, 
-                #      which are used for generating random injection parameters.
-                tmpwaveforms = ''.join(["'", waveforms, "'"]) 
-                make_injection_file_command = ' '.join(["xmakegrbinjectionfile",
-                injfilename, tmpwaveforms,
-                injTimeRangeStr,
-                injTimeOffsetStr,
-                injectionInterval, str(ra), str(decl), str(seed), grid_type, grid_sim_file ])
-                # ---- Issue command to make injection file for this waveform set.
-                # ---- We'll overwrite this file later with miscalibrated and/or
-                #      jittered versions, if desired.
-                print >>  sys.stdout, "    Writing :", injfilename
-                print >>  sys.stdout, make_injection_file_command
-                os.system(make_injection_file_command)
-                if injdistrib:
-                    jitter_injection_command = ' '.join(["xjitterinjectionskypositions",
-                    injfilename,
-                    injfilename,
-                    injdistrib ])
-                    print >>  sys.stdout, "    Jittering: ", injfilename
-                    print >>  sys.stdout, jitter_injection_command
-                    os.system(jitter_injection_command)
 
         # ---- Apply calibiration uncertainties to injections if required. We use
         #      the real detector (rather than the virtual detector) for determining
@@ -1854,6 +1862,7 @@ mergejob = xcondor.XmergeJob(cp)
 # ---- Put a single merge job node in mergejob.  This job will combine
 #      into a single file the output of all of the off-source analysis jobs.
 mergenode = xcondor.XmergeNode(mergejob)
+
 if xtmvaFlag:
     xtmvanode.add_parent(mergenode)
 
@@ -1869,29 +1878,6 @@ event_off_list = event_off_file.readlines()
 nOffEvents = len(event_off_list)
 event_off_file.close()
 # ---- END OF KLUDGE FXI
-
-# ---- Read how the user wants the results distributed (over nodes, or not)
-#      and record this info to a file.
-distributeOffSource = int(cp.get('output','distributeOffSource'))
-if distributeOffSource == 1 :
-    nodePath = cp.get('output','nodePath')
-    onNodeOffSourcePath = cp.get('output','onNodeOffSourcePath')
-    nNodes = int(cp.get('output','nNodes'))
-    jobNodeFileOffSource = cp.get('output','jobNodeFileOffSource')
-    nodeList = open( jobNodeFileOffSource,'w')
-    nodeList.write("Number_of_detectors %d\n"%(len(detector)))
-    for i in range(0,len(detector)) :
-        nodeList.write("%s\t"%(detector[i]))
-    nodeList.write("\n")
-    nodeList.write('event_off_source_file ')
-    nodeList.write(cwdstr + "/input/event_off_source.txt \n")
-    nodeList.write("Injection_file N/A \n")
-    nodeList.write('Number_of_jobs ')
-    nodeList.write("%d \n"%(nOffEvents))
-    nJobsPerNode = int(nOffEvents/nNodes) + 1
-    nodeList.write('Number_of_jobs_per_node ')
-    nodeList.write("%d \n"%(nJobsPerNode))
-    nodeOffset = int(cp.get('output','numberOfFirstNode'));
 
 # ---- Check how many segments are to be bundled into each job, and create
 #      job nodes accordingly.
@@ -1915,32 +1901,8 @@ if maxOffNum == 0 :
         matlab_param_file = cwdstr + "/input/parameters_off_source.txt"
         node.set_param_file(matlab_param_file)
         node.set_x_jobnum(i)
-        if distributeOffSource == 1 :
-            # ---- Write output result file to a cluster node.
-            # ---- Record path to each output result file.  Write results from
-            #      nJobsPerNode jobs on each node.
-            jobNumber = int(i/nJobsPerNode) + nodeOffset
-            while ~(os.path.isdir (nodePath + "%d/"%(jobNumber))) &1:
-                logger.info("Waiting for automount to unmount ...\n")
-                time.sleep(10)
-            # ---- Write name of node before changing nodes.
-            if 0 == i % nJobsPerNode:
-                logger.info("Node number %d"%(jobNumber))
-                nodeList.write(nodePath + "%d/ \n"%(jobNumber)  )
-                # ---- Create directory for results files.
-                fullPath = nodePath + "%d/"%(jobNumber) + \
-                    onNodeOffSourcePath + "/off_source"
-                if ~(os.path.isdir (fullPath))& 1 :
-                    os.makedirs(fullPath)
-                else:
-                    logger.warning("**WARNING** path: " + fullPath \
-                        + " already exists, previous results may be overwritten\n")
-
-            node.set_output_dir(os.path.join( fullPath))
-            nodeList.write(fullPath + "/results_%d.mat \n"%(i) )
-        else:
-            # ---- Output file to local output/off_source directory.
-            node.set_output_dir( os.path.join( cwdstr + "/output/off_source" ) )
+        # ---- Output file to local output/off_source directory.
+        node.set_output_dir( os.path.join( cwdstr + "/output/off_source" ) )
         node.set_x_injnum('0')
         mergenode.add_parent(node)
         node.set_retry(retryNumber)
@@ -1996,8 +1958,6 @@ del dag
 del job
 del mergejob
 # --- Close file recording distribution of off-source results.
-if distributeOffSource == 1 :
-    nodeList.close()
 if smartCluster == True:
   dag_clustered.write_sub_files()
   dag_clustered.write_dag()
