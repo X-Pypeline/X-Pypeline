@@ -23,7 +23,7 @@ import lal
 import numpy as np
 
 def radectoearth(ra, dec, gps, filename=''):
-    gmst = lal.GreenwichMeanSiderealTime(gps)
+    gmst = np.mod(lal.GreenwichMeanSiderealTime(gps), 2* np.pi)  * 86400 / 2 / np.pi
     gmst_deg = gmst / 86400 * 360;
     # ---- Compute Earth-based coordinates of targeted sky location, in degrees.
     phi_deg = ra - gmst_deg;
