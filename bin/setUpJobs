@@ -846,7 +846,10 @@ for seg in full_segment_list:
 
 # Here we create the on source segment
 on_source_window_segment = SegmentList([Segment(on_source_start_time, on_source_start_time + onSourceWindowLength)])
-on_source_window_segment.write('input/on_source_interval.txt')
+if args.search_type == 'grb':
+    on_source_window_segment.write('input/on_source_interval.txt')
+elif args.search_type == 'sn':
+    on_source_window.write('input/on_source_interval.txt')
 
 if args.search_type == 'grb':
     # Make a set of segments for the off_source jobs
@@ -871,7 +874,6 @@ elif args.search_type == 'sn':
     # Make use of unused data
     if abs(coincidence_on_source - coincidence_on_source_segment_chunks):
         coincidence_on_source_segment_chunks.append(Segment(Segment(coincidence_on_source.extent()).end - blockTime, Segment(coincidence_on_source.extent()).end))
-
 
 coincidence_on_source_segment_chunks.write('input/segment_on_source.txt')
 
@@ -985,7 +987,7 @@ for iSeg in range(len(coincidence_on_source_segment_chunks)):
         skyutils.radectoearth(ra, decl, gpsBlockCenterTime, filename='input/earthfixedcoordinates' + str(iSeg) + '.txt')
         phi, theta = skyutils.radectoearth(ra, decl, gpsBlockCenterTime)
         # ---- Load earth-fixed coordinates back in.
-        logger.info("GRB position in Earth-fixed coordinates (rad):")
+        logger.info("SN position in Earth-fixed coordinates (rad):")
         logger.info("    phi = {0}".format(phi))
         logger.info("    theta = {0}".format(theta))
 
@@ -1363,6 +1365,25 @@ if args.search_type == 'grb':
     fev.close()
 
 elif args.search_type == 'sn':
+    event_on_file = open('input/event_on_source.txt')
+    event_on_list = event_on_file.readlines()
+    nOnEvents = len(event_on_list)
+    event_on_file.close()
+    # count the number of effective bkg trials
+    nEffBkgTrials = int(math.floor(float(numOff)/float(nOnEvents)))
+    fwin = open('input/window_off_source.txt','w');
+    for iTrial in range(0,nEffBkgTrials):
+      fwin.write(str(int(trigger_time)) + "\n")
+    fwin.close()
+    # throw away events that would form a last non complete effective bkg trial
+    # ---- Read the number of chunks in on-source from the event list
+    event_off_file = open('input/event_off_source.txt')
+    event_off_list = event_off_file.readlines()
+    event_off_file.close()
+    event_off_file = open('input/event_off_source.txt','w')
+    for iEvent in range(0,nEffBkgTrials*nOnEvents):
+      event_off_file.write(event_off_list[iEvent])
+    event_off_file.close()
     logger.info("We retain the " + str(numOff) +  " jobs from a total of "
         + str(numOff) + " off-source jobs that satisfy " + "our network criteria.")
 
