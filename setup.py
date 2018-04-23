@@ -64,27 +64,13 @@ setup_requires = [
 ]
 install_requires = []
 requires = [
-    'SQLAlchemy',
-    'cython',
+    'gwpy',
     'six',
     'numpy',
     'scipy',
-    'astropy',
     'matplotlib',
-    'gitpython',
     'h5py',
-    'jinja2',
-    'M2Crypto',
-    'pykerberos',
-    'python_cjson',
-    'pyRXP',
-    'scikit_image',
-    'Theano',
-    'keras',
-    'pandas',
-    'gwpy',
     'lscsoft_glue',
-    'panoptes_client',
 ]
 tests_require = [
     'pytest'
