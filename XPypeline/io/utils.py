@@ -133,7 +133,7 @@ def write_waveforms(filename, outputType, frameCacheAll, skyPositionList, likeli
     # ---- Write simulations info.  The specified injection file
     #      will be written later.
     fParam.write('injectionFileName:input/injection_' + waveform + '.txt' + '\n')
-    fParam.write('injectionScale:' + str(injectionScalesList[:]) + '\n')
+    fParam.write('injectionScales:' + str(injectionScalesList[:]) + '\n')
     # fParam.write('catalogdirectory:' + XPIPELINE_ROOT  + '/waveforms\n')
     if outputType == 'seedless' :
       fParam.write('seedlessparams:input/seedless_simulation.txt\n')

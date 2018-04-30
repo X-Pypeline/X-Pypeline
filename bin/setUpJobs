@@ -436,7 +436,7 @@ logger.info("Parsing parameters (ini) file ...")
 
 # ---- Check the params_file exists
 if not os.path.isfile(params_file):
-    logger.critical("Non existent parameter file: {0}".format(params_file))
+    logger.error("Non existent parameter file: {0}".format(params_file))
     raise ValueError("Misspelled or non-existent ini file")
 
 # Set some ini file defaults
@@ -461,7 +461,7 @@ except:
 
 # ---- Matlab seed can take values between 0 and 2^31-2.
 if (seed > pow(2,31)-2) or (seed < 0):
-    logger.critical("Seed must have value between 0 and 2^31-2")
+    logger.error("Seed must have value between 0 and 2^31-2")
 
 # ---- NOTE: The following reading of variables can be split up and
 #      moved into the relevant sections of the script where the
@@ -512,7 +512,7 @@ if args.search_type == 'grb':
             start_time = int(trigger_time - background_period*backgroundAsymmetryFactor)
             end_time = int(trigger_time + background_period*(1.0 - backgroundAsymmetryFactor))
         else:
-            logger.critical( "Running analysis with asymmetric background but with wrong fractional asymmetry. backgroundAsymmetryFactor should be less than 1.0")
+            logger.error( "Running analysis with asymmetric background but with wrong fractional asymmetry. backgroundAsymmetryFactor should be less than 1.0")
 elif args.search_type == 'sn':
     start_time = int(trigger_time + onSourceBeginOffset - transientTime)
     end_time = int(trigger_time + onSourceEndOffset + transientTime)
@@ -544,7 +544,7 @@ except:
 
 # ---- Matlab seed can take values between 0 and 2^31-2.
 if (seed > pow(2,31)-2) or (seed < 0):
-    logger.critical("seed must have value between 0 and 2^31-2")
+    logger.error("seed must have value between 0 and 2^31-2")
 
 # ---- Status message.
 logger.info("... finished parsing parameters (ini) file.")
@@ -593,7 +593,7 @@ if dataFrameCache:
     logger.info("... framecache does exists ...     ")
     # ---- check the frameCache specified actually exists
     if not os.path.isfile(dataFrameCache):
-        logger.critical("non existant framecache: {0}".format(dataFrameCache))
+        logger.error("non existant framecache: {0}".format(dataFrameCache))
 
     # ---- if the specified mdc frame cache exists then concat it other frame caches
     command = 'cat ' + dataFrameCache + '  >> ' + frameCacheAll
@@ -671,7 +671,7 @@ for ifo in all_detectors:
         cat24_segment_file_list[ifo] = "None"
 
 if network_selection and blockTime < 256:
-    logger.critical( "Network selection does not currently "
+    logger.error( "Network selection does not currently "
         "work for blockTimes < 256s \n")
 
 if network_selection :
@@ -763,7 +763,7 @@ logger.info('Based on valid network selecting ini file params, '
 # -------------------------------------------------------------------------
 
 if len(detector) ==0:
-    logger.critical("No ifos in network!!!")
+    logger.error("No ifos in network!!!")
 
 elif len(detector) ==1:
     logger.info("One ifo in network: {0}".format(detector))
@@ -805,7 +805,7 @@ if lagType:
 
     if lagFile:
         if not os.path.isfile(lagFile):
-            logger.critical("Error: non existant lag file: {0}".format(lagFile))
+            logger.error("Error: non existant lag file: {0}".format(lagFile))
 else:
     lagFile = None
 
@@ -819,7 +819,7 @@ logger.info("Using lag file: {0}".format(lagFile))
 try:
    likelihoodTypeStr =  cp.get('parameters',likelihoodType)
 except:
-   logger.critical( "Error: required likelihoodType not specified in "
+   logger.error( "Error: required likelihoodType not specified in "
       "configuration file.")
 
 logger.info("Using likelihoods: {0}".format(likelihoodTypeStr))
@@ -886,7 +886,7 @@ fwin.close()
 if args.search_type == 'grb':
     # For GRB search make sure coincident on-source fully overlaps  with on-source window(i.e. there are no holes with it and the newly made coincident on-source segment.
     if not on_source_window in coincidence_on_source:
-        logging.critical("Error: on-source period is not a coincidence segment of the specified network.")
+        logging.error("Error: on-source period is not a coincidence segment of the specified network.")
         sys.exit(1)
 
     # We must choose a sky grid and then loop over the on source segments with this selected grid and shift the grid slightly for each on source chunk as the earth has rotated
@@ -913,7 +913,7 @@ if args.search_type == 'grb':
             os.system(xconvertfilegridCall)
 
         else:
-            logger.critical("Choice of sky position grid is unrecognized. Please use circular or line.")
+            logger.error("Choice of sky position grid is unrecognized. Please use circular or line.")
 
 
 f = open('input/event_on_source.txt', 'w')
@@ -954,7 +954,7 @@ for iSeg in range(len(coincidence_on_source_segment_chunks)):
 
             # ---- Check that the output file has been created.
             if not os.path.isfile(skyPosFilename):
-                logger.critical("Error creating {0}".format(skyPosFilename))
+                logger.error("Error creating {0}".format(skyPosFilename))
 
             # ---- Count number of sky positions.
             numSky = len(open(skyPosFilename).readlines())
@@ -1124,7 +1124,7 @@ if lagFile:
         # ---- Extract time lag for each detector.
         lags = line.split(None)
         if len(lags) != len(detector):
-            logger.critical("the lag file should have number of "
+            logger.error("the lag file should have number of "
             "columns equal to the the number of detectors we are analysing. "
             " Lag file: 0{}".format(lagFile))
 
@@ -1255,7 +1255,7 @@ if args.search_type == 'grb':
 
     # ---- Check events and networks list have the same length.
     if not(len(events) == len(networks)):
-        logger.critical("off-source networks and events lists "
+        logger.error("off-source networks and events lists "
             "should have the same length")
 
 
@@ -1273,7 +1273,7 @@ if args.search_type == 'grb':
         elif len(detector) == 3:
             internalSlides = np.arange(0,blockTime/2-transientTime-circTimeSlides,circTimeSlides).size
         else:
-            logger.critical('Circtimeslides not set up for number of detectors given')
+            logger.error('Circtimeslides not set up for number of detectors given')
         
     origNumOff = len(events) * internalSlides
 
@@ -1286,20 +1286,20 @@ if args.search_type == 'grb':
     if cp.has_option('background','numJobs'):
         background_numJobs = int(cp.get('background','numJobs'))
         if background_numJobs > origNumOff:
-            logger.critical( "We have only " + origNumOff + " background jobs")
-            logger.critical( "Specify more lags to get desired "
+            logger.error( "We have only {0} background jobs".format(origNumOff))
+            logger.error( "Specify more lags to get desired "
                 "number of background jobs: numJobs = {0}".format(background_numJobs))
 
     elif FAP or FAR:
-        if FAP > 50.0:
+        if FAP > 1.0:
             background_numJobs = 2*(100./(100.0-FAP))
         elif (FAP > 0) and (FAP < 1):
             background_numJobs = 2 * (100./FAP)
         else:
-            logger.critical('FAP number unusual, are you sure this is what you want')
+            logger.error('FAP number unusual, are you sure this is what you want')
         if background_numJobs > origNumOff:
-            logger.critical( "We have only " +  origNumOff + " background jobs")
-            logger.critical( "Specify more lags to get desired "
+            logger.error( "We have only {0} background jobs".format(origNumOff))
+            logger.error( "Specify more lags to get desired "
                 "number of background jobs: numJobs = {0}".format(background_numJobs))
     else:
         background_numJobs = origNumOff
@@ -1345,7 +1345,7 @@ if args.search_type == 'grb':
     if cp.has_option('background','numJobs'):
         background_numJobs = int(cp.get('background','numJobs'))
         if numOff < background_numJobs:
-            logger.critical("Specify more lags to get desired "\
+            logger.error("Specify more lags to get desired "\
                 "number of background jobs: numJobs = {0}".format( background_numJobs))
 
     # ---- Split window list into event list
@@ -1551,7 +1551,7 @@ if xtmvaFlag:
         xtmvainifile.close()
         print >>  sys.stdout, " "
     else:
-        logger.critical("Error: xtmva analysis requested by ini file does not have an [xtmva] section. Exiting.")
+        logger.error("Error: xtmva analysis requested by ini file does not have an [xtmva] section. Exiting.")
  
 # -------------------------------------------------------------------------
 #    Preparations for writing dags.
@@ -2384,7 +2384,7 @@ if cp.has_option('mdc','mdc_sets') :
         #      Read segment list from file.
         segFileName = 'input/segment_' + set +  '.txt'
         if not os.path.isfile(segFileName):
-            logger.critical("Error: non existant segment file: {0}".format(segFileName))
+            logger.error("Error: non existant segment file: {0}".format(segFileName))
 
         segmentList = []
         segmentList = pipeline.ScienceData()

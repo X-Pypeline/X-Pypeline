@@ -66,11 +66,8 @@ def validate_segments(ifos, start, end, cp, trigger_time=None):
     if cp.has_option('parameters','makeSimulatedNoise'):
         for ifo in ifos:
             print 'Making simulated noise, creating temp segment file'
-            background_duration = cp.getint('background','backgroundPeriod')
-            startOfSeg = int(trigger_time) - background_duration/2 -1000
-            endOfSeg = int(trigger_time) + background_duration/2 +1000
             f = open('segments_{0}.txt'.format(ifo),'w')
-            f.write('0 {0} {1} {2}'.format(startOfSeg, endOfSeg ,endOfSeg - startOfSeg))
+            f.write('0 {0} {1} {2}'.format(start, end ,end - start))
             f.close()
             analysis_seg_files.append('segments_{0}.txt'.format(ifo))
     else:
