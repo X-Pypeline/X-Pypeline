@@ -355,6 +355,8 @@ if args.search_type == 'grb':
     logger.info("#              X-GRB Search Pipeline               #")
 if args.search_type == 'sn':
     logger.info("#              X-SN Search Pipeline               #")
+if args.search_type == 'allsky':
+    logger.info("#              X-SPHRAD Search Pipeline               #")
 logger.info("####################################################")
 logger.info("\n")
 logger.info("Parsed input arguments:")
@@ -513,7 +515,7 @@ if args.search_type == 'grb':
             end_time = int(trigger_time + background_period*(1.0 - backgroundAsymmetryFactor))
         else:
             logger.error( "Running analysis with asymmetric background but with wrong fractional asymmetry. backgroundAsymmetryFactor should be less than 1.0")
-elif args.search_type == 'sn':
+elif args.search_type in ['sn', 'allsky']:
     start_time = int(trigger_time + onSourceBeginOffset - transientTime)
     end_time = int(trigger_time + onSourceEndOffset + transientTime)
 
@@ -848,7 +850,7 @@ for seg in full_segment_list:
 on_source_window_segment = SegmentList([Segment(on_source_start_time, on_source_start_time + onSourceWindowLength)])
 if args.search_type == 'grb':
     on_source_window_segment.write('input/on_source_interval.txt')
-elif args.search_type == 'sn':
+elif args.search_type in ['sn', 'allysky']:
     on_source_window.write('input/on_source_interval.txt')
 
 if args.search_type == 'grb':
@@ -865,7 +867,7 @@ if args.search_type == 'grb':
 
 # ---- Split coincidence segment list into "chunks".
     coincidence_on_source_segment_chunks = setuputils.make_chunks(coincidence_on_source, blockTime, 2*transientTime)
-elif args.search_type == 'sn':
+elif args.search_type in ['sn', 'allsky']:
     # If SN then on source and off source are the same soo....
     offsource_full_segment_list = copy.deepcopy(full_segment_list)
     coincidence_on_source = reduce(operator.and_, full_segment_list)
@@ -981,7 +983,7 @@ for iSeg in range(len(coincidence_on_source_segment_chunks)):
             #      parameters files.
             skyPositionList = '[' + str(theta) + ',' + str(phi) + ']'
 
-    elif args.search_type == 'sn':
+    elif args.search_type in ['sn', 'allsky']:
 
         # ---- Convert right ascension, declination to Earth-fixed coordinates.
         skyutils.radectoearth(ra, decl, gpsBlockCenterTime, filename='input/earthfixedcoordinates' + str(iSeg) + '.txt')
@@ -1115,7 +1117,7 @@ if args.search_type == 'grb':
 if lagFile:
     if args.search_type == 'grb':
         f = open('input/window_off_source.txt', 'a')
-    elif args.search_type == 'sn':
+    elif args.search_type in ['sn', 'allsky']:
         f = open('input/event_off_source.txt', 'w')
         fseg = open('input/segment_off_source.txt', 'w')
 
@@ -1145,7 +1147,7 @@ if lagFile:
                                           onSourceBeginOffset + transientTime)) +  ' ' + line
                 f.write(time_range_string)
 
-        elif args.search_type == 'sn':
+        elif args.search_type in ['sn', 'allsky']:
             # ---- Split coincidence segment list into "chunks".
             lag_coincidence_off_source_segment_chunks = setuputils.make_chunks(coincidence_off_source_lag, blockTime, 2*transientTime)
             # If this is a SN search then we want to make an additonal segment using any unused segment data.
@@ -1168,7 +1170,7 @@ if lagFile:
 
     if args.search_type == 'grb':
         f.close()
-    elif args.search_type == 'sn':
+    elif args.search_type in ['sn', 'allsky']:
         f.close()
         fseg.close()
 
@@ -1364,7 +1366,7 @@ if args.search_type == 'grb':
             fev.write(time_range_string)
     fev.close()
 
-elif args.search_type == 'sn':
+elif args.search_type in ['sn', 'allsky']:
     event_on_file = open('input/event_on_source.txt')
     event_on_list = event_on_file.readlines()
     nOnEvents = len(event_on_list)

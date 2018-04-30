@@ -1,0 +1,55 @@
+channelNames:                {'H1:LDAS-STRAIN', 'L1:LDAS-STRAIN'}
+frameTypes:                  {'H1_LDAS_C02_L2', 'L1_LDAS_C02_L2'}
+
+sampleFrequency:		2048
+
+blockDuration:			512
+extraBlockOverlap:              32
+doubleWhiten:                   0
+transientFactor:                2
+
+qRange:                         [sqrt(11) sqrt(2)*100]
+frequencyRange:                 [48 Inf]
+maximumMismatch:                0.2
+
+# Data and filter parameters
+sphrad:                         true
+whiteningDuration:              2.0
+highPassCutoff:                 48
+lowPassCutoff:                  2000
+sphradDebug:                    -1
+clusterThresholds:              [.99 .98]
+#sphradSkyPrior:                0
+sphradTestLocalisation:         1
+sphradFollowUps:                6
+sphradRegions:                  0
+sphradCode:                     0
+sphradDistance:                 0
+regionDirection:                1
+#skyPosition:                   [0.53, 2.34]
+#skyCoordinateSystem:           'geocentric'
+#eOrder:                         [80 80 162 162]
+#eOrder:                                [64 64 128 128]
+#eOrder:                        [10 10 20 20]
+eOrder:                                [-1, -1, -1, -1]
+
+xCoherentCheck:              true
+maxFollowTriggers:           8
+#waveRecovery:               true
+
+#generateReport:                        false
+
+outlierFactor:               2.0
+
+falseEventRate:                   1e0
+maximumSignificants:         1e5
+maximumTriggers:             1e3
+
+durationInflation:           1.0
+bandwidthInflation:          1.0
+
+triggerFormat:               'txt'
+
+coincidenceNumber:           2
+maximumCoincidents:          1e3
+
