@@ -5,19 +5,22 @@
 # -------------------------------------------------------------------------
 
 # ---- Import standard modules to the python path.
-import sys, os, shutil, math, random, copy, getopt, re, string, popen2, time
-import ConfigParser, glob, operator, argparse, socket, socket, uuid, pdb
+import sys, os, shutil, math, random, copy, getopt, re, string, time
+import glob, operator, argparse, socket, socket, uuid, pdb
 import numpy as np
 from glue import segments
-from glue import pipeline
+#from glue import pipeline
 from glue import datafind
 from numpy import loadtxt
+from configparser import ConfigParser
+from functools import reduce
 
 import lal
 
 import json
 
-from XPypeline import xcondor, xparseoutputtype
+#from XPypeline import xcondor, xparseoutputtype
+from XPypeline import xparseoutputtype
 from XPypeline.skyutils import skyutils 
 from XPypeline.io import utils as ioutils
 from XPypeline.setuputils import utils as setuputils
@@ -172,7 +175,7 @@ def parse_commandline():
 			greater or equal <offset>. The maximum of the end offset in the ini
 			file and <offset> is used.
                         """,
-                        type=float, dest='manualEndOffset')
+                        type=float, default=0, dest='manualEndOffset')
     parser.add_argument("-m", "--mdc-path", help=
                         """
                         Path to mdc parent dir
@@ -446,7 +449,7 @@ doAsymmetricBackground    = 0
 backgroundAsymmetryFactor = 0.5
 
 # ---- Create configuration-file-parser object and read parameters file.
-cp = ConfigParser.ConfigParser()
+cp = ConfigParser()
 cp.read(params_file)
 
 if cp.has_option('tags','version') :
@@ -841,9 +844,12 @@ on_source_window = SegmentList([Segment(on_source_start_time, on_source_end_time
 # check that on-source segment overlaps with science segments
 for seg in full_segment_list:
     if not seg.intersects(on_source_window):
-        print "Error: on-source period is not a coincidence segment of the specified network."
-        print "on source period:", on_source_window.start, " ", on_source_window.end()
-        print "coincidence period:", seg.start, " ", seg.end
+        logger.error("Error: on-source period is not a coincidence segment "
+                     "of the specified network."
+                     "on source period: {0} {1} "
+                     "coincidence period: {2} {3}".format(on_source_window.start,
+                                                          on_source_window.end,
+                                                          seg.start, seg.end))
         sys.exit(1)
 
 # Here we create the on source segment
@@ -1447,7 +1453,7 @@ if cp.has_section('waveforms') :
         if waveforms == baseinjfilename :
             command = ' '.join(["cp ", baseinjfilename, " input/"])
             os.system(command)
-            print >>  sys.stdout, "    Using-premade injection file:", injfilename
+            logger.info("    Using-premade injection file: {0}".format(injfilename))
 
   	# ---- setUpJobs script that was here before [SARAH]
         else:
@@ -1463,16 +1469,16 @@ if cp.has_section('waveforms') :
             # ---- Issue command to make injection file for this waveform set.
             # ---- We'll overwrite this file later with miscalibrated and/or
             #      jittered versions, if desired.
-            print >>  sys.stdout, "    Writing :", injfilename
-            print >>  sys.stdout, make_injection_file_command
+            logger.info("    Writing : {0}".format(injfilename))
+            logger.info("{0}".format(make_injection_file_command))
             os.system(make_injection_file_command)
             if injdistrib:
                 jitter_injection_command = ' '.join(["xjitterinjectionskypositions",
                 injfilename,
                 injfilename,
                 injdistrib ])
-                print >>  sys.stdout, "    Jittering: ", injfilename
-                print >>  sys.stdout, jitter_injection_command
+                logger.info("    Jittering: {0}".format(injfilename))
+                logger.info("{0}".format(jitter_injection_command))
                 os.system(jitter_injection_command)
 
         # ---- Apply calibiration uncertainties to injections if required. We use
@@ -1485,8 +1491,8 @@ if cp.has_section('waveforms') :
             injfilename,
             detectorStrTilde,
             frameTypeStrTilde ])
-            print >>  sys.stdout, "    Miscalibrating :", injfilename
-            print >>  sys.stdout, miscalib_injection_command
+            logger.info("    Miscalibrating :{0}".format(injfilename))
+            logger.info("{0}".format(miscalib_injection_command))
             os.system(miscalib_injection_command)
 
     logger.info("... finished making injection files.")
@@ -1512,12 +1518,12 @@ if xtmvaFlag:
         classifier = cp.get('xtmva','classifier')
         tmvadir    = cp.get('xtmva','tmvadir')
         # ---- Copy xtmva scripts to the local directory.
-        print >>  sys.stdout, "Creating ./xtmvapy directory for xtmva analysis."
+        logger.info("Creating ./xtmvapy directory for xtmva analysis.")
         os.system('rm -rf xtmvapy')
         os.system('mkdir xtmvapy')
         os.system('cp ' + tmvadir + '/*.* xtmvapy')
         # ---- Write ini file.
-        print >>  sys.stdout, "Generating ini file for xtmva analysis."
+        logger.info("Generating ini file for xtmva analysis.")
         xtmvainifile = open('./xtmva.ini','w')
         inistring = '[Settings]' + '\n'
         xtmvainifile.write(inistring)
@@ -1551,7 +1557,6 @@ if xtmvaFlag:
         inistring = 'likelihoods='+likelihoodTypeStr + '\n'
         xtmvainifile.write(inistring)
         xtmvainifile.close()
-        print >>  sys.stdout, " "
     else:
         logger.error("Error: xtmva analysis requested by ini file does not have an [xtmva] section. Exiting.")
  
@@ -1665,7 +1670,7 @@ if cp.has_option('mdc','mdc_sets') :
 if xtmvaFlag:
     logger.info("Writing xtmva dag ... ")
     log_file_xtmva = cp.get('condor','dagman_log_on_source')+'_xtmva'
-    print(log_file_xtmva)
+    logger.info(log_file_xtmva)
     dag_xtmva = pipeline.CondorDAG(log_file_xtmva + uuidtag)
     dag_xtmva.set_dag_file( 'grb_xtmva' )
     xtmvajob  = xcondor.XtmvaJob(cp,len(detector))
@@ -1701,7 +1706,7 @@ if xtmvaFlag:
 # ---- if clustering.
 if smartCluster == True:
   logger.info("Writing on-source clustering dag ... ")
-  print(log_file_on_source_clustered)
+  logger.info(log_file_on_source_clustered)
   dag_clustered = pipeline.CondorDAG(log_file_on_source_clustered + uuidtag)
   dag_clustered.set_dag_file( 'grb_on_source_clustered' )
   mergeclusteredjob = xcondor.XmergeClusteredJob(cp,len(detector))
@@ -2361,7 +2366,7 @@ if cp.has_option('mdc','mdc_sets') :
 
     # ---- Write one dag for each waveform set.
     for set in mdc_sets :
-        print 'Writing dag for MDC set:' + set
+        logger.info('Writing dag for MDC set: {0}'.format(set))
         if cp.has_section(set) & cp.has_option(set,'injectionScales') :
             injectionScalesList = cp.get(set,'injectionScales')
             injectionScales = injectionScalesList.split(',')
@@ -2555,7 +2560,7 @@ if xtmvaFlag:
 
 # ---- Use grep to combine all dag files into a single dag, with the
 #      PARENT-CHILD relationships listed at the end.
-print "Combining all jobs into a single dag ..."
+logger.info("Combining all jobs into a single dag ...")
 os.system('rm -f grb_alljobs.dag')
 os.system('echo "DOT xpipeline_triggerGen.dot" > .dag_temp')
 os.system('grep -h -v PARENT *.dag >> .dag_temp')

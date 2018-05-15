@@ -194,8 +194,8 @@ def write_mdc(filename, outputType, frameCacheAll, skyPositionList, likelihoodTy
             scale_counter = scale_counter + 1
 
     # ---- Status message.
-    print >> sys.stdout, "Writing Matlab-formatted MDC channel files "\
-        "and framecache files... "
+    print("Writing Matlab-formatted MDC channel files "
+          "and framecache files... ")
 
     # ---- Get list of MDC sets to process.
     mdc_setsList = cp.get('mdc','mdc_sets')
@@ -292,21 +292,21 @@ def write_mdc(filename, outputType, frameCacheAll, skyPositionList, likelihoodTy
                         "--lal-cache",
                         " > mdclalcache.txt"])
                         # ---- Issue dataFind command.
-                        print "calling dataFind:", dataFindCommand
+                        print("calling dataFind: {0}".format(dataFindCommand))
                         os.system(dataFindCommand)
-                        print "... finished call to dataFind."
+                        print("... finished call to dataFind.")
 
                         # ---- Convert lalframecache file to readframedata format.
-                        print "calling convertlalcache:"
+                        print("calling convertlalcache:")
                         os.system('convertlalcache.pl mdclalcache.txt mdcframecache_temp.txt')
                         os.system('cat mdcframecache_temp.txt >> ' + frameCacheAll)
-                        print "... finished call to convertlalcache."
+                        print("... finished call to convertlalcache.")
                         # ---- Clean up.
                         os.system('rm -f mdcframecache_temp.txt mdclalcache.txt')
 
                         # ---- Status message.
-                        print >> sys.stdout, "... finished writing MDC framecache file."
-                        print >> sys.stdout
+                        print("... finished writing MDC framecache file.")
+                        print(sys.stdout)
 
             #-------------------------------------------------------------------------
             #   Create a list of the mdc log files and create an mdc segment list.

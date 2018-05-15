@@ -65,7 +65,7 @@ def validate_segments(ifos, start, end, cp, trigger_time=None):
     # simulated and therefore has no DQ issues.
     if cp.has_option('parameters','makeSimulatedNoise'):
         for ifo in ifos:
-            print 'Making simulated noise, creating temp segment file'
+            print('Making simulated noise, creating temp segment file')
             f = open('segments_{0}.txt'.format(ifo),'w')
             f.write('0 {0} {1} {2}'.format(start, end ,end - start))
             f.close()
