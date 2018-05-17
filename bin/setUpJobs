@@ -19,12 +19,12 @@ import lal
 
 import json
 
-#from XPypeline import xcondor, xparseoutputtype
-from XPypeline import xparseoutputtype
-from XPypeline.skyutils import skyutils 
-from XPypeline.io import utils as ioutils
-from XPypeline.setuputils import utils as setuputils
-from XPypeline.setuputils import xnetworkselection, log
+#from xpipeline import xcondor, xparseoutputtype
+from xpipeline import xparseoutputtype
+from xpipeline.skyutils import skyutils
+from xpipeline.io import utils as ioutils
+from xpipeline.setuputils import utils as setuputils
+from xpipeline.setuputils import xnetworkselection, log
 
 from gwpy.detector import Channel
 from gwpy.segments import SegmentList, Segment
@@ -234,14 +234,14 @@ def parse_commandline():
     parser.add_argument("--long-inj", help=
                         """
                         If specified, then when making injection dags a
-			buffer will be used in comparing injection peak 
-			time to block interval to determine if an 
+			buffer will be used in comparing injection peak
+			time to block interval to determine if an
 			injection should be processed by multiple blocks.
 			Works only for waveform sets with names beginning
-			with adi-a, adi-b, adi-c, adi-d, adi-e, ebbh-a,  
+			with adi-a, adi-b, adi-c, adi-d, adi-e, ebbh-a,
 			ebbh-d, ebbh-e, mva. See code for details.
                         """,
-                        dest='longInjections', action='store_true', default=False) 
+                        dest='longInjections', action='store_true', default=False)
     parser.add_argument("--smart-cluster", help=
                         """
                         This will produce an extra set of DAGs that will run
@@ -603,7 +603,7 @@ if dataFrameCache:
     # ---- if the specified mdc frame cache exists then concat it other frame caches
     command = 'cat ' + dataFrameCache + '  >> ' + frameCacheAll
     os.system(command)
-else: 
+else:
     # ---- Status message.
     logger.info("... framecache does NOT exists ...     ")
     logger.info("Writing framecache file for ifo data...")
@@ -836,7 +836,7 @@ logger.info("Using likelihoods: {0}".format(likelihoodTypeStr))
 # ---- Status message.
 logger.info("Writing on-source event file ...          ")
 
-# Here we calculate and create a setgment of the actual on source window of the analysis. This is not necessarily the same as the size of the onsource coincident segment which relates to the requested blockTime. 
+# Here we calculate and create a setgment of the actual on source window of the analysis. This is not necessarily the same as the size of the onsource coincident segment which relates to the requested blockTime.
 on_source_start_time = int(trigger_time + onSourceBeginOffset - transientTime)
 on_source_end_time = int(trigger_time + onSourceEndOffset + transientTime)
 on_source_window = SegmentList([Segment(on_source_start_time, on_source_end_time)])
@@ -866,7 +866,7 @@ if args.search_type == 'grb':
     for iseglist in offsource_full_segment_list:
         for iseg in range(len(iseglist)):
             iseglist[iseg] = Segment(iseglist[iseg])
-            
+
 
     coincidence_off_source = reduce(operator.and_, offsource_full_segment_list)
     coincidence_on_source = on_source_window_segment or reduce(operator.and_, full_segment_list)
@@ -1137,7 +1137,7 @@ if lagFile:
             " Lag file: 0{}".format(lagFile))
 
         # ---- Make a time-lagged copy of the segment lists.
-        lag_full_segment_list = copy.deepcopy(offsource_full_segment_list) 
+        lag_full_segment_list = copy.deepcopy(offsource_full_segment_list)
         # ---- Time shift segment list of each detector.
         for idet in range(len(detector)):
             for isegments in range(len(lag_full_segment_list[idet])):
@@ -1163,7 +1163,7 @@ if lagFile:
             for iSeg in range(len(lag_coincidence_off_source_segment_chunks)):
                 # ---- Write event to event file.
                 time_range_string = str((int(lag_coincidence_off_source_segment_chunks[iSeg].start) \
-                    + int(lag_coincidence_off_source_segment_chunks[iSeg].end)) / 2) 
+                    + int(lag_coincidence_off_source_segment_chunks[iSeg].end)) / 2)
                 time_range_string = time_range_string + ' ' + line
                 f.write(time_range_string)
                 # ---- Write segment to segment file.
@@ -1282,7 +1282,7 @@ if args.search_type == 'grb':
             internalSlides = np.arange(0,blockTime/2-transientTime-circTimeSlides,circTimeSlides).size
         else:
             logger.error('Circtimeslides not set up for number of detectors given')
-        
+
     origNumOff = len(events) * internalSlides
 
     # ---- Keep track of how many off-source jobs we have after
@@ -1458,9 +1458,9 @@ if cp.has_section('waveforms') :
   	# ---- setUpJobs script that was here before [SARAH]
         else:
             # ---- Construct command to make injection file for this waveform set.
-            # ---- Wrap waveforms string in single quotes to escape any ; characters, 
+            # ---- Wrap waveforms string in single quotes to escape any ; characters,
             #      which are used for generating random injection parameters.
-            tmpwaveforms = ''.join(["'", waveforms, "'"]) 
+            tmpwaveforms = ''.join(["'", waveforms, "'"])
             make_injection_file_command = ' '.join(["xmakegrbinjectionfile",
             injfilename, tmpwaveforms,
             injTimeRangeStr,
@@ -1483,7 +1483,7 @@ if cp.has_section('waveforms') :
 
         # ---- Apply calibiration uncertainties to injections if required. We use
         #      the real detector (rather than the virtual detector) for determining
-        #      calibration uncertainties, as the virtual detector may not have 
+        #      calibration uncertainties, as the virtual detector may not have
         #      been operational at the time of the trigger.
         if int(cp.get('injection','miscalibrateInjections'))==1:
             miscalib_injection_command = ' '.join(["xmiscalibrategrbinjectionfile",
@@ -1502,14 +1502,14 @@ if cp.has_section('waveforms') :
 #      Create ini file for xtmva.py, if required.
 # -------------------------------------------------------------------------
 
-# ---- Procedure: 
-#      -> Copy the xtmva codes from the tmvadir location specified in the grb 
-#         ini file to a new local directory called xtmvapy. This local copy 
-#         will be used for the analysis to avoid conflicts if other xtmva 
-#         analyses are running simultaneously. 
-#      -> Write a bespoke ini file. Place it in the local run directory since 
+# ---- Procedure:
+#      -> Copy the xtmva codes from the tmvadir location specified in the grb
+#         ini file to a new local directory called xtmvapy. This local copy
+#         will be used for the analysis to avoid conflicts if other xtmva
+#         analyses are running simultaneously.
+#      -> Write a bespoke ini file. Place it in the local run directory since
 #         xtmva.py will look for it there.
-#      -> To do: add a "post" script to the all_jobs dag that runs xtmva.py. 
+#      -> To do: add a "post" script to the all_jobs dag that runs xtmva.py.
 #         In fact this is probably easier to do in xgrbwebpage.py.
 if xtmvaFlag:
     # ---- Extract required data from [xtmva] section.
@@ -1559,7 +1559,7 @@ if xtmvaFlag:
         xtmvainifile.close()
     else:
         logger.error("Error: xtmva analysis requested by ini file does not have an [xtmva] section. Exiting.")
- 
+
 # -------------------------------------------------------------------------
 #    Preparations for writing dags.
 # -------------------------------------------------------------------------
@@ -1662,10 +1662,10 @@ if cp.has_option('mdc','mdc_sets') :
 #      Prepare xtmva dag.
 # -------------------------------------------------------------------------
 
-# ---- We initalise the dag here but do not write it until after all other 
+# ---- We initalise the dag here but do not write it until after all other
 #      dags have been written (on-source, off-source, simulations). This is
-#      because the xtmva dag is unique in that all other dags must complete 
-#      before it can run. We fix this dependency by adding all the xmerge 
+#      because the xtmva dag is unique in that all other dags must complete
+#      before it can run. We fix this dependency by adding all the xmerge
 #      jobs as parents to the xtmva job.
 if xtmvaFlag:
     logger.info("Writing xtmva dag ... ")
@@ -2074,7 +2074,7 @@ if cp.has_section('waveforms') :
           # waveform are in adjacent segments
           # The functionality is as follows: injection X is done first in segment 0 with parameters_0
           # then if straddling next segment is done in segment 1 with parameters_1 but the results are
-          # appended to the existing trigger file 
+          # appended to the existing trigger file
           mergenode = []
           if smartCluster == True:
             mergeclusterednode = []
@@ -2149,8 +2149,8 @@ if cp.has_section('waveforms') :
                   childNode.add_parent(parentNode)
                   dag.add_node(parentNode)
                 dag.add_node(nodeList[-1])
-                  
-                
+
+
           # ---- Loop over injection scales.
           for scale_counter in range(len(injectionScales)) :
               # ---- Point to already produced injection results if provided.

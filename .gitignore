@@ -4,10 +4,10 @@
 *.ipynb_checkpoints
 
 # build products
-/XPypeline/version.py
+/xpipeline/version.py
 /build/
 /dist/
-/XPypeline.egg-info
+/xpipeline.egg-info
 /.eggs/
 
 # documentation products

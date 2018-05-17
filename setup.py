@@ -32,8 +32,8 @@ import os.path
 from setuptools import (setup, find_packages)
 
 # set basic metadata
-PACKAGENAME = 'XPypeline'
-DISTNAME = 'XPypeline'
+PACKAGENAME = 'xpipeline'
+DISTNAME = 'xpipeline'
 AUTHOR = 'Scott Coughlin'
 AUTHOR_EMAIL = 'scott.coughlin@ligo.org'
 LICENSE = 'GPLv3'
@@ -106,7 +106,7 @@ setup(name=DISTNAME,
       install_requires=install_requires,
       tests_require=tests_require,
       extras_require=extras_require,
-      test_suite='XPypeline.tests',
+      test_suite='xpipeline.tests',
       use_2to3=True,
       classifiers=[
           'Programming Language :: Python',
