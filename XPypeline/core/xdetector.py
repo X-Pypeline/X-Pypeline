@@ -101,12 +101,13 @@ class Detector(object):
         e_v2 = nk + kn
 
         # ----- Compute waveform projected onto antenna pattern.
-        Fp = e_plus*d
-        Fc = e_cross*d
-        Fb = e_breathing*d
-        FL = e_long*d
-        F1 = e_v1*d
-        F2 = e_v2*d
+        Fp = np.sum(e_plus.T*d, axis=1)
+        Fc = np.sum(e_cross.T*d, axis=1)
+        Fb = np.sum(e_breathing.T*d, axis=1)
+        FL = np.sum(e_long.T*d, axis=1)
+        F1 = np.sum(e_v1.T*d, axis=1)
+        F2 = np.sum(e_v2.T*d, axis=1)
+
         return Fp, Fc, Fb, FL, F1, F2
 
 
@@ -115,14 +116,14 @@ class Detector(object):
         """
         c =lal.C_SI
         # Construct the sky direction assumed from skyPosition
-        omega = np.array(sin(theta)*cos(phi), # x
-                 sin(theta)*sin(phi), # y
-                 cos(theta))          # z
+        omega = np.array([sin(theta)*cos(phi),
+                 sin(theta)*sin(phi),
+                 cos(theta)])
          
         # Calculate the time delay for each detector (in seconds)
-        deltaT = -omega*self.location / c;
+        deltaT = np.sum(-omega.T*self.location / c, axis=1);
 
-        return 
+        return deltaT 
 
 
     def time_delay_from_earth_center(self, right_ascension, declination, t_gps):

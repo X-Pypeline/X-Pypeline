@@ -64,6 +64,7 @@ class XEvent(object):
                 number of seconds in single FFT
         """
         whitened_timeseries = TimeSeriesDict()
+        asd_frequency_series = TimeSeriesDict()
         for (idet, iseries) in self.timeseries.items():
             asd = iseries.asd(self.whiteningtime,
                               self.whiteningtime/2.,
@@ -74,23 +75,91 @@ class XEvent(object):
             whitened_timeseries.append(
                                        {idet : whitened}
                                        )
+            asd_frequency_series.append(
+                                       {idet : asd}
+                                       )
 
         self.whitened_timeseries = whitened_timeseries
-        return whitened_timeseries
+        self.asd_frequency_series = asd_frequency_series
+
+        return whitened_timeseries, asd_frequency_series
 
 
     def compute_antenna_patterns(self):
-        # dimensions are number of skypostions by detectors
-        # currently 6 patterns are calculated
-        Fp = np.zeros([len(self.phi), len(self.detectors.keys())]) 
-        Fc = np.zeros([len(self.phi), len(self.detectors.keys())]) 
-        Fb = np.zeros([len(self.phi), len(self.detectors.keys())]) 
-        FL = np.zeros([len(self.phi), len(self.detectors.keys())]) 
-        F1 = np.zeros([len(self.phi), len(self.detectors.keys())]) 
-        F2 = np.zeros([len(self.phi), len(self.detectors.keys())]) 
-        for idet in self.detectors.items():
-            idet = 1
-        
+        """White this `TimeSeries` against its own ASD
+            
+            Parameters
+            ----------
+            fft_length : `float`
+                number of seconds in single FFT
+        """
+        Fp = {}
+        Fc = {}
+        Fb = {}
+        FL = {}
+        F1 = {}
+        F2 = {}
+        for (idet_name, idet) in self.detectors.items():
+            [Fptmp, Fctmp, Fbtmp, FLtmp, F1tmp, F2tmp] = \
+                idet.compute_antenna_response(self.phi, self.theta)
+            Fp[idet_name] = Fptmp
+            Fc[idet_name] = Fctmp
+            Fb[idet_name] = Fbtmp
+            FL[idet_name] = FLtmp
+            F1[idet_name] = F1tmp
+            F2[idet_name] = F2tmp
+
+        self.Fp = Fp
+        self.Fc = Fc
+        self.Fb = Fb
+        self.FL = FL
+        self.F1 = F1
+        self.F2 = F2
+        return Fp, Fc, Fb, FL, F1, F2
+
+
+    def compute_time_delays(self):
+        """White this `TimeSeries` against its own ASD
+            
+            Parameters
+            ----------
+            fft_length : `float`
+                number of seconds in single FFT
+        """
+        time_delays = {}
+        for (idet_name, idet) in self.detectors.items():
+            self.reference_detector = idet_name
+            time_delays[idet_name] = \
+                idet.time_delay_from_earth_center_phi_theta(self.phi, self.theta)
+        if len(self.detectors) == 1:
+            self.time_delays = time_delays
+            return time_delays
+        else:
+            # shift everything in relation to the first detector
+            for idet, itime_delay in time_delays.items():
+                time_delays[idet] = itime_delay - time_delays[self.reference_detector]
+        self.time_delays = time_delays
+        return time_delays
+
+
+    def spectrogram(self, fftlength, overlap=0, window='hann'):
+        """White this `TimeSeries` against its own ASD
+            
+            Parameters
+            ----------
+            fft_length : `float`
+                number of seconds in single FFT
+        """
+        tfmaps = TimeSeriesDict()
+        for (idet, iseries) in self.event.whitened_timeseries.items():
+            tfmap = iseries.spectrogram(stride=fftlength,
+                                fftlength=fftlength, overlap=overlap,
+                                window=window)
+            tfmaps.append(
+                          {idet : tfmap}
+                         )
+        self.tfmaps = tfmaps
+        return tfmaps
 
 
 class XCreateEventFromFile(XEvent):
