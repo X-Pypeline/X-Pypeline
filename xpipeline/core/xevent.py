@@ -10,84 +10,9 @@ from .xdetector import Detector
 
 
 class XEvent(object):
-    def retrieve_data(self, channel_names=[], frame_types=[], verbose=False):
-        """Obtain data for either on source, off source, or injections.
-
-        This uses the gwpy `TimeSeriesDict.get` method
-
-        Parameters
-        ----------
-        channel_names (`list`) :
-            required data channels.
-
-        frame_types : `str`, optional
-            name of frametype in which this channel is stored, by default
-            will search for all required frame types
-
-        verbose : `bool`, optional
-            print verbose output about NDS progress.
-
-        Returns:
-
-            `TimeSeriesDict` :
-        """
-        if hasattr(self, 'channel_names'):
-            channel_names = self.channel_names
-        if hasattr(self, 'frame_types'):
-            frame_types = self.frame_types
-
-        #----- Start and stop time for this event.
-        startTime = self.event_time - self.blocktime / 2;
-        stopTime = self.event_time + self.blocktime / 2;
-
-        # zip frameTypes and detectors, and channel names and detectors
-        data = TimeSeriesDict.get(
-                        channel_names,
-                        startTime, stopTime, verbose=verbose
-                       )
-
-        for (idet, iseries) in data.items():
-            # resample data
-            if iseries.sample_rate.decompose().value != self.samplefrequency:
-                data[idet] = iseries.resample(self.samplefrequency)
-
-        self.timeseries = data
-        return data
-
-
-    def whiten(self):
-        """White this `TimeSeries` against its own ASD
-            
-            Parameters
-            ----------
-            fft_length : `float`
-                number of seconds in single FFT
-        """
-        whitened_timeseries = TimeSeriesDict()
-        asd_frequency_series = TimeSeriesDict()
-        for (idet, iseries) in self.timeseries.items():
-            asd = iseries.asd(self.whiteningtime,
-                              self.whiteningtime/2.,
-                              method='lal_median_mean')
-            whitened = iseries.whiten(self.whiteningtime,
-                                      self.whiteningtime/2.,
-                                      asd=asd)
-            whitened_timeseries.append(
-                                       {idet : whitened}
-                                       )
-            asd_frequency_series.append(
-                                       {idet : asd}
-                                       )
-
-        self.whitened_timeseries = whitened_timeseries
-        self.asd_frequency_series = asd_frequency_series
-
-        return whitened_timeseries, asd_frequency_series
-
-
     def compute_antenna_patterns(self):
         """White this `TimeSeries` against its own ASD
-            
+
             Parameters
             ----------
             fft_length : `float`
@@ -120,7 +45,7 @@ class XEvent(object):
 
     def compute_time_delays(self):
         """White this `TimeSeries` against its own ASD
-            
+
             Parameters
             ----------
             fft_length : `float`
@@ -140,26 +65,6 @@ class XEvent(object):
                 time_delays[idet] = itime_delay - time_delays[self.reference_detector]
         self.time_delays = time_delays
         return time_delays
-
-
-    def spectrogram(self, fftlength, overlap=0, window='hann'):
-        """White this `TimeSeries` against its own ASD
-            
-            Parameters
-            ----------
-            fft_length : `float`
-                number of seconds in single FFT
-        """
-        tfmaps = TimeSeriesDict()
-        for (idet, iseries) in self.event.whitened_timeseries.items():
-            tfmap = iseries.spectrogram(stride=fftlength,
-                                fftlength=fftlength, overlap=overlap,
-                                window=window)
-            tfmaps.append(
-                          {idet : tfmap}
-                         )
-        self.tfmaps = tfmaps
-        return tfmaps
 
 
 class XCreateEventFromFile(XEvent):
@@ -242,7 +147,7 @@ class XCreateEvent(XEvent):
         ----------
         event_time (float):
         block_time (int, optional):
-        sample_frequency (optional, float): 
+        sample_frequency (optional, float):
         rightascension (float, optional):
         declination (float, optional):
 

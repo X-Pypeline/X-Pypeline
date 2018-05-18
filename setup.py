@@ -62,6 +62,7 @@ setup_requires = [
     'setuptools',
     'pytest-runner',
 ]
+
 install_requires = ['gwpy>=0.10',
     'six',
     'numpy',
@@ -70,9 +71,11 @@ install_requires = ['gwpy>=0.10',
     'h5py',
     'lscsoft_glue',
 ]
+
 tests_require = [
     'pytest'
 ]
+
 if sys.version_info < (2, 7):
     tests_require.append('unittest2')
 extras_require = {
@@ -81,7 +84,6 @@ extras_require = {
         'numpydoc',
         'sphinx_rtd_theme',
         'sphinxcontrib_programoutput',
-        'sphinxcontrib_epydoc',
     ],
 }
 

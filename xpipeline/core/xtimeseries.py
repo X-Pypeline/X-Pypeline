@@ -83,9 +83,23 @@ class XTimeSeries(TimeSeriesDict):
         return whitened_timeseries, asd_frequency_series
 
 
-    def normalize_whitened_data(self, fftlength)
+    def normalize_whitened_data(self, fftlength):
+        """White this `TimeSeries` against its own ASD
+
+            Parameters
+            ----------
+            fft_length : `float`
+                number of seconds in single FFT
+        """
         return
 
 
     def shift_by_sky_location(self, phi, theta):
+        """White this `TimeSeries` against its own ASD
+
+            Parameters
+            ----------
+            fft_length : `float`
+                number of seconds in single FFT
+        """
         return

@@ -1,8 +1,8 @@
 .. _command-line:
 
-#####################################
+#########################################
 Running ``setupJobs`` on the command line
-#####################################
+#########################################
 
 As described on the home page, the main interface to the setUpJobs algorithm is the command-line executable ``setUpJobs``.
 

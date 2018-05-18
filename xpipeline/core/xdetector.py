@@ -24,7 +24,7 @@
 # =============================================================================
 #
 """This module provides utilities for calculating detector responses.
-This was grabbed from 
+This was grabbed from
 https://github.com/gwastro/pycbc/blob/master/pycbc/detector.py
 """
 import lalsimulation
@@ -47,7 +47,7 @@ class Detector(object):
 
 
     def light_travel_time_to_detector(self, det):
-        """ Return the light travel time from this detector
+        """Return the light travel time from this detector
         Parameters
         ----------
         detector: Detector
@@ -119,11 +119,11 @@ class Detector(object):
         omega = np.array([sin(theta)*cos(phi),
                  sin(theta)*sin(phi),
                  cos(theta)])
-         
+
         # Calculate the time delay for each detector (in seconds)
         deltaT = np.sum(-omega.T*self.location / c, axis=1);
 
-        return deltaT 
+        return deltaT
 
 
     def time_delay_from_earth_center(self, right_ascension, declination, t_gps):
@@ -140,6 +140,7 @@ class Detector(object):
         arrival time in this detector and `t2` is the arrival time in the
         other detector. Note that this would return the same value as
         `time_delay_from_earth_center` if `other_detector` was geocentric.
+
         Parameters
         ----------
         other_detector : detector.Detector
@@ -150,9 +151,10 @@ class Detector(object):
             The declination (in rad) of the signal.
         t_gps : float
             The GPS time (in s) of the signal.
+
         Returns
         -------
-        float
+        float :
             The arrival time difference between the detectors.
         """
         return lal.ArrivalTimeDiff(self.location, other_detector.location,
@@ -182,7 +184,7 @@ class Detector(object):
 
 
 def overhead_antenna_pattern(right_ascension, declination, polarization):
-    """Return the detector response where (0, 0) indicates an overhead source. 
+    """Return the detector response where (0, 0) indicates an overhead source.
     This functions uses coordinates such that the detector can be thought to
     be on the north pole.
     Parameters
@@ -193,7 +195,7 @@ def overhead_antenna_pattern(right_ascension, declination, polarization):
     Returns
     -------
     f_plus: float
-    f_cros: float   
+    f_cros: float
     """
     # convert from declination coordinate to polar (angle dropped from north axis)
     theta = np.pi / 2.0 - declination
