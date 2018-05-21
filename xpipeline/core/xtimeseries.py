@@ -4,7 +4,9 @@
 import numpy as np
 
 from gwpy.timeseries import TimeSeriesDict
-
+from .xfrequencyseries import XFrequencySeriesDict
+from .xtimefrequencymap import XTimeFrequencyMapDict, XTimeFrequencyMap
+from collections import OrderedDict
 
 class XTimeSeries(TimeSeriesDict):
     @classmethod
@@ -53,53 +55,83 @@ class XTimeSeries(TimeSeriesDict):
             # set epoch of timeseries to the event_time
             iseries.epoch = event_time
 
+        # set one of the detectors to be the reference detecotr
+        # for any future coherent combinations
+
         return XTimeSeries(data)
 
 
-    def whiten(self, fftlength):
-        """White this `TimeSeries` against its own ASD
+    def asd(self, fftlength, **kwargs):
+        """Obtain the asd of items in this dict.
+
+        Parameters
+        ----------
+        fftlength : `dict`, `float`
+            either a `dict` of (channel, `float`) pairs for key-wise
+            asd calc, or a single float/int to computer as of all items.
+
+        **kwargs
+             other keyword arguments to pass to each item's asd
+             method.
+        """
+        asds = XFrequencySeriesDict()
+        if not isinstance(fftlength, dict):
+            fftlength = dict((c, fftlength) for c in self)
+
+        for key, fftlen in fftlength.items():
+            asds[key] = self[key].asd(fftlen,
+                                      fftlen/2.,
+                                      method='lal_median_mean'
+                                     )
+
+        return asds
+
+
+    def whiten(self, asds):
+        """White this `XTimeSeries` against its own ASD
 
             Parameters
             ----------
-            fft_length : `float`
-                number of seconds in single FFT
+            asds : `dict`
+                a `dict` of (channel, `XFrequencySeries`) pairs for key-wise
+                            whitened of the timeseries
         """
+        if not isinstance(asds, dict):
+            raise ValueError("asds must be supplied in the form of a dict")
+
         whitened_timeseries = XTimeSeries()
-        asd_frequency_series = XTimeSeries()
         for (idet, iseries) in self.items():
-            asd = iseries.asd(fftlength,
-                              fftlength/2.,
-                              method='lal_median_mean')
-            whitened = iseries.whiten(fftlength,
-                                      fftlength/2.,
-                                      asd=asd)
+            whitened = iseries.whiten(asds[idet].dx,
+                                      asds[idet].dx/2.,
+                                      asd=asds[idet])
             whitened_timeseries.append(
-                                       {idet + '-whitened' : whitened}
-                                       )
-            asd_frequency_series.append(
-                                       {idet + '-ASD' : asd}
+                                       {idet : whitened}
                                        )
 
-        return whitened_timeseries, asd_frequency_series
+        return whitened_timeseries
 
 
-    def normalize_whitened_data(self, fftlength):
-        """White this `TimeSeries` against its own ASD
+    def spectrogram(self, fftlength):
+        """Obtain the specotrograms of items in this dict.
 
-            Parameters
-            ----------
-            fft_length : `float`
-                number of seconds in single FFT
+        Parameters
+        ----------
+        fftlength : `dict`, `float`
+            either a `dict` of (channel, `float`) pairs for key-wise
+            asd calc, or a single float/int to computer as of all items.
+
+        **kwargs
+             other keyword arguments to pass to each item's asd
+             method.
         """
-        return
+        tfmaps = XTimeFrequencyMapDict()
+        if not isinstance(fftlength, dict):
+            fftlength = dict((c, fftlength) for c in self)
 
-
-    def shift_by_sky_location(self, phi, theta):
-        """White this `TimeSeries` against its own ASD
-
-            Parameters
-            ----------
-            fft_length : `float`
-                number of seconds in single FFT
-        """
-        return
+        for (idet, iseries) in self.items():
+            tfmaps[idet] = XTimeFrequencyMap(iseries.spectrogram(
+                                             stride=fftlength[idet],
+                                             fftlength=fftlength[idet],
+                                             overlap=0.5,
+                                             window='hann'))
+        return tfmaps
