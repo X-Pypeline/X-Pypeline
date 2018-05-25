@@ -3,46 +3,49 @@
 # ---- Import standard modules to the python path.
 import numpy as np
 from collections import OrderedDict
+from gwpy.frequencyseries import FrequencySeries
 
 class XFrequencySeriesDict(OrderedDict):
-    def to_dominant_polarization_frame(self, phi, theta):
+    def project_onto_antenna_patterns(self, antenna_responses):
         """Shift timeseries by assosciated time delay
 
             Parameters
             ----------
-            antenna_patterns : `dict`
-                key-wise pair of antenna pattern name and value
-                {'f_plus' : 0.045}
-                available antenna patterns include
-                'f_plus', 'f_cross', 'f_scalar',
-                'f_long', 'f_one', 'f_two'
-
+            antenna_responses : `dict`
+                key-wise pair of
+                OrderedDict([('f_plus',
+                              OrderedDict([('H1', array([-0.02424373])),
+                                           ('L1', array([0.3089992]))])),
+                             ('f_cross',
+                              OrderedDict([('H1', array([-0.5677237])),
+                                           ('L1', array([0.52872644]))])),
+                             ('f_scalar',
+                              OrderedDict([('H1', array([0.12427263])),
+                                           ('L1', array([-0.30016348]))]))])
         """
-        wFp = np.zeros([num_of_frequency_bins, num_of_detectors])
-        wFc = np.zeros([num_of_frequency_bins, num_of_detectors])
-        wFb = np.zeros([num_of_frequency_bins, num_of_detectors])
-        wFL = np.zeros([num_of_frequency_bins, num_of_detectors])
-        wF1 = np.zeros([num_of_frequency_bins, num_of_detectors])
-        wF2 = np.zeros([num_of_frequency_bins, num_of_detectors])
-        for idetidx, iasd in enumerate(asds.values()):
-            detector = Detector(list(asds.keys())[idetidx])
-            [Fp, Fc, Fb, FL, F1, F2] = detector.compute_antenna_response([phi], [theta])
-            wFp[:, idetidx] = Fp / iasd
-            wFc[:, idetidx] = Fc / iasd
-            wFb[:, idetidx] = Fb / iasd
-            wFL[:, idetidx] = FL / iasd
-            wF1[:, idetidx] = F1 / iasd
-            wF2[:, idetidx] = F2 / iasd
+        antenna_response_asds = OrderedDict()
+        for pattern, responses in antenna_responses.items():
+            antenna_weighted_asds = XFrequencySeriesDict()
+            for det, asd in self.items():
+                abbr_det = det.split(':')[0]
+                antenna_weighted_asds[det] = responses[abbr_det] / asd
 
-        wFp, wFc, psi = convert_to_dominant_polarization_frame(wFp, wFc)
-        self['wFp'] = wFp
-        self['wFc'] = wFc
-        self['wFb'] = wFb
-        self['wFL'] = wFL
-        self['wF1'] = wF1
-        self['wF2'] = wF2
+            antenna_response_asds[pattern] = antenna_weighted_asds
+
+        return antenna_response_asds
 
 
+    def to_array(self):
+        number_of_frequencies = list(self.values())[0].size
+        number_of_detectors = len(self)
+        array = np.zeros([number_of_frequencies, number_of_detectors])
+        for idx, asd in enumerate(self.values()):
+            array[:, idx] = asd
+
+        return array
+
+
+#wFp, wFc, psi = convert_to_dominant_polarization_frame(wFp, wFc)
 def convert_to_dominant_polarization_frame(Fp, Fc):
     """Take in stream of fplus and f_cross and convert to DPF
 

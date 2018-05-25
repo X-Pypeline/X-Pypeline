@@ -32,7 +32,7 @@ import numpy as np
 import lal
 from numpy import cos, sin
 from gwpy.timeseries import TimeSeries
-
+from collections import OrderedDict
 
 class Detector(object):
     """A gravitaional wave detector
@@ -213,3 +213,50 @@ def overhead_antenna_pattern(right_ascension, declination, polarization):
 
 def effective_distance(distance, inclination, f_plus, f_cross):
     return distance / np.sqrt( ( 1 + np.cos( inclination )**2 )**2 / 4 * f_plus**2 + np.cos( inclination )**2 * f_cross**2 )
+
+
+_default_antenna_patterns = ['f_plus', 'f_cross', 'f_scalar',
+                             'f_long', 'f_one', 'f_two']
+def compute_antenna_patterns(detectors, phi, theta, **kwargs):
+    """Compute the antenna patterns for a set of detectors and a sky location
+
+       Parameters
+        ----------
+        detectors : `list`
+            A list of detector by there abbr i.e. H1, L1 etc.
+        phi : float
+            Earth fixed coordinate of signal
+        theta : float
+            The earth fixed coordinate of signal.
+        antenna_patterns : `list`
+            list of antenna patterns to calculate and return
+
+        Returns
+        -------
+        `dict` :
+            key-wise dict were keys are antenna pattern name
+            values are `XFrequencyDicts` 
+    """
+    antenna_patterns = kwargs.pop('antenna_patterns',
+                                  _default_antenna_patterns)
+    antenna_responses = OrderedDict()
+    for ipattern in antenna_patterns:
+        antenna_responses[ipattern] = OrderedDict()
+
+    for idet in detectors:
+        detector = Detector(idet)
+        [Fp, Fc, Fb, FL, F1, F2] = detector.compute_antenna_response([phi], [theta])
+        if 'f_plus' in antenna_patterns:
+            antenna_responses['f_plus'][idet] = Fp
+        if 'f_cross' in antenna_patterns:
+            antenna_responses['f_cross'][idet] = Fc
+        if 'f_scalar' in antenna_patterns:
+            antenna_responses['f_scalar'][idet] = Fb
+        if 'f_long' in antenna_patterns:
+            antenna_responses['f_long'][idet] = FL
+        if 'f_one' in antenna_patterns:
+            antenna_responses['f_one'][idet] = F1
+        if 'f_two' in antenna_patterns:
+            antenna_responses['f_two'][idet] = F2
+
+    return antenna_responses

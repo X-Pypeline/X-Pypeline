@@ -7,18 +7,49 @@ import numpy as np
 
 
 class XTimeFrequencyMapDict(OrderedDict):
-    def dosomething(self):
-        return
+    def to_coherent(self):
+        """Sum all maps in the dict
+
+           Returns:
+               `XTimeFrequencyMap`:
+                   A coherent TF-Map
+        """
+        coherent_map = 0
+        for key, tfmap in self.items():
+            coherent_map =+ tfmap
+
+        return coherent_map
+
+
+    def to_dominant_polarization_frame(self, projected_asds):
+        """Project Tfmap to an antenna frame give a dict of asds
+
+           Parameters:
+               projected_asds : `dict`
+                   key-wise dict of antenna pattern name
+                   and values `XFrequencySeriesDict`
+
+           Returns:
+               `OrderedDict`:
+                   A key-wise dict of antenna pattern name
+                   and value `XTimeFrequencyMapDict`
+        """
+        projected_time_frequency_maps = OrderedDict()
+        for pattern, asds in projected_asds.items():
+            projected_time_frequency_maps[pattern] = XTimeFrequencyMapDict()
+            for det, asd in asds.items():
+                projected_time_frequency_maps[pattern][det] = self[det] * asd
+        return projected_time_frequency_maps
 
 
 class XTimeFrequencyMap(Spectrogram):
     def find_significant_pixels(self, blackpixel_percentile=99):
         """Obtain the time-frequency indicies of the loudest pixels
 
-            Parameters
-            ----------
-            blackpixel_percentile : `int`
-                what 2D percentile value we will use as the threshold
+           Parameters:
+
+           blackpixel_percentile : `int`
+               what 2D percentile value we will use as the threshold
         """
         energy_threshold  = np.percentile(self, blackpixel_percentile,
                                           interpolation='midpoint')
@@ -61,7 +92,7 @@ class XTimeFrequencyMap(Spectrogram):
 
 
     def to_dominant_polarization_frame(self, dpf_asd):
-        return XTimeFrequencyMapDPF(self * dpf_asd)
+        return self * dpf_asd
 
 
 def residual_time_shift(seconds, frequencies):

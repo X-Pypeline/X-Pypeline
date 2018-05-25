@@ -36,7 +36,7 @@ The Time-Frequency Map
 
     In [1]: from xpipeline.core.xtimeseries import XTimeSeries
 
-    In [2]: data = XTimeSeries.retrieve_data(event_time=1135223174.0, block_time=256, sample_frequency=1024, channel_names=['H1:DCS-CALIB_STRAIN_C01','L1:DCS-CALIB_STRAIN_C01'], verbose=True)
+    In [2]: data = XTimeSeries.read('examples/example.gwf', channels=['H1:DCS-CALIB_STRAIN_C01','L1:DCS-CALIB_STRAIN_C01']) 
 
     In [3]: asds = data.asd(1.0)
 
@@ -46,8 +46,42 @@ The Time-Frequency Map
 
     In [6]: print(whitened_timeseries)
 
+    In [7]: tfmaps = whitened_timeseries.spectrogram(1.0)
+
+    In [8]: print(tfmaps)
+
 The Dominant Polarization Frame
 -------------------------------
+
+.. ipython::
+
+    In [1]: from xpipeline.core.xtimeseries import XTimeSeries
+
+    In [2]: data = XTimeSeries.read('examples/example.gwf', channels=['H1:DCS-CALIB_STRAIN_C01','L1:DCS-CALIB_STRAIN_C01'])
+
+    In [3]: asds = data.asd(1.0)
+
+    In [4]: data.whiten(asds)
+
+    In [5]: whitened_timeseries = data.whiten(asds)
+
+    In [6]: tfmaps = whitened_timeseries.spectrogram(1.0)
+
+    In [7]: from xpipeline.core.xdetector import compute_antenna_patterns
+
+    In [8]: phi = 0.7728; theta = 1.4323
+
+    In [9]: antenna_patterns = compute_antenna_patterns(['H1', 'L1'], phi, theta, antenna_patterns=['f_plus', 'f_cross', 'f_scalar'])
+
+    In [10]: print(antenna_patterns)
+
+    In [11]: projected_asds = asds.project_onto_antenna_patterns(antenna_patterns)
+
+    In [12]: print(projected_asds)
+
+    In [13]: projected_tfmaps = tfmaps.to_dominant_polarization_frame(projected_asds)
+
+    in [14]: print(projected_tfmaps)
 
 Coherent Data
 -------------
