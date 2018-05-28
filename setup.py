@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Copyright (C) Duncan Macleod (2013)
+# Copyright (C) Scott Coughlin (2018)
 #
 # This file is part of the hveto python package.
 #
@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with hveto.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Setup the GravitySpy package
+"""Setup the xpipeline package
 """
 
 from __future__ import print_function

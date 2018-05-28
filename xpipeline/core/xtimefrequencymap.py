@@ -76,15 +76,21 @@ class XTimeFrequencyMap(Spectrogram):
 
 
     def circular_time_slide(self, slide, sample_frequency, offset):
-        """Phase shift this `spectrogram` by ``delta``
+        """Slide the TF pixels of this map
 
-        This modifies the spectrogram in-place.
+        This should move the appropriate number of time bins
+        such that slide represents a slide in seconds.
 
         Parameters
         ----------
-        delta : `float`, `~astropy.units.Quantity`, `str`
-            The amount by which to shift (in seconds if `float`), give
-            a negative value to shift backwards in time
+        slide : `int`,
+            Ho many seconds we are sliding the map
+
+        sample_freqeunecy : `float`
+            what is the sample frequency of the data
+
+        offset : `float`
+            what offset was used to make this spectrogram
         """
         offsetlength = seconds_to_samples(offset, sample_frequency)
         ntimepixelshifted = slide * sample_frequency/offsetlength
