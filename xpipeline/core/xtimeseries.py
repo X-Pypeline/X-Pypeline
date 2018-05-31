@@ -128,9 +128,7 @@ class XTimeSeries(TimeSeriesDict):
             fftlength = dict((c, fftlength) for c in self)
 
         for (idet, iseries) in self.items():
-            tfmaps[idet] = XTimeFrequencyMap(iseries.spectrogram(
-                                             stride=fftlength[idet],
+            tfmaps[idet] = XTimeFrequencyMap(iseries.spectrogram2(
                                              fftlength=fftlength[idet],
-                                             overlap=fftlength[idet]*0.5,
                                              window='hann'))
         return tfmaps
