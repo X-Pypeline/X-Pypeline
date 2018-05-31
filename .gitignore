@@ -13,6 +13,7 @@
 # documentation products
 /docs/_build/
 /docs/api/
+/docs/savefig/
 
 # test products
 /.cache/

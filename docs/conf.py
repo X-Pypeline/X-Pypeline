@@ -16,6 +16,9 @@ import sys
 import os
 import re
 
+from matplotlib import use
+use('agg')
+
 from xpipeline import __version__ as xpipeline_version
 
 # If extensions (or modules to document with autodoc) are in another directory,
@@ -43,6 +46,14 @@ extensions = [
     'numpydoc',
     'sphinxcontrib.programoutput',
 ]
+
+autosummary_generate = True
+
+# -- plot_directive -----------------------------
+
+plot_formats = ['png']
+plot_include_source = True
+plot_html_show_source_link = False
 
 # -- numpydoc -----------------------------------
 
