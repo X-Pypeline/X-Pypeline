@@ -63,13 +63,12 @@ setup_requires = [
     'pytest-runner',
 ]
 
-install_requires = ['gwpy>=0.10',
+install_requires = [
     'six',
     'numpy',
-    'scipy',
-    'matplotlib',
-    'h5py',
-    'lscsoft_glue',
+    'astropy',
+    'gwpy>=0.10',
+    'lscsoft-glue',
 ]
 
 tests_require = [
