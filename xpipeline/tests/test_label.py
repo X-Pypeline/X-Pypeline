@@ -1,17 +1,11 @@
-"""Unit test for GravitySpy
+"""Unit test for X-pipeline
 """
 
 __author__ = 'Scott Coughlin <scott.coughlin@ligo.org>'
 
-import os
-import unittest2
 
-class GravitSpyTests(unittest2.TestCase):
-    """`TestCase` for the GravitySpy
+class TestXpipeline(object):
+    """`TestCase` for X-pipeline
     """
-    def test_pickle(self):
-        self.assertEqual(1, 1)
-
-
-if __name__ == '__main__':
-    unittest2.main()
+    def test_something(self):
+        assert 1 == 1
