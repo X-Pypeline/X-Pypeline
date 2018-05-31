@@ -38,7 +38,7 @@ The following is all open data obtained via `LOSC <https://losc.ligo.org/>`_
 
     In [1]: from xpipeline.core.xtimeseries import XTimeSeries
 
-    In [2]: data = XTimeSeries.read('examples/GW150914.gwf', channels=['H1:GDS-CALIB_STRAIN','L1:GDS-CALIB_STRAIN']) 
+    In [2]: data = XTimeSeries.read('examples/GW150914.gwf', channels=['H1:GDS-CALIB_STRAIN','L1:GDS-CALIB_STRAIN'])
 
     In [3]: asds = data.asd(1.0)
 
@@ -55,30 +55,94 @@ The following is all open data obtained via `LOSC <https://losc.ligo.org/>`_
        ...:     ax.set_epoch(gps)
        ...:     ax.set_xlabel('Time [milliseconds]')
        ...:     ax.set_ylim(20, 500)
+       ...:
 
     @savefig plot-time-frequency-map.png
     In [9]: plot
 
-    In [10]: plot = tfmaps.to_coherent().plot(figsize=[8, 4])
+The Coherent Time-Frequency Map
+-------------------------------
+In this example we use a sky location chosen from the sky map assocaited with GW150914
+to illustrate what a coherent anlaysis might look like if say you had a Gamma-Ray-Burst
+or Supernova counterpart you were following up.
 
-    In [11]: for ax in plot.axes:
-        ...:     ax.set_xlim(gps - 0.15, gps + 0.05)
-        ...:     ax.set_epoch(gps)
-        ...:     ax.set_xlabel('Time [milliseconds]')
-        ...:     ax.set_ylim(20, 500)
-        ...:     
+The way we can accomplish this is by either physically shifting the data of N-1 detectors
+relative to a baseline detector some delta T amount or we can phase shift the pixels
+of the timefrequencymap, here we do each of these methods.
 
-    @savefig plot-time-frequency-map-coherent.png
-    In [12]: plot
+.. ipython::
+
+    In [10]: from xpipeline.core.xdetector import Detector
+
+    In [11]: hanford = Detector('H1')
+
+    In [12]: livingston = Detector('L1')
+
+    In [13]: phi = -0.3801; theta = 2.7477 # Earth fixed coordinates
+
+    In [14]: time_shift = livingston.time_delay_from_earth_center_phi_theta([phi], [theta]) - hanford.time_delay_from_earth_center_phi_theta([phi], [theta])
+
+    In [15]: whitened_timeseries['L1:GDS-CALIB_STRAIN'].shift(time_shift[0]) # In place shift
+
+    In [16]: tfmaps_ts_shifted = whitened_timeseries.spectrogram(1. /64)
+
+    In [17]: plot = tfmaps_ts_shifted.plot(figsize=[8, 4])
+
+    In [18]: for ax in plot.axes:
+       ....:     ax.set_xlim(gps - 0.15, gps + 0.05)
+       ....:     ax.set_epoch(gps)
+       ....:     ax.set_xlabel('Time [milliseconds]')
+       ....:     ax.set_ylim(20, 500)
+
+    @savefig plot-time-frequency-map-ts-shifted.png
+    In [19]: plot
+
+    In [20]: plot = tfmaps_ts_shifted.to_coherent().plot(figsize=[8, 4])
+
+    In [21]: for ax in plot.axes:
+       ....:     ax.set_xlim(gps - 0.15, gps + 0.05)
+       ....:     ax.set_epoch(gps)
+       ....:     ax.set_xlabel('Time [milliseconds]')
+       ....:     ax.set_ylim(20, 500)
+
+    @savefig plot-time-frequency-map-time-shifted-coherent.png
+    In [22]: plot
+
+    In [23]: tfmaps['L1:GDS-CALIB_STRAIN'] = tfmaps['L1:GDS-CALIB_STRAIN'].phaseshift(time_shift[0]).abs()
+
+    In [24]: plot = tfmaps.plot(figsize=[8, 4])
+
+    In [25]: for ax in plot.axes:
+       ....:     ax.set_xlim(gps - 0.15, gps + 0.05)
+       ....:     ax.set_epoch(gps)
+       ....:     ax.set_xlabel('Time [milliseconds]')
+       ....:     ax.set_ylim(20, 500)
+
+    @savefig plot-time-frequency-map-phase-shifted.png
+    In [26]: plot
+
+    In [27]: plot = tfmaps.to_coherent().plot(figsize=[8, 4])
+
+    In [28]: for ax in plot.axes:
+       ....:     ax.set_xlim(gps - 0.15, gps + 0.05)
+       ....:     ax.set_epoch(gps)
+       ....:     ax.set_xlabel('Time [milliseconds]')
+       ....:     ax.set_ylim(20, 500)
+
+    @savefig plot-time-frequency-map-coherent-phase-shifted.png
+    In [26]: plot
 
 The Dominant Polarization Frame
 -------------------------------
+Now the we have a sky location assosciated with the event we can project every time-freqeuncy pixel
+into the Dominant Polarization Frame (DPF). What this means is the is we assume the GW has a plus and cross
+polarization there is some orthoganal projection of the pixels onto the plus-cross plane for 2 or more detectors
 
 .. ipython::
 
     In [13]: from xpipeline.core.xdetector import compute_antenna_patterns
 
-    In [14]: phi = 0.7728; theta = 1.4323
+    In [14]: phi = -0.3801; theta = 2.7477 # Earth fixed coordinates
 
     In [15]: antenna_patterns = compute_antenna_patterns(['H1', 'L1'], phi, theta, antenna_patterns=['f_plus', 'f_cross', 'f_scalar'])
 
@@ -89,10 +153,10 @@ The Dominant Polarization Frame
     In [18]: plot = projected_tfmaps['f_plus'].plot(figsize=[8, 4])
 
     In [19]: for ax in plot.axes:
-        ...:     ax.set_xlim(gps - 0.15, gps + 0.05)
-        ...:     ax.set_epoch(gps)
-        ...:     ax.set_xlabel('Time [milliseconds]')
-        ...:     ax.set_ylim(20, 500)
+       ....:     ax.set_xlim(gps - 0.15, gps + 0.05)
+       ....:     ax.set_epoch(gps)
+       ....:     ax.set_xlabel('Time [milliseconds]')
+       ....:     ax.set_ylim(20, 500)
 
     @savefig plot-time-frequency-map-dpf-plus.png
     In [20]: plot
@@ -131,10 +195,10 @@ the plus and cross polarization plane (i.e. `projected_tfmaps` should also be la
     In [30]: plot = likelihood_map.plot(figsize=[8, 4])
 
     In [31]: for ax in plot.axes:
-        ...:     ax.set_xlim(gps - 0.15, gps + 0.05)
-        ...:     ax.set_epoch(gps)
-        ...:     ax.set_xlabel('Time [milliseconds]')
-        ...:     ax.set_ylim(20, 500)
+       ....:     ax.set_xlim(gps - 0.15, gps + 0.05)
+       ....:     ax.set_epoch(gps)
+       ....:     ax.set_xlabel('Time [milliseconds]')
+       ....:     ax.set_ylim(20, 500)
 
     @savefig plot-time-frequency-map-standard-likelihood.png
     In [32]: plot
