@@ -12,8 +12,9 @@ from glue import segments
 #from glue import pipeline
 from glue import datafind
 from numpy import loadtxt
-from configparser import ConfigParser
-from functools import reduce
+
+from six.moves.configparser import ConfigParser
+from six.moves import reduce
 
 import lal
 
