@@ -68,7 +68,7 @@ class XTimeSeries(TimeSeriesDict):
         ----------
         fftlength : `dict`, `float`
             either a `dict` of (channel, `float`) pairs for key-wise
-            asd calc, or a single float/int to computer as of all items.
+            asd calc, or a single float/int to compute as of all items.
 
         **kwargs
              other keyword arguments to pass to each item's asd
@@ -79,8 +79,7 @@ class XTimeSeries(TimeSeriesDict):
             fftlength = dict((c, fftlength) for c in self)
 
         for key, fftlen in fftlength.items():
-            asds[key] = self[key].asd(fftlen,
-                                      fftlen/2.,
+            asds[key] = self[key].asd(fftlength=fftlen,
                                       method='lal_median_mean'
                                      )
 
@@ -101,8 +100,8 @@ class XTimeSeries(TimeSeriesDict):
 
         whitened_timeseries = XTimeSeries()
         for (idet, iseries) in self.items():
-            whitened = iseries.whiten(asds[idet].dx,
-                                      asds[idet].dx/2.,
+            dt = 1./asds[idet].dx
+            whitened = iseries.whiten(fftlength=dt,
                                       asd=asds[idet])
             whitened_timeseries.append(
                                        {idet : whitened}
@@ -132,6 +131,6 @@ class XTimeSeries(TimeSeriesDict):
             tfmaps[idet] = XTimeFrequencyMap(iseries.spectrogram(
                                              stride=fftlength[idet],
                                              fftlength=fftlength[idet],
-                                             overlap=0.5,
+                                             overlap=fftlength[idet]*0.5,
                                              window='hann'))
         return tfmaps

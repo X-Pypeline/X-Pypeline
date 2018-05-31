@@ -38,8 +38,43 @@ class XTimeFrequencyMapDict(OrderedDict):
         for pattern, asds in projected_asds.items():
             projected_time_frequency_maps[pattern] = XTimeFrequencyMapDict()
             for det, asd in asds.items():
-                projected_time_frequency_maps[pattern][det] = self[det] * asd
+                mask = np.in1d(asd.xindex, self[det].yindex)
+                projected_time_frequency_maps[pattern][det] = self[det] * asd[mask]
         return projected_time_frequency_maps
+
+
+    def plot(self, label='key', **kwargs):
+        """Plot the data for this `XTimeFrequencyMapDict`.
+
+        Parameters
+        ----------
+        label : `str`, optional
+
+            labelling system to use, or fixed label for all elements
+            Special values include
+
+            - ``'key'``: use the key of the `XTimeFrequencyMapDict`,
+            - ``'name'``: use the :attr:`~XTimeSeries.name` of each element
+
+            If anything else, that fixed label will be used for all lines.
+
+        **kwargs
+            all other keyword arguments are passed to the plotter as
+            appropriate
+        """
+        from gwpy.plotter import Plot
+        figargs = dict()
+        for key in ['figsize', 'dpi']:
+            if key in kwargs:
+                figargs[key] = kwargs.pop(key)
+        plot_ = Plot(**figargs)
+        for lab, tfmap in self.items():
+            if label.lower() == 'name':
+                lab = series.name
+            elif label.lower() != 'key':
+                lab = label
+            plot_.add_spectrogram(tfmap, label=lab, newax=True, **kwargs)
+        return plot_
 
 
 class XTimeFrequencyMap(Spectrogram):
