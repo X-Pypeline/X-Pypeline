@@ -1,5 +1,6 @@
 six
 numpy
 astropy
+lalsuite
 gwpy
 lscsoft-glue

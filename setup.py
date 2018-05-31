@@ -67,6 +67,7 @@ install_requires = [
     'six',
     'numpy',
     'astropy',
+    'lalsuite',
     'gwpy>=0.10',
     'lscsoft-glue',
 ]
