@@ -1,10 +1,29 @@
-#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# Copyright (C) Scott Coughlin (2017-)
+#
+# This file is part of the XPypeline python package.
+#
+# hveto is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# hveto is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with hveto.  If not, see <http://www.gnu.org/licenses/>.
 
 # ---- Import standard modules to the python path.
 from gwpy.spectrogram import Spectrogram
 from collections import OrderedDict
 import numpy as np
 
+
+__author__ = 'Scott Coughlin <scott.coughlin@ligo.org>'
+__all__ = ['XTimeFrequencyMapDict', 'residual_time_shift', 'XTimeFrequencyMap']
 
 class XTimeFrequencyMapDict(OrderedDict):
     def to_coherent(self):

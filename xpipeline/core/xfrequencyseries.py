@@ -1,10 +1,29 @@
-#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# Copyright (C) Scott Coughlin (2017-)
+#
+# This file is part of the XPypeline python package.
+#
+# hveto is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# hveto is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with hveto.  If not, see <http://www.gnu.org/licenses/>.
 
 # ---- Import standard modules to the python path.
 import numpy as np
 from collections import OrderedDict
 from gwpy.frequencyseries import FrequencySeries
 import copy
+
+__author__ = 'Scott Coughlin <scott.coughlin@ligo.org>'
+__all__ = ['XFrequencySeriesDict', 'convert_to_dominant_polarization_frame']
 
 class XFrequencySeriesDict(OrderedDict):
     def project_onto_antenna_patterns(self, antenna_responses,
@@ -79,6 +98,24 @@ class XFrequencySeriesDict(OrderedDict):
            the DP frame.
         """
         return np.sum(self.to_array()**2, 1)
+
+
+    def slice_frequencies(self, indices):
+        """select a subset of frequencies from XFrequencySeriesDict
+
+           Parameters:
+               indices (array):
+                   an array of indexs to select from all elements
+                   of `XFrequencySeriesDict`
+
+           Returns:
+               `XFrequencySeriesDict`
+        """
+        asd_subset = XFrequencySeriesDict()
+        for det, asd in self.items():
+            asd_subset[det] = self[det][indices]
+
+        return asd_subset
 
 
 def convert_to_dominant_polarization_frame(Fp, Fc):
