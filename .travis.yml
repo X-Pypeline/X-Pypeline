@@ -1,34 +1,26 @@
 language: python
 
 python:
-- '2.7'
-- '3.5'
-
-env:
-  global:
-  - KERAS_BACKEND=theano
-  matrix:
-  - PIP_FLAGS="--quiet"
-  - PIP_FLAGS="--quiet --pre"
-
-matrix:
-  allow_failures:
-  - python: '3.5'
-  fast_finish: true
+  - '2.7'
+  - '3.4'
+  - '3.5'
+  - '3.6'
 
 before_install:
-- pip install -q --upgrade pip
-- pip install ${PRE} -r requirements.txt
+  - pip install pip setuptools cython numpy --upgrade
 
 install:
-- pip install --editable . 
+  - python -m pip install .
 
 before_script:
-- pip list installed
+  - python -m pip install coveralls "pytest>=3.1" pytest-runner sphinx numpydoc sphinx-bootstrap-theme sphinxcontrib-programoutput sphinx_rtd_theme
 
 script:
-- pip install ${PRE} unittest2 coveralls "pytest>=2.8"
-- . .travis/run-tests.sh
+  # run unit tests
+  - . .travis/run-tests.sh 
+
+  # build documentation
+  - cd docs && make html; cd ../
 
 after_success:
 - coveralls

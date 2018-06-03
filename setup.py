@@ -2,20 +2,20 @@
 # -*- coding: utf-8 -*-
 # Copyright (C) Scott Coughlin (2018)
 #
-# This file is part of the hveto python package.
+# This file is part of the xpipeline python package.
 #
-# hveto is free software: you can redistribute it and/or modify
+# xpipeline is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 #
-# hveto is distributed in the hope that it will be useful,
+# xpipeline is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with hveto.  If not, see <http://www.gnu.org/licenses/>.
+# along with xpipeline.  If not, see <http://www.gnu.org/licenses/>.
 
 """Setup the xpipeline package
 """
@@ -30,10 +30,17 @@ import glob
 import os.path
 
 from setuptools import (setup, find_packages)
-
-from Cython.Build import cythonize
 from distutils.extension import Extension
-import numpy
+
+try:
+    from Cython.Build import cythonize
+except ImportError:
+    raise ImportError("Cython needed for cpp extensions")
+
+try:
+   import numpy
+except ImportError:
+    raise ImportError("Building Cython extensions requires numpy.")
 
 # set basic metadata
 PACKAGENAME = 'xpipeline'
@@ -69,7 +76,7 @@ setup_requires = [
 
 install_requires = [
     'six',
-    'numpy',
+    'numpy>=1.10',
     'astropy',
     'lalsuite',
     'cython',
