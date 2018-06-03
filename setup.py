@@ -31,6 +31,10 @@ import os.path
 
 from setuptools import (setup, find_packages)
 
+from Cython.Build import cythonize
+from distutils.extension import Extension
+import numpy
+
 # set basic metadata
 PACKAGENAME = 'xpipeline'
 DISTNAME = 'xpipeline'
@@ -68,6 +72,7 @@ install_requires = [
     'numpy',
     'astropy',
     'lalsuite',
+    'cython',
     'gwpy>=0.10',
     'lscsoft-glue',
 ]
@@ -78,12 +83,22 @@ tests_require = [
 
 extras_require = {
     'doc': [
+        'ipython',
         'sphinx',
         'numpydoc',
         'sphinx_rtd_theme',
         'sphinxcontrib_programoutput',
     ],
 }
+
+extensions = [
+    Extension("xpipeline.cluster.nearestneighbor",
+              ["xpipeline/cluster/src/nearestneighbors.pyx"],
+              include_dirs=[numpy.get_include()],
+              extra_compile_args=['-std=c++11'],
+              language='c++'
+              ),
+]
 
 # -- run setup ----------------------------------------------------------------
 
@@ -99,6 +114,7 @@ setup(name=DISTNAME,
       author_email=AUTHOR_EMAIL,
       license=LICENSE,
       packages=packagenames,
+      ext_modules=cythonize(extensions),
       include_package_data=True,
       cmdclass=cmdclass,
       scripts=scripts,
