@@ -62,6 +62,30 @@ class XTimeFrequencyMapDict(OrderedDict):
         return projected_time_frequency_maps
 
 
+    def get_significant_pixels(self, blackpixel_percentile):
+        """Obtain the time-frequency indicies of the loudest pixels
+
+        Parameters:
+
+            blackpixel_percentile : `dict`, `int`
+                either a `dict` of (channel, `int`) pairs for key-wise
+                significant pixel calc, or a single int to use as the
+                threshold of all items.
+
+        Returns:
+            `dict`: key-wise pair of channel : freq,time indices
+        """
+        if not isinstance(blackpixel_percentile, dict):
+            blackpixel_percentile = dict((c, blackpixel_percentile)
+                                         for c in self)
+
+        significant_pixels = OrderedDict()
+        for key, pix_thres in blackpixel_percentile.items():
+            significant_pixels[key] = {}
+            significant_pixels[key]['pix_time'], significant_pixels[key]['pix_freq'] \
+                = self[key].find_significant_pixels(blackpixel_percentile=pix_thres)
+
+
     def plot(self, label='key', **kwargs):
         """Plot the data for this `XTimeFrequencyMapDict`.
 
@@ -97,7 +121,7 @@ class XTimeFrequencyMapDict(OrderedDict):
 
 
 class XTimeFrequencyMap(Spectrogram):
-    def find_significant_pixels(self, blackpixel_percentile=99):
+    def find_significant_pixels(self, blackpixel_percentile):
         """Obtain the time-frequency indicies of the loudest pixels
 
            Parameters:

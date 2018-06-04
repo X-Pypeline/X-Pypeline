@@ -217,3 +217,26 @@ the plus and cross polarization plane (i.e. `projected_tfmaps` should also be la
 
     @savefig plot-time-frequency-map-likelihood-maps.png
     In [32]: plot
+
+
+Clustering Pixels
+-----------------
+There are a few ways to speed up the processing of the map. Many of the pixels
+are going to not be significant, so we can threhold on what pixels we want
+(say the loudest 1 percent of pixels) and then employ a method to group the pixels
+together in what are referred to as `clusters`. These `clusters` become our possible
+gravitational wave `triggers` on which we evaluate the likelihoods described above
+
+.. ipython::
+
+    In [34]: from xpipeline.cluster import nearestneighbor
+
+    In [35]: pixel_time, pixel_freq = tfmaps['L1:GDS-CALIB_STRAIN'].find_significant_pixels(blackpixel_percentile=99)
+
+    In [36]: coord_array = np.array([pix_time, pix_freq])
+
+    In [37]: coord_dim_array = tfmaps['L1:GDS-CALIB_STRAIN'].shape
+
+    In [38]: npixels = pix_time.size; connectivity = 8
+
+    In [39]: labelled_map = nearestneighbor.fastlabel_wrapper(coord_array, coord_dim_array, connectivity, npixels)
