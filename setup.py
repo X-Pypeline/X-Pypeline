@@ -77,6 +77,7 @@ setup_requires = [
 install_requires = [
     'six',
     'numpy>=1.10',
+    'scipy>=1.0',
     'astropy',
     'lalsuite',
     'cython',

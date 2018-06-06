@@ -233,10 +233,66 @@ gravitational wave `triggers` on which we evaluate the likelihoods described abo
 
     In [35]: pixel_time, pixel_freq = tfmaps['L1:GDS-CALIB_STRAIN'].find_significant_pixels(blackpixel_percentile=99)
 
-    In [36]: coord_array = np.array([pix_time, pix_freq])
+    In [36]: coord_array = np.array([pixel_time, pixel_freq])
 
     In [37]: coord_dim_array = tfmaps['L1:GDS-CALIB_STRAIN'].shape
 
-    In [38]: npixels = pix_time.size; connectivity = 8
+    In [38]: npixels = pixel_time.size; connectivity = 8;
 
     In [39]: labelled_map = nearestneighbor.fastlabel_wrapper(coord_array, coord_dim_array, connectivity, npixels)
+
+    In [40]: print(labelled_map)
+
+
+The Waveform
+------------
+In order to train these likelihoods so we can understand what values to expect from
+gravitational wave clusters instead of random noise fluctations or `glitches` we must
+inject a number of fake gravitational wave like signals.
+
+This involves to steps, generating a gravitational-wave like waveform on the fly
+and then injecting that signal into a stretch of data.
+
+The parametrs that go into xmakewaveform are the `family` of waveform, a set of parameters specific for that
+waveform. In this case, the hrss is the quadrature sum of the RSS amplitudes of the plus and cross
+polarizations, tau is the duration, f0 is the central frequency, alpha is
+the chirp parameter, and delta is the phase at the peak of the envelope.
+
+.. ipython::
+
+    In [40]: from xpipeline.waveform import xwaveform
+
+    In [41]: from gwpy.plotter import TimeSeriesPlot
+
+    In [42]: t, hp, hc, hb = xwaveform.xmakewaveform(family='chirplet', parameters=[1e-22, 0.0033, 300.0, 0, 0, 1], T=513, T0=256.6161, fs=1024)
+
+    In [43]: plot = TimeSeriesPlot(hp, hc)
+
+    In [44]: plot.set_epoch(256.6161)
+
+    In [45]: plot.set_xlim([256.6161 - 0.05, 256.6161 + 0.05])
+
+    @savefig chirplet.png
+    In [46]: plot
+
+Now let's say this is not an analytical waveform and instead an hplus and hcross
+from say a supernova simulation. We can also handles that, tracked by `git-lfs`,
+the waveforms folder of X-Pypeline repository houses a number of hdf5 files
+full of pregenerated waveforms.
+
+.. ipython::
+
+    In [40]: from xpipeline.waveform import xwaveform
+
+    In [41]: from gwpy.plotter import TimeSeriesPlot
+
+    In [42]: t, hp, hc, hb = xwaveform.xmakewaveform(family='o1snews',
+       ....:     parameters=[1e-21, 1e-21, 'R4E1FC_L_theta2.094_phi2.094'],
+       ....:     T=1, T0=0, fs=16384, catalogdirectory='../waveforms/')
+
+    In [43]: plot = TimeSeriesPlot(hp, hc)
+
+    In [44]: plot.set_xlim([0, 0.1])
+
+    @savefig supernova-R4E1FC_L_theta2.094_phi2.094.png
+    In [45]: plot
