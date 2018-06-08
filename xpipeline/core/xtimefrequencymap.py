@@ -105,15 +105,15 @@ class XTimeFrequencyMapDict(OrderedDict):
             all other keyword arguments are passed to the plotter as
             appropriate
         """
-        from gwpy.plotter import Plot
+        from gwpy.plotter import SpectrogramPlot
         figargs = dict()
         for key in ['figsize', 'dpi']:
             if key in kwargs:
                 figargs[key] = kwargs.pop(key)
-        plot_ = Plot(**figargs)
+        plot_ = SpectrogramPlot(sep=True, **figargs)
         for lab, tfmap in self.items():
             if label.lower() == 'name':
-                lab = series.name
+                lab = tfmap.name
             elif label.lower() != 'key':
                 lab = label
             plot_.add_spectrogram(tfmap, label=lab, newax=True, **kwargs)

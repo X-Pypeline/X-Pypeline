@@ -140,7 +140,7 @@ def xoptimalsnr(h, t0, fs, S=None, F0=None, dF=None, Fmin=None, Fmax=None):
             Fmax = F[-1]
         else:
             # ---- Default to Nyquist.
-            Fmax = np.floor(fs/2).astype(int)
+            Fmax = numpy.floor(fs/2).astype(int)
 
     if not Fmin:
         if noise:

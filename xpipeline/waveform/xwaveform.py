@@ -1,7 +1,7 @@
 from scipy.interpolate import interp1d
 from scipy.interpolate import CubicSpline
 from gwpy.timeseries import TimeSeries
-from xoptimalsnr import xoptimalsnr
+from .xoptimalsnr import xoptimalsnr
 
 import numpy
 import scipy.signal
@@ -210,8 +210,15 @@ def xmakewaveform(family, parameters, T, T0, fs, **kwargs):
 
     #----- If parameters are supplied as tilde-delimited string, then convert
     #      to cell or double array.
-    if type(parameters) == str:
-        parameters = parameters.split('~')
+    if type(parameters) in [str, numpy.str_, numpy.str, numpy.string_]:
+        parameters_tmp = parameters.split('~')
+        parameters = []
+        for param in parameters_tmp:
+            try:
+                parameters.append(float(param))
+            except:
+                parameters.append(param)
+        
 
     if family.lower() in ['aorddmj10', 'dojmm07', 'domj08', 'mob09', 'obdl06', 'oblw04']:
 
@@ -1139,51 +1146,55 @@ def xmakewaveform(family, parameters, T, T0, fs, **kwargs):
         hp = hp / (distance/20.)
         hc = hc / (distance/20.)
 
+    elif family.lower() in ['scalarchirplet']:
+
+        h_rss = parameters[0]
+        tau = parameters[1]
+        f0 = parameters[2]
+
+        # ---- Optional parameters.
+        alpha = 0
+        delta = 0
+        ciota = 1
+        if len(parameters) >= 4:
+            alpha = parameters[3]
+
+        if len(parameters) >= 5:
+            delta = parameters[4]
+
+        if len(parameters) >= 6:
+            ciota = parameters[5]
+
+        # ---- Waveform.
+        h = h_rss * (
+                     numpy.exp(
+                              (-1 + sqrt_of_neg_1 * alpha) * (t-T0)**2 /
+                              (4 * tau**2)
+                              + sqrt_of_neg_1 * 2 * numpy.pi * (t-T0) *f0
+                              + sqrt_of_neg_1 * delta)
+                     /
+                     (2 * math.pi * tau**2)**(1/4))
+
+        hb = TimeSeries(h, dx=1./fs, name=family.lower())
+
+        hc = TimeSeries(numpy.zeros(hb.size), dx=1/hp.sample_rate.value,
+                        name=hb.name)
+        hp = TimeSeries(numpy.zeros(hb.size), dx=1/hp.sample_rate.value,
+                        name=hb.name)
+
+        # ---- Turn off default interpolation (ad hoc waveform is designed
+        #      to produce desired T0).
+        pregen = 0
+
         """
-        elif family.lower() in ['scalarchirplet']:
-
-                # ---- Chirplet - Gaussian-modulated sinusoid with frequency
-                #      changing linearly with time.  Put chirping cosine-Gaussian
-                #      in plus polarization, chirping sine-Gaussian in cross.
-
-                # ---- Required parameters.
-                h_rss = parameters(1)
-                tau = parameters(2)
-                f0 = parameters(3)
-
-                # ---- Optional parameters.
-                alpha = 0
-                delta = 0
-                if (length(parameters) >= 4)
-                    alpha = parameters(4)
-                end
-                if (length(parameters) >= 5)
-                    delta = parameters(5)
-                end
-
-                # ---- Waveform.
-                h = 2^0.5*h_rss*exp(...
-                        (-1+i*alpha)*(t-T0).^2./(4*tau.^2) ...
-                        +i*2*pi*(t-T0)*f0 ...
-                        +i*delta  ...
-                    )./(2*pi*tau^2).^(1/4)
-                hb = real(h)
-                hp = zeros(size(hb))
-                hc = zeros(size(hb))
-
-                # ---- Turn off default interpolation (ad hoc waveform is designed
-                #      to produce desired T0).
-                pregen = 0
-
         elif family.lower() in ['scalarsn']:
-    TimeSeries
                 # ---- Ibanez and Novak scalar-mode gravitational
                 #      collapse waveform (pregenerated).
 
                 # ---- Model type and parameters.
-                model    = parameters{1}
-                distance = parameters{2}
-                newalpha    = parameters{3}
+                model    = parameters[0]
+                distance = parameters[1]
+                newalpha    = parameters[2]
 
                 # ---- Pre-sampled waveform.  Columns: time [s], strain [unitless].
                 #      For model details on each model look Tabel 1 of

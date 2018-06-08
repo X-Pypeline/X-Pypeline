@@ -17,9 +17,10 @@
 # along with hveto.  If not, see <http://www.gnu.org/licenses/>.
 
 # ---- Import standard modules to the python path.
-import numpy as np
+import numpy
 
 from gwpy.timeseries import TimeSeriesDict
+from gwpy.timeseries import TimeSeries
 from .xfrequencyseries import XFrequencySeriesDict
 from .xtimefrequencymap import XTimeFrequencyMapDict, XTimeFrequencyMap
 from collections import OrderedDict
@@ -41,11 +42,14 @@ class XTimeSeries(TimeSeriesDict):
         event_time : (`float)
             trigger time of event to be processing
 
-        blcok_time : (`int`)
+        block_time : (`int`)
             length of data to be processed
 
         channel_names (`list`) :
             required data channels.
+
+        sample_frequency (`int`):
+            sample rate of the data desired
 
         frame_types : `str`, optional
             name of frametype in which this channel is stored, by default
@@ -59,25 +63,77 @@ class XTimeSeries(TimeSeriesDict):
             `TimeSeriesDict` :
         """
         #----- Start and stop time for this event.
-        startTime = event_time - block_time / 2;
-        stopTime = event_time + block_time / 2;
+        start_time = event_time - block_time / 2;
+        stop_time = event_time + block_time / 2;
 
         # Retrieve data and then resample and set epoch
         data = cls.get(
                         channel_names,
-                        startTime, stopTime, verbose=verbose
+                        start_time, stop_time, verbose=verbose
                        )
 
         data.resample(sample_frequency)
 
         for (idet, iseries) in data.items():
             # set epoch of timeseries to the event_time
-            iseries.epoch = event_time
+            iseries.epoch = start_time
 
         # set one of the detectors to be the reference detecotr
         # for any future coherent combinations
 
         return XTimeSeries(data)
+
+
+    @classmethod
+    def generate_data(cls, event_time, block_time,
+                      channel_names, sample_frequency,
+                      verbose=False):
+        """Obtain data for either on source, off source, or injections.
+
+        This uses the gwpy `TimeSeriesDict.get` method
+
+        Parameters
+        ----------
+        event_time : (`float)
+            trigger time of event to be processing
+
+        block_time : (`int`)
+            length of data to be processed
+
+        channel_names (`list`) :
+            required data channels.
+
+        sample_frequency (`int`):
+            sample rate of the data desired
+
+        verbose : `bool`, optional
+            print verbose output about NDS progress.
+
+        Returns:
+
+            `TimeSeriesDict` :
+        """
+        #----- Start and stop time for this event.
+        start_time = event_time - block_time / 2;
+        stop_time = event_time + block_time / 2;
+
+        # Retrieve data and then resample and set epoch
+        data = {}
+        for det in channel_names:
+            data[det] = TimeSeries(numpy.random.normal(scale=.1,
+                                        size=sample_frequency*block_time),
+                                   sample_rate=sample_frequency)
+
+        data = XTimeSeries(data)
+
+        for (idet, iseries) in data.items():
+            # set epoch of timeseries to the event_time
+            iseries.t0 = start_time
+
+        # set one of the detectors to be the reference detecotr
+        # for any future coherent combinations
+
+        return data
 
 
     def asd(self, fftlength, **kwargs):
@@ -130,7 +186,7 @@ class XTimeSeries(TimeSeriesDict):
 
 
     def spectrogram(self, fftlength):
-        """Obtain the specotrograms of items in this dict.
+        """Obtain the spectrograms of items in this dict.
 
         Parameters
         ----------
@@ -151,3 +207,32 @@ class XTimeSeries(TimeSeriesDict):
                                              fftlength=fftlength[idet],
                                              window='hann'))
         return tfmaps
+
+
+    def inject(self, injection_data, **kwargs):
+        """Take an injection time series and inject into `XTimeSeries`
+
+        This is essentially a wrapper arounf the very useful
+        `gwpy.timeseries.TimeSeries.inject` method
+
+        Parameters
+        ----------
+        injection_data : `XTimeSeries`,
+            A `XtimeSeries` containing the same keys as
+            the `XTimeSeries` you are injecting into
+            i.e. if you are injecting into an
+            `XTimeSeries` with 'H1', 'L1' and 'V1'
+            data then your injeciton data
+            should have the same keys
+
+        **kwargs
+             other keyword arguments to pass to each item's asd
+             method.
+        """
+        injection_timeseries = XTimeSeries()
+        for (idet, iseries) in self.items():
+            injection_timeseries.append(
+                {idet : iseries.inject(injection_data[idet])}
+                )
+
+        return injection_timeseries
