@@ -19,6 +19,7 @@
 # ---- Import standard modules to the python path.
 from gwpy.spectrogram import Spectrogram
 from collections import OrderedDict
+from gwpy.signal.fft.ui import seconds_to_samples
 import numpy as np
 
 
@@ -33,11 +34,7 @@ class XTimeFrequencyMapDict(OrderedDict):
                `XTimeFrequencyMap`:
                    A coherent TF-Map
         """
-        coherent_map = 0
-        for key, tfmap in self.items():
-            coherent_map =+ tfmap
-
-        return coherent_map
+        return sum(self.values())
 
 
     def to_dominant_polarization_frame(self, projected_asds):
@@ -60,6 +57,36 @@ class XTimeFrequencyMapDict(OrderedDict):
                 mask = np.in1d(asd.xindex, self[det].yindex)
                 projected_time_frequency_maps[pattern][det] = self[det] * asd[mask]
         return projected_time_frequency_maps
+        significant_pixels = OrderedDict()
+        for key, pix_thres in blackpixel_percentile.items():
+            significant_pixels[key] = {}
+            significant_pixels[key]['pix_time'], significant_pixels[key]['pix_freq'] \
+                = self[key].find_significant_pixels(blackpixel_percentile=pix_thres)
+
+
+    def blackout_pixels(self, blackpixel_percentile):
+        """Set pixels below certain energy level to zero
+
+        Parameters:
+
+            blackpixel_percentile : `dict`, `int`
+                either a `dict` of (channel, `int`) pairs for key-wise
+                significant pixel calc, or a single int to use as the
+                threshold of all items.
+
+        Returns:
+            `dict`: key-wise pair of channel : freq,time indices
+        """
+        if not isinstance(blackpixel_percentile, dict):
+            blackpixel_percentile = dict((c, blackpixel_percentile)
+                                         for c in self)
+
+        self_ = self
+        for key, pix_thres in blackpixel_percentile.items():
+            self_[key] = self_[key].blackout_pixels(
+                                       blackpixel_percentile=pix_thres)
+
+        return self_
 
 
     def plot(self, label='key', **kwargs):
@@ -81,15 +108,15 @@ class XTimeFrequencyMapDict(OrderedDict):
             all other keyword arguments are passed to the plotter as
             appropriate
         """
-        from gwpy.plotter import Plot
+        from gwpy.plotter import SpectrogramPlot
         figargs = dict()
         for key in ['figsize', 'dpi']:
             if key in kwargs:
                 figargs[key] = kwargs.pop(key)
-        plot_ = Plot(**figargs)
+        plot_ = SpectrogramPlot(sep=True, **figargs)
         for lab, tfmap in self.items():
             if label.lower() == 'name':
-                lab = series.name
+                lab = tfmap.name
             elif label.lower() != 'key':
                 lab = label
             plot_.add_spectrogram(tfmap, label=lab, newax=True, **kwargs)
@@ -97,19 +124,20 @@ class XTimeFrequencyMapDict(OrderedDict):
 
 
 class XTimeFrequencyMap(Spectrogram):
-    def find_significant_pixels(self, blackpixel_percentile=99):
-        """Obtain the time-frequency indicies of the loudest pixels
+    def blackout_pixels(self, blackpixel_percentile):
+        """Set pixels below certain energy level to zero
 
            Parameters:
 
            blackpixel_percentile : `int`
-               what 2D percentile value we will use as the threshold
+               the x-percentile loudest tile all pixels
+               below which will be set to energy of 0
         """
-        energy_threshold  = np.percentile(self, blackpixel_percentile,
+        self_ = self
+        energy_threshold  = np.percentile(self_, blackpixel_percentile,
                                           interpolation='midpoint')
-        pixel_time, pixel_freq = np.where(self.value > energy_threshold)
-
-        return pixel_time, pixel_freq
+        self_[self_.value <= energy_threshold] = 0
+        return self_ 
 
 
     def phaseshift(self, delta):
@@ -138,7 +166,7 @@ class XTimeFrequencyMap(Spectrogram):
         Parameters
         ----------
         slide : `int`,
-            Ho many seconds we are sliding the map
+            How many seconds we are sliding the map
 
         sample_freqeunecy : `float`
             what is the sample frequency of the data

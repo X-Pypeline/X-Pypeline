@@ -30,7 +30,7 @@ except ImportError:  # astropy < 1.2.1
     IORegistryError = Exception
 from astropy.table import Table
 
-_FETCHERS = {}
+_WAVEFORMS = {}
 
 __author__ = 'Duncan Macleod <duncan.macleod@ligo.org>'
 
@@ -55,8 +55,8 @@ def register_generator(data_format, data_class, function, force=False,
         default: `False`
     """
     key = (data_format, data_class)
-    if key not in _FETCHERS or force:
-        _FETCHERS[key] = (function, usage)
+    if key not in _WAVEFORMS or force:
+        _WAVEFORMS[key] = (function, usage)
     else:
         raise IORegistryError("Fetcher for format '{0}' and class '{1}' "
                               "has already been " "defined".format(
@@ -81,12 +81,12 @@ def get_generator(data_format, data_class):
         if not registration is found matching ``data_format``
     """
     # this is a copy of astropy.io.regsitry.get_reader
-    generators = [(fmt, cls) for fmt, cls in _FETCHERS if fmt == data_format]
+    generators = [(fmt, cls) for fmt, cls in _WAVEFORMS if fmt == data_format]
     for generate_fmt, generate_cls in generators:
         if io_registry._is_best_match(data_class, generate_cls, generators):
-            return _FETCHERS[(generate_fmt, generate_cls)][0]
+            return _WAVEFORMS[(generate_fmt, generate_cls)][0]
     else:
-        formats = [fmt for fmt, cls in _FETCHERS if
+        formats = [fmt for fmt, cls in _WAVEFORMS if
                    io_registry._is_best_match(fmt, cls, generators)]
         formatstr = '\n'.join(sorted(formats))
         raise IORegistryError(
@@ -118,10 +118,10 @@ def _update__doc__(data_class):
 
     # now re-write the format list
     formats = []
-    for fmt, cls in sorted(_FETCHERS, key=lambda x: x[0]):
+    for fmt, cls in sorted(_WAVEFORMS, key=lambda x: x[0]):
         if cls is not data_class:
             continue
-        usage = _FETCHERS[(fmt, cls)][1]
+        usage = _WAVEFORMS[(fmt, cls)][1]
         formats.append((
             fmt, '``generate(%r, %s)``' % (fmt, usage)))
     format_str = Table(rows=formats, names=['Format', 'Basic usage']).pformat(
