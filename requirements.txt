@@ -1,6 +1,7 @@
 six
-numpy
+numpy>=1.10
 astropy
 lalsuite
+cython
 gwpy
 lscsoft-glue
