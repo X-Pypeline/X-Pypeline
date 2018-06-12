@@ -205,6 +205,7 @@ class XTimeSeries(TimeSeriesDict):
         for (idet, iseries) in self.items():
             tfmaps[idet] = XTimeFrequencyMap(iseries.spectrogram2(
                                              fftlength=fftlength[idet],
+                                             overlap=0.5*fftlength[idet],
                                              window='hann'))
         return tfmaps
 

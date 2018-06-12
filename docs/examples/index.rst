@@ -134,7 +134,7 @@ of the timefrequencymap, here we do each of these methods.
 
 The Dominant Polarization Frame
 -------------------------------
-Now the we have a sky location assosciated with the event we can project every time-freqeuncy pixel
+Now the we have a sky location assosciated with the event we can proclustersum.clustersum_wrapperject every time-freqeuncy pixel
 into the Dominant Polarization Frame (DPF). What this means is the is we assume the GW has a plus and cross
 polarization there is some orthoganal projection of the pixels onto the plus-cross plane for 2 or more detectors
 
@@ -150,7 +150,7 @@ polarization there is some orthoganal projection of the pixels onto the plus-cro
 
     In [16]: frequencies = np.in1d(asds['L1:GDS-CALIB_STRAIN'].xindex.to_value(),tfmaps['L1:GDS-CALIB_STRAIN'].yindex.to_value())
 
-    In [17]: sliced_asds = asds.slice_frequencies(frequencies) 
+    In [17]: sliced_asds = asds.slice_frequencies(frequencies)
 
     In [18]: projected_asds = sliced_asds.project_onto_antenna_patterns(antenna_patterns, to_dominant_polarization_frame=True)
 
@@ -227,27 +227,103 @@ are going to not be significant, so we can threhold on what pixels we want
 together in what are referred to as `clusters`. These `clusters` become our possible
 gravitational wave `triggers` on which we evaluate the likelihoods described above
 
+column 0: minimum time of cluster
+column 1: weighted center time of cluster
+column 2: maximum time of cluster
+column 3: minimum frequency of cluster
+column 4: weighted center frequency of cluster
+column 5: maximum frequency of cluster
+column 6: number of pixels in cluster
+column 7-?: sum-over-cluster map values for each likelihood
+
 .. ipython::
 
     In [34]: from xpipeline.cluster import nearestneighbor
 
-    In [35]: ind_map = tfmaps['L1:GDS-CALIB_STRAIN']
+    In [34]: import numpy
 
-    In [36]: clustered
+    In [35]: tfmaps_ts_shifted = tfmaps_ts_shifted.blackout_pixels(99)
 
-    In [39]: time_pixel_all, freq_pixel_all = numpy.where(ind_map)
+    In [35]: coh_map = tfmaps_ts_shifted.to_coherent() 
 
-    In [35]: pixel_time, pixel_freq = ind_map.find_significant_pixels(blackpixel_percentile=99)
+    In [35]: pixels = numpy.argwhere(coh_map).T
 
-    In [36]: coord_array = np.array([pixel_time, pixel_freq])
+    In [37]: coord_dim_array = coh_map.shape
 
-    In [37]: coord_dim_array = ind_map.shape
+    In [38]: npixels = pixels.shape[1]; connectivity = 8;
 
-    In [38]: npixels = pixel_time.size; connectivity = 8;
-
-    In [39]: labelled_map = nearestneighbor.fastlabel_wrapper(coord_array, coord_dim_array, connectivity, npixels).astype(int)
+    In [39]: labelled_map = nearestneighbor.fastlabel_wrapper(pixels + 1, coord_dim_array, connectivity, npixels).astype(int)
 
     In [40]: print(labelled_map)
+
+Now the we have labelled are remaining pixels (the non-zeroed out pixels), let's extract
+some fo the cluster properites of these clusters. i.e. how many piels are in the clsuter
+the bounding box of the cluster (i.e. [[min-time, max-time], [min-freq, max-freq]] and the
+sum of energy over the cluster.
+
+Specifically the function `clusterproperities` outputs the following information
+
+column 0: minimum time of cluster
+column 1: weighted center time of cluster
+column 2: maximum time of cluster
+column 3: minimum frequency of cluster
+column 4: weighted center frequency of cluster
+column 5: maximum frequency of cluster
+column 6: number of pixels in cluster
+column 7-?: sum-over-cluster map values for each likelihood
+
+.. ipython::
+
+    In [41]: from xpipeline.cluster import clusterproperties
+
+    In [41]: from gwpy.table import EventTable
+
+    In [41]: total_energy = coh_map[pixels[0,:], pixels[1,:]] 
+
+    In [43]: dim_array = numpy.array([total_energy.shape[0], 1, 2.0])
+
+    In [42]: cluster_array = clusterproperties.clusterproperities_wrapper(dim_array, labelled_map, total_energy, pixels[0,:] + 1, pixels[1,:] + 1).T
+
+    In [43]: cluster_array[:,0:3] = cluster_array[:,0:3]  * coh_map.dx + coh_map.t0
+
+    In [44]: cluster_array[:,3:6] = cluster_array[:,3:6] * coh_map.dy + coh_map.y0
+
+    In [67]: clusters = EventTable(cluster_array,
+       ....:                       names=['min_time_of_cluster',
+       ....:                              'weighted_center_time', 'max_time_of_cluster',
+       ....:                              'min_frequency_of_cluster',
+       ....:                              'weighted_center_frequency',
+       ....:                              'max_frequency_of_cluster',
+       ....:                              'number_of_pixels', 'energy_of_cluster'])
+
+    In [47]: print(clusters)
+
+    In [47]: loudest_cluster_idx = clusters['energy_of_cluster'].argmax()
+
+    In [48]: min_time = clusters['min_time_of_cluster'][loudest_cluster_idx]; max_time = clusters['max_time_of_cluster'][loudest_cluster_idx]; weighted_center_time = clusters['weighted_center_time'][loudest_cluster_idx]; min_freq = clusters['min_frequency_of_cluster'][loudest_cluster_idx]; max_freq = clusters['max_frequency_of_cluster'][loudest_cluster_idx];
+
+    In [50]: plot = coh_map.plot()
+
+    In [51]: for ax in plot.axes:
+       ....:     ax.set_xlim(min_time, max_time)
+       ....:     ax.set_epoch(weighted_center_time)
+       ....:     ax.set_xlabel('Time [milliseconds]')
+       ....:     ax.set_ylim(min_freq, max_freq)
+
+    @savefig loudest-cluster-gw150914.png
+    In [32]: plot
+
+
+Alright, we now have a labelling of all pixels into clusters and likelihood maps.
+So, let us calculated the likelihood of the clusters
+
+.. ipython::
+
+    In [41]: from xpipeline.cluster import clustersum
+
+    In [42]: clustersum.clustersum_wrapper
+
+    In [43]: likelihood = clustersum.clustersum_wrapper(labelled_map, likelihood_map_standard[pixels[0,:], pixels[1,:]])
 
 
 The Waveform
@@ -335,7 +411,7 @@ just like we do for the data.
 
     In [9]: plot.set_xlim([peak_time - 0.1, peak_time + 0.1])
 
-    @savefig chirplet-h1-l1-v1.png 
+    @savefig chirplet-h1-l1-v1.png
     In [10]: plot
 
 Now let's inject this into some data, we could use real data but let's just generate
@@ -349,7 +425,7 @@ some data and scale it to an amplitude where we would expect this waveform to sh
        ....:                                  block_time=block_time,
        ....:                                  channel_names=channel_names,
        ....:                                  sample_frequency=sample_frequency)
-       ....:  
+       ....:
 
     In [13]: for det, series in data.items():
        ....:     data[det] = series * 1e-21
@@ -362,7 +438,7 @@ some data and scale it to an amplitude where we would expect this waveform to sh
 
     In [17]: plot.add_legend()
 
-    @savefig chirplet-h1-l1-v1-in-data.png 
+    @savefig chirplet-h1-l1-v1-in-data.png
     In [17]: plot
 
 Now you can see where the injection went in terms of the entire length of data
@@ -374,7 +450,7 @@ we are analyzing (a 256 second block) but let us zoom in a bit.
 
     In [19]: plot.set_xlim([peak_time - 0.1, peak_time + 0.1])
 
-    @savefig chirplet-h1-l1-v1-in-data-zoom.png 
+    @savefig chirplet-h1-l1-v1-in-data-zoom.png
     In [20]: plot
 
 You will notice that just like int he case where we read in the data surrounding GW150914
@@ -393,7 +469,7 @@ an injected signal in there. Well let us look at what the likelihoods look like 
     In [7]: plot = tfmaps.plot(figsize=[12, 6])
 
     In [8]: for ax in plot.axes:
-       ...:     ax.set_xlim(peak_time - 0.15, peak_time + 0.05)
+       ...:     ax.set_xlim(peak_time - 0.05, peak_time + 0.05)
        ...:     ax.set_epoch(peak_time)
        ...:     ax.set_xlabel('Time [milliseconds]')
        ...:     ax.set_ylim(20, 500)
@@ -422,7 +498,7 @@ an injected signal in there. Well let us look at what the likelihoods look like 
 
     In [17]: plot.add_legend()
 
-    In [19]: plot.set_xlim([peak_time - 0.1, peak_time + 0.1])
+    In [19]: plot.set_xlim([peak_time - 0.05, peak_time + 0.05])
 
     @savefig plot-chirplet-wts-shifted.png
     In [22]: plot
@@ -447,21 +523,61 @@ an injected signal in there. Well let us look at what the likelihoods look like 
     In [15]: antenna_patterns = compute_antenna_patterns(['H1', 'L1', 'V1'],
        ....:     phi, theta, antenna_patterns=['f_plus', 'f_cross', 'f_scalar'])
 
-    In [16]: frequencies = np.in1d(asds['L1'].xindex.to_value(), tfmaps['L1'].yindex.to_value())
+    In [16]: frequencies = np.in1d(asds['L1'].xindex.to_value(), tfmaps_ts_shifted['L1'].yindex.to_value())
 
-    In [17]: sliced_asds = asds.slice_frequencies(frequencies) 
+    In [17]: sliced_asds = asds.slice_frequencies(frequencies)
 
     In [18]: projected_asds = sliced_asds.project_onto_antenna_patterns(antenna_patterns, to_dominant_polarization_frame=True)
 
-    In [19]: projected_tfmaps = tfmaps.to_dominant_polarization_frame(projected_asds)
+    In [19]: projected_tfmaps = tfmaps_ts_shifted.to_dominant_polarization_frame(projected_asds)
 
     In [20]: plot = projected_tfmaps['f_plus'].plot(figsize=[12, 6])
 
     In [21]: for ax in plot.axes:
-       ....:     ax.set_xlim(peak_time - 0.15, peak_time + 0.05)
+       ....:     ax.set_xlim(peak_time - 0.05, peak_time + 0.05)
        ....:     ax.set_epoch(peak_time)
        ....:     ax.set_xlabel('Time [milliseconds]')
        ....:     ax.set_ylim(20, 500)
 
     @savefig plot-chirplet-time-frequency-map-dpf-plus.png
     In [22]: plot
+
+    In [21]: from xpipeline.core.xlikelihood import XLikelihood
+
+    In [22]: mpp = projected_asds['f_plus'].to_m_ab()
+
+    In [23]: mcc = projected_asds['f_cross'].to_m_ab()
+
+    In [24]: wfptimefrequencymap = projected_tfmaps['f_plus'].to_coherent()
+
+    In [25]: wfctimefrequencymap = projected_tfmaps['f_cross'].to_coherent()
+
+    In [26]: likelihood_map_standard = XLikelihood.standard(mpp, mcc, wfptimefrequencymap, wfctimefrequencymap)
+
+    In [27]: likelihood_map_circenergy = XLikelihood.circenergy(mpp, mcc, wfptimefrequencymap, wfctimefrequencymap)
+
+    In [28]: likelihood_map_circinc = XLikelihood.circinc(tfmaps, mpp, mcc, projected_asds)
+
+    In [29]: likelihood_map_circnullinc = XLikelihood.circnullinc(tfmaps, mpp, mcc, projected_asds)
+
+    In [30]: likelihood_map_circnullenergy = XLikelihood.circnullenergy(mpp, mcc, wfptimefrequencymap, wfctimefrequencymap)
+
+    In [31]: plot = likelihood_map_standard.plot(figsize=(12,8), label='standard')
+
+    In [32]: plot.add_spectrogram(likelihood_map_circinc, newax=True, label='circinc')
+
+    In [33]: plot.add_spectrogram(likelihood_map_circnullenergy, newax=True, label='circnullenergy')
+
+    In [34]: plot.add_spectrogram(likelihood_map_circnullinc, newax=True, label='circnullinc')
+
+    In [35]: plot.add_spectrogram(likelihood_map_circenergy, newax=True, label='circenergy')
+
+    In [31]: for ax in plot.axes:
+       ....:     plot.add_colorbar(ax=ax)
+       ....:     ax.set_xlim(peak_time - 0.05, peak_time + 0.05)
+       ....:     ax.set_epoch(peak_time)
+       ....:     ax.set_xlabel('Time [milliseconds]')
+       ....:     ax.set_ylim(20, 500)
+
+    @savefig plot-chirplet-time-frequency-map-likelihood-maps.png
+    In [32]: plot

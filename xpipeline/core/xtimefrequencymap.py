@@ -19,6 +19,7 @@
 # ---- Import standard modules to the python path.
 from gwpy.spectrogram import Spectrogram
 from collections import OrderedDict
+from gwpy.signal.fft.ui import seconds_to_samples
 import numpy as np
 
 
@@ -33,11 +34,7 @@ class XTimeFrequencyMapDict(OrderedDict):
                `XTimeFrequencyMap`:
                    A coherent TF-Map
         """
-        coherent_map = 0
-        for key, tfmap in self.items():
-            coherent_map =+ tfmap
-
-        return coherent_map
+        return sum(self.values())
 
 
     def to_dominant_polarization_frame(self, projected_asds):
@@ -60,10 +57,15 @@ class XTimeFrequencyMapDict(OrderedDict):
                 mask = np.in1d(asd.xindex, self[det].yindex)
                 projected_time_frequency_maps[pattern][det] = self[det] * asd[mask]
         return projected_time_frequency_maps
+        significant_pixels = OrderedDict()
+        for key, pix_thres in blackpixel_percentile.items():
+            significant_pixels[key] = {}
+            significant_pixels[key]['pix_time'], significant_pixels[key]['pix_freq'] \
+                = self[key].find_significant_pixels(blackpixel_percentile=pix_thres)
 
 
-    def get_significant_pixels(self, blackpixel_percentile):
-        """Obtain the time-frequency indicies of the loudest pixels
+    def blackout_pixels(self, blackpixel_percentile):
+        """Set pixels below certain energy level to zero
 
         Parameters:
 
@@ -79,11 +81,12 @@ class XTimeFrequencyMapDict(OrderedDict):
             blackpixel_percentile = dict((c, blackpixel_percentile)
                                          for c in self)
 
-        significant_pixels = OrderedDict()
+        self_ = self
         for key, pix_thres in blackpixel_percentile.items():
-            significant_pixels[key] = {}
-            significant_pixels[key]['pix_time'], significant_pixels[key]['pix_freq'] \
-                = self[key].find_significant_pixels(blackpixel_percentile=pix_thres)
+            self_[key] = self_[key].blackout_pixels(
+                                       blackpixel_percentile=pix_thres)
+
+        return self_
 
 
     def plot(self, label='key', **kwargs):
@@ -121,19 +124,20 @@ class XTimeFrequencyMapDict(OrderedDict):
 
 
 class XTimeFrequencyMap(Spectrogram):
-    def find_significant_pixels(self, blackpixel_percentile):
-        """Obtain the time-frequency indicies of the loudest pixels
+    def blackout_pixels(self, blackpixel_percentile):
+        """Set pixels below certain energy level to zero
 
            Parameters:
 
            blackpixel_percentile : `int`
-               what 2D percentile value we will use as the threshold
+               the x-percentile loudest tile all pixels
+               below which will be set to energy of 0
         """
-        energy_threshold  = np.percentile(self, blackpixel_percentile,
+        self_ = self
+        energy_threshold  = np.percentile(self_, blackpixel_percentile,
                                           interpolation='midpoint')
-        pixel_time, pixel_freq = np.where(self.value > energy_threshold)
-
-        return pixel_time, pixel_freq
+        self_[self_.value <= energy_threshold] = 0
+        return self_ 
 
 
     def phaseshift(self, delta):
@@ -162,7 +166,7 @@ class XTimeFrequencyMap(Spectrogram):
         Parameters
         ----------
         slide : `int`,
-            Ho many seconds we are sliding the map
+            How many seconds we are sliding the map
 
         sample_freqeunecy : `float`
             what is the sample frequency of the data

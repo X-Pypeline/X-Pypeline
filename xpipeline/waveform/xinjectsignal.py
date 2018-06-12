@@ -254,4 +254,3 @@ def xinjectsignal(start_time, block_time, channels, sample_rate,
 
     #----- Done
     return XTimeSeries(injection_data), gps_s, gps_ns, phi, theta, psi
-
