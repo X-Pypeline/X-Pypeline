@@ -1,0 +1,2 @@
+waveforms/ filter=lfs diff=lfs merge=lfs -text
+waveforms/adi.hdf5 filter=lfs diff=lfs merge=lfs -text

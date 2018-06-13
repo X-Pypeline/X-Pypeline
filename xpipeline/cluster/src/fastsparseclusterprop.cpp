@@ -19,15 +19,9 @@ inline double min(double a,double b)
   return b;
 }
 
-void fastsparseclusterprop(const int *dimArray, const double *labelledMap, const double * likelihoodMap, const double * pixTime, const double * pixFreq, double *clusterArray)
+void fastsparseclusterprop(const double *dimArray, const double *labelledMap, const double *likelihoodMap, const double *pixTime, const double *pixFreq, double *clusterArray)
 {
   //Declaration
-  const double *labelledMap;
-  const double *likelihoodMap;
-  const double *pixTime;
-  const double *pixFreq;
-  const int *dimArray
-  double *clusterArray;
   int nDims;
 
   // check input variable, if time/frequency scale information is

@@ -34,6 +34,8 @@ from numpy import cos, sin
 from gwpy.timeseries import TimeSeries
 from collections import OrderedDict
 
+__all__ = ['Detector', 'effective_distance', 'compute_antenna_patterns']
+
 class Detector(object):
     """A gravitaional wave detector
     """

@@ -77,6 +77,7 @@ setup_requires = [
 install_requires = [
     'six',
     'numpy>=1.10',
+    'scipy>=1.0',
     'astropy',
     'lalsuite',
     'cython',
@@ -101,6 +102,19 @@ extras_require = {
 extensions = [
     Extension("xpipeline.cluster.nearestneighbor",
               ["xpipeline/cluster/src/nearestneighbors.pyx"],
+              include_dirs=[numpy.get_include()],
+              extra_compile_args=['-std=c++11'],
+              language='c++'
+              ),
+
+    Extension('xpipeline.cluster.clusterproperties',
+              ['xpipeline/cluster/src/clusterproperties.pyx'],
+              include_dirs=[numpy.get_include()],
+              extra_compile_args=['-std=c++11'],
+              language='c++'
+              ),
+    Extension('xpipeline.cluster.clustersum',
+              ['xpipeline/cluster/src/clustersum.pyx'],
               include_dirs=[numpy.get_include()],
               extra_compile_args=['-std=c++11'],
               language='c++'
