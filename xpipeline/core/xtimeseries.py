@@ -210,6 +210,31 @@ class XTimeSeries(TimeSeriesDict):
         return tfmaps
 
 
+    def fftgram(self, fftlength):
+        """Obtain the spectrograms of items in this dict.
+
+        Parameters
+        ----------
+        fftlength : `dict`, `float`
+            either a `dict` of (channel, `float`) pairs for key-wise
+            asd calc, or a single float/int to computer as of all items.
+
+        **kwargs
+             other keyword arguments to pass to each item's asd
+             method.
+        """
+        tfmaps = XTimeFrequencyMapDict()
+        if not isinstance(fftlength, dict):
+            fftlength = dict((c, fftlength) for c in self)
+
+        for (idet, iseries) in self.items():
+            tfmaps[idet] = XTimeFrequencyMap(iseries.fftgram(
+                                             fftlength=fftlength[idet],
+                                             overlap=0.5*fftlength[idet],
+                                             window='hann'))
+        return tfmaps
+
+
     def inject(self, injection_data, **kwargs):
         """Take an injection time series and inject into `XTimeSeries`
 

@@ -44,7 +44,9 @@ The following is all open data obtained via `LOSC <https://losc.ligo.org/>`_
 
     In [4]: whitened_timeseries = data.whiten(asds)
 
-    In [5]: tfmaps = whitened_timeseries.spectrogram(1. /64)
+    In [5]: fft_maps = whitened_timeseries.fftgram(1. /64)
+
+    In [6]: tfmaps = fft_maps.abs() 
 
     In [6]: gps = 1126259462.427
 
@@ -80,13 +82,13 @@ of the timefrequencymap, here we do each of these methods.
 
     In [13]: phi = -0.3801; theta = 2.7477 # Earth fixed coordinates
 
-    In [14]: time_shift = livingston.time_delay_from_earth_center_phi_theta([phi], [theta]) - hanford.time_delay_from_earth_center_phi_theta([phi], [theta])
+    In [14]: time_shift = hanford.time_delay_from_earth_center_phi_theta([phi], [theta]) - livingston.time_delay_from_earth_center_phi_theta([phi], [theta])
 
-    In [15]: whitened_timeseries['L1:GDS-CALIB_STRAIN'].shift(-time_shift[0]) # In place shift
+    In [15]: whitened_timeseries['L1:GDS-CALIB_STRAIN'].shift(time_shift[0]) # In place shift
 
-    In [16]: tfmaps_ts_shifted = whitened_timeseries.spectrogram(1. /64)
+    In [16]: fft_gram_shifted = whitened_timeseries.fftgram(1. /64)
 
-    In [17]: plot = tfmaps_ts_shifted.plot(figsize=[ 12, 6])
+    In [17]: plot = fft_gram_shifted.abs().plot(figsize=[ 12, 6])
 
     In [18]: for ax in plot.axes:
        ....:     ax.set_xlim(gps - 0.15, gps + 0.05)
@@ -97,7 +99,7 @@ of the timefrequencymap, here we do each of these methods.
     @savefig plot-time-frequency-map-ts-shifted.png
     In [19]: plot
 
-    In [20]: plot = tfmaps_ts_shifted.to_coherent().plot(figsize=[ 12, 6])
+    In [20]: plot = fft_gram_shifted.to_coherent().abs().plot(figsize=[ 12, 6])
 
     In [21]: for ax in plot.axes:
        ....:     ax.set_xlim(gps - 0.15, gps + 0.05)
@@ -108,29 +110,6 @@ of the timefrequencymap, here we do each of these methods.
     @savefig plot-time-frequency-map-time-shifted-coherent.png
     In [22]: plot
 
-    In [23]: tfmaps['L1:GDS-CALIB_STRAIN'] = tfmaps['L1:GDS-CALIB_STRAIN'].phaseshift(time_shift[0]).abs()
-
-    In [24]: plot = tfmaps.plot(figsize=[ 12, 6])
-
-    In [25]: for ax in plot.axes:
-       ....:     ax.set_xlim(gps - 0.15, gps + 0.05)
-       ....:     ax.set_epoch(gps)
-       ....:     ax.set_xlabel('Time [milliseconds]')
-       ....:     ax.set_ylim(20, 500)
-
-    @savefig plot-time-frequency-map-phase-shifted.png
-    In [26]: plot
-
-    In [27]: plot = tfmaps.to_coherent().plot(figsize=[ 12, 6])
-
-    In [28]: for ax in plot.axes:
-       ....:     ax.set_xlim(gps - 0.15, gps + 0.05)
-       ....:     ax.set_epoch(gps)
-       ....:     ax.set_xlabel('Time [milliseconds]')
-       ....:     ax.set_ylim(20, 500)
-
-    @savefig plot-time-frequency-map-coherent-phase-shifted.png
-    In [26]: plot
 
 The Dominant Polarization Frame
 -------------------------------
@@ -142,21 +121,21 @@ polarization there is some orthoganal projection of the pixels onto the plus-cro
 
     In [13]: from xpipeline.core.xdetector import compute_antenna_patterns
 
-    In [14]: import numpy as np
+    In [14]: import numpy
 
     In [14]: phi = -0.3801; theta = 2.7477 # Earth fixed coordinates
 
     In [15]: antenna_patterns = compute_antenna_patterns(['H1', 'L1'], phi, theta, antenna_patterns=['f_plus', 'f_cross', 'f_scalar'])
 
-    In [16]: frequencies = np.in1d(asds['L1:GDS-CALIB_STRAIN'].xindex.to_value(),tfmaps['L1:GDS-CALIB_STRAIN'].yindex.to_value())
+    In [16]: frequencies = numpy.in1d(asds['L1:GDS-CALIB_STRAIN'].xindex.to_value(),tfmaps['L1:GDS-CALIB_STRAIN'].yindex.to_value())
 
     In [17]: sliced_asds = asds.slice_frequencies(frequencies)
 
     In [18]: projected_asds = sliced_asds.project_onto_antenna_patterns(antenna_patterns, to_dominant_polarization_frame=True)
 
-    In [19]: projected_tfmaps = tfmaps.to_dominant_polarization_frame(projected_asds)
+    In [19]: projected_tfmaps = fft_gram_shifted.to_dominant_polarization_frame(projected_asds)
 
-    In [20]: plot = projected_tfmaps['f_plus'].plot(figsize=[ 12, 6])
+    In [20]: plot = projected_tfmaps['f_plus'].abs().plot(figsize=[ 12, 6])
 
     In [21]: for ax in plot.axes:
        ....:     ax.set_xlim(gps - 0.15, gps + 0.05)
@@ -178,7 +157,7 @@ the plus and cross polarization plane (i.e. `projected_tfmaps` should also be la
 
 .. ipython::
 
-    In [21]: from xpipeline.core.xlikelihood import XLikelihood
+    In [21]: from xpipeline.likelihood.xlikelihood import XLikelihood
 
     In [22]: mpp = projected_asds['f_plus'].to_m_ab()
 
@@ -240,11 +219,9 @@ column 7-?: sum-over-cluster map values for each likelihood
 
     In [34]: from xpipeline.cluster import nearestneighbor
 
-    In [34]: import numpy
+    In [35]: fft_gram_shifted_zeroed = fft_gram_shifted.blackout_pixels(99)
 
-    In [35]: tfmaps_ts_shifted = tfmaps_ts_shifted.blackout_pixels(99)
-
-    In [35]: coh_map = tfmaps_ts_shifted.to_coherent() 
+    In [35]: coh_map = fft_gram_shifted_zeroed.to_coherent().abs()
 
     In [35]: pixels = numpy.argwhere(coh_map).T
 
@@ -542,7 +519,7 @@ an injected signal in there. Well let us look at what the likelihoods look like 
     @savefig plot-chirplet-time-frequency-map-dpf-plus.png
     In [22]: plot
 
-    In [21]: from xpipeline.core.xlikelihood import XLikelihood
+    In [21]: from xpipeline.likelihood.xlikelihood import XLikelihood
 
     In [22]: mpp = projected_asds['f_plus'].to_m_ab()
 
