@@ -18,14 +18,20 @@
 
 # ---- Import standard modules to the python path.
 from gwpy.spectrogram import Spectrogram
+from gwpy.timeseries import TimeSeries
 from collections import OrderedDict
 from gwpy.signal.fft.ui import seconds_to_samples
 from .xfrequencyseries import XFrequencySeriesDict
+from scipy import sparse
+
 import numpy
 
 
 __author__ = 'Scott Coughlin <scott.coughlin@ligo.org>'
-__all__ = ['XTimeFrequencyMapDict', 'residual_time_shift', 'XTimeFrequencyMap']
+__all__ = ['csc_XSparseTimeFrequencyMap', 
+           'XSparseTimeFrequencyMapDict'
+           'XTimeFrequencyMapDict',
+           'residual_time_shift', 'XTimeFrequencyMap']
 
 class XTimeFrequencyMapDict(OrderedDict):
     def abs(self):
@@ -89,12 +95,29 @@ class XTimeFrequencyMapDict(OrderedDict):
             blackpixel_percentile = dict((c, blackpixel_percentile)
                                          for c in self)
 
-        self_ = self
-        for key, pix_thres in blackpixel_percentile.items():
-            self_[key] = self_[key].blackout_pixels(
-                                       blackpixel_percentile=pix_thres)
+        return XSparseTimeFrequencyMapDict({k: self[k].blackout_pixels(v)
+                                     for k,v in blackpixel_percentile.items()})
 
-        return self_
+    def circular_time_slide(self, npixels_to_shift):
+        """slide all maps in dict by specified number of pixels
+
+        Parameters:
+
+            npixels_to_shift : `dict`, `int`
+                either a `dict` of (channel, `int`) pairs for key-wise
+                internal time slide calc. Since it does not make sense
+                to slide all the tfmaps the same number of pixels
+                you must specify a dict with all detectors and pixels to slide.
+
+        Returns:
+            `dict`: key-wise pair of channel
+        """
+        if not isinstance(npixels_to_shift, dict):
+            raise ValueError("Must be a dict")
+
+        return XTimeFrequencyMapDict({key :
+                self[key].circular_time_slide(npixels_to_shift=npix_to_shift)
+                for key, npix_to_shift in npixels_to_shift.items()})
 
     def plot(self, label='key', **kwargs):
         """Plot the data for this `XTimeFrequencyMapDict`.
@@ -157,7 +180,8 @@ class XTimeFrequencyMap(Spectrogram):
         energy_threshold  = numpy.percentile(self_, blackpixel_percentile,
                                              interpolation='midpoint')
         self_[self_.value <= energy_threshold] = 0
-        return self_ 
+        return csc_XSparseTimeFrequencyMap(self_, xindex=self.xindex,
+                                           yindex=self.yindex)
 
     def gaussianity(self):
         """Calculate the gaussianity of this map
@@ -186,7 +210,7 @@ class XTimeFrequencyMap(Spectrogram):
                                               self.frequencies.to_value())
         return self * frequency_shift
 
-    def circular_time_slide(self, seconds, sample_frequency, offset):
+    def circular_time_slide(self, npixels_to_shift):
         """Slide the TF pixels of this map
 
         This should move the appropriate number of time bins
@@ -208,15 +232,149 @@ class XTimeFrequencyMap(Spectrogram):
                 A time frequency map slide by the appropriate number
                 of seconds
         """
-        offsetlength = seconds_to_samples(offset, sample_frequency)
-        ntimepixelshifted = int(seconds * sample_frequency//offsetlength)
+        if not npixels_to_shift:
+            return self
 
-        slided_map = numpy.roll(self.value, ntimepixelshifted)
-        return XTimeFrequencyMap(slided_map,
-                                 yindex=self.yindex, xindex=self.xindex)
+        idx = numpy.searchsorted(self.xindex.value,
+                                 numpy.roll(self.xindex.value,
+                                            npixels_to_shift
+                                ))
+
+        return self[idx]
 
     def to_dominant_polarization_frame(self, dpf_asd):
         return self * dpf_asd
+
+
+class XSparseTimeFrequencyMapDict(OrderedDict):
+    def abs(self):
+        """Take the absolute value of all maps in dict
+
+           Returns:
+               `XTimeFrequencyMapDict`:
+                   power_map of all Fourier Grams in Dict
+        """
+        return XTimeFrequencyMapDict({k: v.abs() for k,v in self.items()})
+
+    def to_coherent(self):
+        """Sum all maps in the dict
+
+           Returns:
+               `XTimeFrequencyMap`:
+                   A coherent TF-Map
+        """
+        return sum(self.values())
+
+    def to_xtimefrequencymapdict(self):
+        """Convert dict fo sparse matrix to `XTimeFrequencyMapDict`
+        """
+        maps = {k : XTimeFrequencyMap(v.toarray(), xindex=v.xindex,
+                                      yindex=v.yindex)
+                for k, v in self.items()}
+        return XTimeFrequencyMapDict(maps)
+
+    def plot(self, label='key', **kwargs):
+        """Plot the data for this `XTimeFrequencyMapDict`.
+
+        Parameters
+        ----------
+        label : `str`, optional
+
+            labelling system to use, or fixed label for all elements
+            Special values include
+
+            - ``'key'``: use the key of the `XTimeFrequencyMapDict`,
+            - ``'name'``: use the :attr:`~XTimeSeries.name` of each element
+
+            If anything else, that fixed label will be used for all lines.
+
+        **kwargs
+            all other keyword arguments are passed to the plotter as
+            appropriate
+        """
+        return self.to_xtimefrequencymapdict().plot(label='key', **kwargs)
+
+class csc_XSparseTimeFrequencyMap(sparse.csc_matrix):
+    _metadata_slots = ('energy', 'tindex', 'findex', 'yindex', 'xindex')
+    def __init__(self, matrix, yindex=None, xindex=None, energy=None,
+                       tindex=None, findex=None, **kwargs):
+        super(csc_XSparseTimeFrequencyMap, self).__init__(matrix, **kwargs)
+
+        self.yindex = yindex
+        self.xindex = xindex
+
+        if energy is not None:
+            self.energy = energy
+        else:
+            self.energy = numpy.asarray(self[self.nonzero()])[0]
+
+        if tindex is not None:
+            self.tindex = tindex
+        else:
+            self.tindex = self.nonzero()[0]
+
+        if tindex is not None:
+            self.findex = findex
+        else:
+            self.findex = self.nonzero()[1]
+
+    def _repr_helper(self, print_):
+        if print_ is repr:
+            opstr = '='
+        else:
+            opstr = ': '
+
+        # get prefix and suffix
+        prefix = '{}('.format(type(self).__name__)
+        suffix = ')'
+        if print_ is repr:
+            prefix = '<{}'.format(prefix)
+            suffix += '>'
+
+        indent = ' ' * len(prefix)
+
+        # format value
+        arrstr = ''
+
+        # format unit
+        metadata = [('unit', 'dimensionless')]
+
+        # format other metadata
+        try:
+            attrs = self._print_slots
+        except AttributeError:
+            attrs = self._metadata_slots
+        for key in attrs:
+            try:
+                val = getattr(self, key)
+            except (AttributeError, KeyError):
+                val = None
+            thisindent = indent + ' ' * (len(key) + len(opstr))
+            metadata.append((
+                key.lstrip('_'),
+                print_(val).replace('\n', '\n{}'.format(thisindent)),
+            ))
+        metadata = (',\n{}'.format(indent)).join(
+            '{0}{1}{2}'.format(key, opstr, value) for key, value in metadata)
+
+        return "{0}{1}\n{2}{3}{4}".format(
+            prefix, arrstr, indent, metadata, suffix)
+
+    def __repr__(self):
+        """Return a representation of this object
+
+        This just represents each of the metadata objects appropriately
+        after the core data array
+        """
+        return self._repr_helper(repr)
+
+    def __str__(self):
+        """Return a printable string format representation of this object
+
+        This just prints each of the metadata objects appropriately
+        after the core data array
+        """
+        return self._repr_helper(str)
 
 
 def residual_time_shift(seconds, frequencies):

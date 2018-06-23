@@ -128,7 +128,7 @@ class XLikelihoodMap(object):
 
         for (detector, tfmap) in self.energy_maps.items():
             inc_energy += ((self.projected_asds['f_plus'][detector]**2 /
-                           self.mcc) * tfmap)
+                           self.mpp) * tfmap)
         return inc_energy
 
     def crossinc(self):

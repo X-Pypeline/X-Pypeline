@@ -135,7 +135,6 @@ class XTimeSeries(TimeSeriesDict):
 
         return data
 
-
     def asd(self, fftlength, **kwargs):
         """Obtain the asd of items in this dict.
 

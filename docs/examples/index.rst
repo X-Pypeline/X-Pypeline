@@ -46,7 +46,7 @@ The following is all open data obtained via `LOSC <https://losc.ligo.org/>`_
 
     In [5]: fft_maps = whitened_timeseries.fftgram(1. /64)
 
-    In [6]: tfmaps = fft_maps.abs() 
+    In [6]: energy_maps = fft_maps.abs() 
 
     In [6]: gps = 1126259462.427
 
@@ -88,7 +88,9 @@ of the timefrequencymap, here we do each of these methods.
 
     In [16]: fft_gram_shifted = whitened_timeseries.fftgram(1. /64)
 
-    In [17]: plot = fft_gram_shifted.abs().plot(figsize=[ 12, 6])
+    In [17]: energy_map_shifted = fft_gram_shifted.abs()
+
+    In [17]: plot = energy_map_shifted.plot(figsize=[ 12, 6])
 
     In [18]: for ax in plot.axes:
        ....:     ax.set_xlim(gps - 0.15, gps + 0.05)
@@ -99,7 +101,7 @@ of the timefrequencymap, here we do each of these methods.
     @savefig plot-time-frequency-map-ts-shifted.png
     In [19]: plot
 
-    In [20]: plot = fft_gram_shifted.to_coherent().abs().plot(figsize=[ 12, 6])
+    In [20]: plot = energy_map_shifted.to_coherent().plot(figsize=[ 12, 6])
 
     In [21]: for ax in plot.axes:
        ....:     ax.set_xlim(gps - 0.15, gps + 0.05)
@@ -113,7 +115,7 @@ of the timefrequencymap, here we do each of these methods.
 
 The Dominant Polarization Frame
 -------------------------------
-Now the we have a sky location assosciated with the event we can proclustersum.clustersum_wrapperject every time-freqeuncy pixel
+Now the we have a sky location assosciated with the event we can project every time-freqeuncy pixel
 into the Dominant Polarization Frame (DPF). What this means is the is we assume the GW has a plus and cross
 polarization there is some orthoganal projection of the pixels onto the plus-cross plane for 2 or more detectors
 
@@ -157,7 +159,12 @@ the plus and cross polarization plane (i.e. `projected_tfmaps` should also be la
 
 .. ipython::
 
-    In [21]: from xpipeline.likelihood.xlikelihood import XLikelihood
+    In [21]: from xpipeline.likelihood.xlikelihood import XLikelihoodMap
+
+    In [22]: from xpipeline.core.xtimefrequencymap import XTimeFrequencyMapDict
+
+    In [22]: likelihoods = ['standard', 'plusenergy', 'crossenergy', 
+       ....:                'plusinc', 'crossinc']
 
     In [22]: mpp = projected_asds['f_plus'].to_m_ab()
 
@@ -167,25 +174,18 @@ the plus and cross polarization plane (i.e. `projected_tfmaps` should also be la
 
     In [25]: wfctimefrequencymap = projected_tfmaps['f_cross'].to_coherent()
 
-    In [26]: likelihood_map_standard = XLikelihood.standard(mpp, mcc, wfptimefrequencymap, wfctimefrequencymap)
+    In [26]: likelihood_map = XLikelihoodMap(mpp=mpp,
+       ....:                                 mcc=mcc,
+       ....:                                 tfmaps=fft_gram_shifted,
+       ....:                                 projected_asds=projected_asds)
 
-    In [27]: likelihood_map_circenergy = XLikelihood.circenergy(mpp, mcc, wfptimefrequencymap, wfctimefrequencymap)
+    In [26]: likelihood_maps = XTimeFrequencyMapDict()
 
-    In [28]: likelihood_map_circinc = XLikelihood.circinc(tfmaps, mpp, mcc, projected_asds)
+    In [26]: for likelihood in likelihoods:
+       ....:     likelihood_function = getattr(likelihood_map, likelihood)
+       ....:     likelihood_maps[likelihood] = likelihood_function()
 
-    In [29]: likelihood_map_circnullinc = XLikelihood.circnullinc(tfmaps, mpp, mcc, projected_asds)
-
-    In [30]: likelihood_map_circnullenergy = XLikelihood.circnullenergy(mpp, mcc, wfptimefrequencymap, wfctimefrequencymap)
-
-    In [31]: plot = likelihood_map_standard.plot(figsize=(12,8), label='standard')
-
-    In [32]: plot.add_spectrogram(likelihood_map_circinc, newax=True, label='circinc')
-
-    In [33]: plot.add_spectrogram(likelihood_map_circnullenergy, newax=True, label='circnullenergy')
-
-    In [34]: plot.add_spectrogram(likelihood_map_circnullinc, newax=True, label='circnullinc')
-
-    In [35]: plot.add_spectrogram(likelihood_map_circenergy, newax=True, label='circenergy')
+    In [31]: plot = likelihood_maps.plot(figsize=(16,8))
 
     In [31]: for ax in plot.axes:
        ....:     plot.add_colorbar(ax=ax)
@@ -219,11 +219,13 @@ column 7-?: sum-over-cluster map values for each likelihood
 
     In [34]: from xpipeline.cluster import nearestneighbor
 
-    In [35]: fft_gram_shifted_zeroed = fft_gram_shifted.blackout_pixels(99)
+    In [35]: energy_map_shifted_zeroed = energy_map_shifted.blackout_pixels(99)
 
-    In [35]: coh_map = fft_gram_shifted_zeroed.to_coherent().abs()
+    In [36]: print(energy_map_shifted_zeroed)
 
-    In [35]: pixels = numpy.argwhere(coh_map).T
+    In [35]: coh_map = energy_map_shifted_zeroed.to_coherent()
+
+    In [35]: pixels = numpy.vstack([coh_map.tindex, coh_map.findex])
 
     In [37]: coord_dim_array = coh_map.shape
 
@@ -255,7 +257,7 @@ column 7-?: sum-over-cluster map values for each likelihood
 
     In [41]: from gwpy.table import EventTable
 
-    In [41]: total_energy = coh_map[pixels[0,:], pixels[1,:]] 
+    In [41]: total_energy = coh_map.energy 
 
     In [43]: dim_array = numpy.array([total_energy.shape[0], 1, 2.0])
 
