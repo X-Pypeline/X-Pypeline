@@ -1824,11 +1824,11 @@ def xmakewaveform(family, parameters, T, T0, fs, **kwargs):
         #      specifying vector "t".)  Use spline rather than linear
         #      interpolation the latter effectively acts as a low-pass-filter
         #      which causes problems with high-frequency waveforms.
-        hp_interp = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
+        hp_interp = TimeSeries(numpy.zeros(t.size), dx=1/hp.sample_rate.value,
                                name=hp.name)
-        hc_interp = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
+        hc_interp = TimeSeries(numpy.zeros(t.size), dx=1/hp.sample_rate.value,
                                name=hp.name)
-        hb_interp = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
+        hb_interp = TimeSeries(numpy.zeros(t.size), dx=1/hp.sample_rate.value,
                                name=hp.name)
 
         hp_interp_function = CubicSpline(pregen_t, hp)

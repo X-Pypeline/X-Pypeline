@@ -1,0 +1,226 @@
+#!/usr/bin/env python
+
+from xpipeline.core.xtimeseries import XTimeSeries
+from xpipeline.core.xdetector import Detector
+from xpipeline.core.xdetector import compute_antenna_patterns
+from xpipeline.likelihood.xlikelihood import XLikelihoodMap
+from xpipeline.core.xtimefrequencymap import XTimeFrequencyMapDict
+from xpipeline.core.xtimefrequencymap import csc_XSparseTimeFrequencyMap
+
+import pandas
+from gwpy.table import EventTable
+from astropy.table import vstack
+
+from scipy import sparse
+import numpy
+
+# presets
+whitening_length = 1.0
+transient_time = 4.0
+circ_time_slides = 6.0
+gps = 1126259462.427
+
+# likelihoods to analze
+likelihoods = ['loghbayesiancirc', 'standard', 'circenergy',
+               'circinc', 'circnullenergy', 'circnullinc', 'powerlaw',
+               'energyitf1', 'energyitf2']
+
+likelihoods = ['standard', 'plusenergy', 'crossenergy',
+               'plusinc', 'crossinc']
+
+channels = ['H1:GDS-CALIB_STRAIN','L1:GDS-CALIB_STRAIN']
+
+# fft length to loop over
+fft_lengths = [1.0, 1./2, 1./4, 1./8, 1./16, 1./32, 1./64, 1./128]
+
+# initialize cluster loop
+clusters = pandas.DataFrame(columns=['min_time_of_cluster',
+                             'weighted_center_time', 'max_time_of_cluster',
+                             'min_frequency_of_cluster',
+                             'weighted_center_frequency',
+                             'max_frequency_of_cluster',
+                             'number_of_pixels', 'energy_of_cluster',
+                             'fftlength', 'phi', 'theta',
+                             'circular_time_slide']
+                             + likelihoods)
+
+
+data = XTimeSeries.read('examples/GW150914.gwf',
+                        channels=channels)
+
+# seconds to slide tf-maps (so called internal time slide
+internal_slides = numpy.arange(0,
+                               data['H1:GDS-CALIB_STRAIN'].duration.value -
+                                   2*transient_time - circ_time_slides,
+                               circ_time_slides).astype(int)
+
+slides = {}
+for isecond in internal_slides:
+    slides[str(isecond)] = {'H1:GDS-CALIB_STRAIN' : 0, 'L1:GDS-CALIB_STRAIN' : isecond}
+
+injection=False
+if injection:
+    dosomething=0
+
+asds = data.asd(whitening_length)
+whitened_timeseries = data.whiten(asds)
+
+hanford = Detector('H1')
+livingston = Detector('L1')
+
+sky_postions = [[-0.3801, 2.7477],
+                [-0.39, 2.7477],
+                [-0.4, 2.7477],
+                [-0.41, 2.7477],
+                [-0.42, 2.7477],
+                [-0.43, 2.7477],
+                [-0.44, 2.7477],
+                [-0.45, 2.7477],
+               ]
+
+all_clusters = numpy.zeros((len(slides)*len(sky_postions)*len(fft_lengths)*248,11))
+
+for fft_length in fft_lengths:
+    for sky_postion in sky_postions:
+        phi = sky_postion[0]; theta = sky_postion[1]
+
+        time_shift = (hanford.time_delay_from_earth_center_phi_theta([phi], [theta]) -
+                      livingston.time_delay_from_earth_center_phi_theta([phi], [theta])
+                     )
+
+        # shift data appropriately
+        whitened_timeseries['L1:GDS-CALIB_STRAIN'].shift(time_shift[0])
+
+        # NOTE we calculate everything from here to the loop over
+        # internal time slides for the non-slide maps
+        # this way when we find pizels for the slide maps
+        # if we undo the slide to the non-slide maps values
+        # then we do not need to recalculate say likelihood maps again
+        # and again
+
+        ####################################################
+        # Create TF maps and Likelihood Maps               #
+        ####################################################
+
+        # Make a spectrogram that contains phase information
+        fft_grams = whitened_timeseries.fftgram(fft_length)
+
+        #antenna_patterns = compute_antenna_patterns(['H1', 'L1'], phi, theta, antenna_patterns=['f_plus', 'f_cross', 'f_scalar'])
+
+        #frequencies = numpy.in1d(asds['L1:GDS-CALIB_STRAIN'].xindex.to_value(), fft_grams['L1:GDS-CALIB_STRAIN'].yindex.to_value())
+
+        #sliced_asds = asds.slice_frequencies(frequencies)
+
+        #projected_asds = sliced_asds.project_onto_antenna_patterns(antenna_patterns, to_dominant_polarization_frame=True)
+
+        #projected_fftmaps = fft_grams.to_dominant_polarization_frame(projected_asds)
+
+        time_shift = (hanford.time_delay_from_earth_center_phi_theta([phi], [theta]) -
+                      livingston.time_delay_from_earth_center_phi_theta([phi], [theta])
+                     )
+
+        ####################################################
+        # Find loud pixels and down select maps            #
+        ####################################################
+        # Create spectrogram that contains info of the energy in each pixel
+        energy_maps = fft_grams.abs()
+        # for reference we will create a coherent map out of all pixels before
+        # only making maps with the reduced set of pixels
+        full_coh_energy_map = energy_maps.to_coherent()
+
+        # Turn off the bottom 99 percent of pixels (i.e. set to 0)
+        energy_maps_zeroed = energy_maps.blackout_pixels(99)
+
+        # Add maps together and then back extract the t-f indices
+        # of the pixels, these will represent all t-f pixels used
+        # in our analysis and new sparse tf maps will need
+        # to be made for the individual ifos
+        coh_energy_maps_zeroed = energy_maps_zeroed.to_coherent()
+
+        # find nonzero pixels indicies
+        tf_indices = coh_energy_maps_zeroed.nonzero()
+
+        # If we are doing internal time slides we should register the time bins
+        # as these are the only things that will be shifted for any
+        # detectors
+        tindex = {k : tf_indices[0] for k in energy_maps}
+        findex = {k : tf_indices[1] for k in energy_maps}
+
+        # Obtain individual ifo energies
+        no_slide_energies = {k : v.value[tf_indices]
+                             for k, v in energy_maps.items()}
+
+        # Now that we have the pixels that are in each map
+        # let's reconstruc tthe sparse tf map
+        # Now with pixels from both detectors
+        energy_maps_zeroed = energy_maps.to_sparse(tindex, findex)
+
+        # Recreate individual sparse projected tfmaps
+        #sparse_projected_fftgrams = {k : v.to_sparse(tindex, findex)
+        #                             for k,v in projected_fftmaps.items()}
+
+        # make a note of the final time bin
+        final_time_bin_idx = energy_maps['H1:GDS-CALIB_STRAIN'].shape[0]
+
+        coord_dim_array = energy_maps['H1:GDS-CALIB_STRAIN'].shape
+        # Alright Now that we have all this information about all the pixels
+        # we must group them together in nearby "clusters" of pixels
+        # these clusters will represent our possible gravitational
+        # wave canididates
+        for slide in slides.values():
+
+            # slide time indices 
+            for detector, second in slide.items():
+                # check to make sure this tfmap is even being slide by any seconds
+                if second:
+                    number_of_time_bins_shifted = second *2048
+
+                    # take the time indices and shift them
+                    time_idx_shifted = numpy.mod(tindex[detector] +
+                                                 number_of_time_bins_shifted,
+                                                 final_time_bin_idx)
+
+                    # Reconstruct sparse matrix
+                    energy_maps_zeroed[detector] = csc_XSparseTimeFrequencyMap(
+                                                       (no_slide_energies[detector],
+                                                        (time_idx_shifted, findex[detector])
+                                                       ),
+                                                       shape=coord_dim_array,
+                                                       tindex=time_idx_shifted,
+                                                       findex=findex[detector])
+
+            # Add new maps together
+            coh_energy_maps_zeroed = energy_maps_zeroed.to_coherent()
+
+            # find nonzero pixels indicies
+            tf_indices = coh_energy_maps_zeroed.nonzero()
+
+            tindex_slide = {k : tf_indices[0] for k in energy_maps}
+            findex_slide = {k : tf_indices[1] for k in energy_maps}
+            # Perform the time slide again to joint pixels
+            for detector, second in slide.items():
+                # check to make sure this tfmap is even being slide by any seconds
+                if second:
+                    tindex_slide[detector] = numpy.mod(tindex_slide[detector] +
+                                                       number_of_time_bins_shifted,
+                                                       final_time_bin_idx)
+
+            # Obtain individual ifo energies
+            maps_to_cluster = energy_maps.to_sparse(tindex, findex)
+            cluster = maps_to_cluster.cluster()
+
+            #final_clusters = clusters.nlargest(248, 'energy_of_cluster')
+            #final_clusters['fft_length'] = fft_length
+            #final_clusters['phi'] = phi
+            #final_clusters['theta'] = theta
+            #slide_string = '~'.join([str(islide) for islide in slide.values()])
+            #final_clusters['slide'] = slide_string 
+            #cluster_this_fftlength = cluster_this_fftlength.append(final_clusters)
+
+    #all_clusters = all_clusters.append(
+    #                    cluster_this_fftlength.groupby('slide').apply(lambda grp: grp.nlargest(248, 'energy_of_cluster')).reset_index(drop=True)
+    #                   )
+
+#all_clusters = EventTable.from_pandas(all_clusters)
+#all_clusters.convert_unicode_to_bytestring()
+#all_clusters.write('triggers.hdf5', format='hdf5', path='offsource', append=True)

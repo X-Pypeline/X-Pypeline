@@ -100,7 +100,7 @@ class XFrequencySeriesDict(OrderedDict):
                `gwpy.frequencyseries.FrequencySeries`
                    Units Hz
         """
-        return sum([v**2 for v in list(self.values())])
+        return sum([v**2 for v in self.values()])
 
 
     def slice_frequencies(self, indices):

@@ -7,21 +7,58 @@ xpipeline an explanation
 ============
 Introduction
 ============
-The story of one “trial” of core X-Pipeline,
+Xpipeline is an unmodelled Gravitational Wave Burst analysis algorithm aimed at
+using coherent detection statistics as well as coherent conistency checks to eliminate
+surperfluous noise transients and extact real gravitational wave events from the data.
 
-There is some timestamp considered as an “event time”
+In order to build the statistics necessary to claim a detection
+and to calculate the coherent statistics needed to eliminate excess back ground noise,
+xpipeline conists of performing the same statistical "trials" over stretches of
+data that couldhave a gravitational wave event and data which it is
+either not believed or not possible for it to contain a graviational wave event.
+In addition to these two stretches of data, an analysis is also performed on a
+variety of simulated signals which is injected
+into the data that is believed to contain a graviational wave in order that we
+may understand what to expect from an actual gravitational wave
+if it were to appear in the data during the stretch fo time believed to contain and gravitational wave.
 
-Some block of data from N detectors if obtain around this event time.
+Below we highlight what one of these "statistical trials" look like (either for the time
+that does or does not contain a graviational wave). First, we use time from a known graviational wave event
+to hightlight what the trial would look like for it, and then second we use a known noise transient
+to see what it would look like for it.
 
-A time-frequency is made for a given fftlength, and based on time delays between detectors which is based on a potential sky location of the “source”, the tfmaps of N-1 detectors is phase shifted appropriately.
+In this breakdown, we imagine we are running over a stretch of data due to an
+alert from a electromagnetic countrpart, i.e. an event that is believed to create
+photometric and graviational wave signatures.
 
-From these individual maps loud pixels are identified and then a “coherent” set of pixels is calculated from the overlap of these individually loud pixels.
+Through the alert, there is some timestamp considered as an “event time”, and around said
+event time is some stretch of probable time that could contain the graviational wave counterpart to the
+observation.
 
-a coherent energy is calculated and a threshold on loud coherent pixels is used,
+The data corresponding to the appropriate stretch of plausible time when
+the gravitational wave could have passed through earth is obtained for N detectors
+that were operating during that time.
 
-These final loud enough coherent pixels are then turned from individual pixels into clusters using whatever clustering algorithm
+The data from these N detectors are then FFT'ed and taken from time-amplitude
+into time-frequency space. Since we have a plausible sky location of the source,
+not only can we shrink the amount of data we search for a graviational wave over,
+we can combine the data streams from the N detectors based on the known travel time of
+graviational wave (i.e. the speed of light).
 
-these clusters then are assigned a variety of *likelihoods* these *likelihoods* for each cluster are based on the concept of translating the data in the dominant polarization frame i.e. plus and cross polarized time frequency maps instead of the standard time frequency maps considered above.
+The tfmaps of N-1 detectors are time/phase shifted appropriately with the sky
+location (locations if there is some error box).
+
+From these individual maps loud time-frequency pixels are identified and
+a “coherent” set of pixels is calculated from the overlap of these individually loud pixels.
+
+After these coherent (overlapping) pixels are calculted a chosen "clustering" algorithm is
+applied to the pizels that group near by loud pixels into possible graviational wave candidate events.
+
+So essentially, our possible grviational wave events are simply a cluster of loud time frequency pixels upon
+which numerous fancy statistics will be applied (these statistics often are called coherent statistics as
+they are most useful when N streams of data can be projected combined together).
+
+Specificlly, these clusters then are assigned a variety of *likelihoods* these *likelihoods* for each cluster are based on the concept of translating the data in the dominant polarization frame i.e. plus and cross polarized time frequency maps instead of the standard time frequency maps considered above.
 
 So the final important stat calculated is energy_of_cluster * likelihood_of_cluster for a given likelihood.
 
@@ -29,10 +66,21 @@ These likelihood rely largely on the ability to project the N stream of gravitat
 
 In order to calculate these antenna weighted tfmaps we need to re-weight the ASDs of the data streams appropriately. This re-weighted ASD is then multiplied with the time frequency map obtained normally above.
 
+So let us see what the above looks like if we had had an counterpart signal to the very
+first graviational wave detection.
+
 
 The Time-Frequency Map
 ----------------------
 The following is all open data obtained via `LOSC <https://losc.ligo.org/>`_
+
+Data from Hanford and Livingston is obtained, and then whitened (one can think of this as a normalization process).
+The realty is that our detectors are more or less senstive to different frequencies and therefore in order
+to detect excess noise we must first "whiten that data."
+
+As I know the event time I have zoomed in close on the over all time frequnecy map
+so that the signal is quite clear even without any fancy statistics. Nonetheless,
+let us go through the whole process.
 
 .. ipython::
 
@@ -50,7 +98,7 @@ The following is all open data obtained via `LOSC <https://losc.ligo.org/>`_
 
     In [6]: gps = 1126259462.427
 
-    In [7]: plot = tfmaps.plot(figsize=[ 12, 6])
+    In [7]: plot = energy_maps.plot(figsize=[ 12, 6])
 
     In [8]: for ax in plot.axes:
        ...:     ax.set_xlim(gps - 0.15, gps + 0.05)
@@ -64,13 +112,18 @@ The following is all open data obtained via `LOSC <https://losc.ligo.org/>`_
 
 The Coherent Time-Frequency Map
 -------------------------------
+In the above example you may notice that the data streams from both detectors do not seem to be
+in sync. Well this is because we have not utilized the most important concept in this
+unmodeled gravitational wave search analysis, the coherent combining of data streams, based upon
+an a sky location value known ahead of time.
+
 In this example we use a sky location chosen from the sky map assocaited with GW150914
 to illustrate what a coherent anlaysis might look like if say you had a Gamma-Ray-Burst
 or Supernova counterpart you were following up.
 
 The way we can accomplish this is by either physically shifting the data of N-1 detectors
 relative to a baseline detector some delta T amount or we can phase shift the pixels
-of the timefrequencymap, here we do each of these methods.
+of the timefrequencymap, here we physically shift the livingston data.
 
 .. ipython::
 
@@ -86,11 +139,11 @@ of the timefrequencymap, here we do each of these methods.
 
     In [15]: whitened_timeseries['L1:GDS-CALIB_STRAIN'].shift(time_shift[0]) # In place shift
 
-    In [16]: fft_gram_shifted = whitened_timeseries.fftgram(1. /64)
+    In [16]: fft_grams = whitened_timeseries.fftgram(1. /64)
 
-    In [17]: energy_map_shifted = fft_gram_shifted.abs()
+    In [17]: energy_maps = fft_grams.abs()
 
-    In [17]: plot = energy_map_shifted.plot(figsize=[ 12, 6])
+    In [17]: plot = energy_maps.plot(figsize=[ 12, 6])
 
     In [18]: for ax in plot.axes:
        ....:     ax.set_xlim(gps - 0.15, gps + 0.05)
@@ -101,7 +154,9 @@ of the timefrequencymap, here we do each of these methods.
     @savefig plot-time-frequency-map-ts-shifted.png
     In [19]: plot
 
-    In [20]: plot = energy_map_shifted.to_coherent().plot(figsize=[ 12, 6])
+    In [20]: coh_energy_maps = energy_maps.to_coherent()
+
+    In [20]: plot = coh_energy_maps.plot(figsize=[ 12, 6])
 
     In [21]: for ax in plot.axes:
        ....:     ax.set_xlim(gps - 0.15, gps + 0.05)
@@ -112,11 +167,98 @@ of the timefrequencymap, here we do each of these methods.
     @savefig plot-time-frequency-map-time-shifted-coherent.png
     In [22]: plot
 
+Clustering Pixels
+-----------------
+There are a few ways to speed up the processing of the map. Many of the pixels
+are not going to be significant, so we can threhold on what pixels we want
+(say the loudest 1 percent of pixels) and then employ a method to group the pixels
+together in what are referred to as `clusters`. These `clusters` become our possible
+gravitational wave `triggers` on which we will later perform statistics on to determine
+whether they originate from gravitational wave source or not.
+
+In order to retain the visual key of a time frequency map pixels being grouped
+and added together, but also perform algorithmic opertaions quickly we
+utilize a subclass of the `scipy.sparse.csc_matrix` class which is designed
+to efficiently perform operation on 2D matrices that are mostly zeroes
+(which is what happens when we set 99 percent of the pixels to zero).
+
+The algorithm employed to label the remaining pixels in our map into groups
+is a nearest neighbor cpp wrapped algorithm called fastlabel.
+
+.. ipython::
+
+    In [35]: energy_map_zeroed = energy_maps.blackout_pixels(99)
+
+    In [20]: plot = energy_map_zeroed.plot(figsize=[ 12, 6])
+
+    In [21]: for ax in plot.axes:
+       ....:     ax.set_xlim(gps - 0.15, gps + 0.05)
+       ....:     ax.set_epoch(gps)
+       ....:     ax.set_xlabel('Time [milliseconds]')
+       ....:     ax.set_ylim(20, 500)
+
+    @savefig plot-sparse-ind-tfmaps.png
+    In [22]: plot
+
+    In [35]: coh_map = energy_map_zeroed.to_coherent()
+
+    In [36]: tf_indices = coh_map.nonzero()
+
+    In [41]: tindex = {k : tf_indices[0]
+       ....:           for k in energy_maps}
+
+    In [42]: findex = {k : tf_indices[1]
+       ....:           for k in energy_maps}
+
+    In [43]: energy_map_zeroed = energy_maps.to_sparse(tindex, findex)
+
+    In [44]: clusters = energy_map_zeroed.cluster()
+
+    In [40]: print(clusters)
+
+
+Now the we have labelled our remaining pixels (the non-zeroed out pixels), let's extract
+some of the cluster properites of these clusters. i.e. how many pixels are in the cluster
+the bounding box of the cluster (i.e. [[min-time, max-time], [min-freq, max-freq]] and the
+sum of energy over the cluster.
+
+Specifically, the cpp wrapped function `clusterproperities` outputs the following information
+
+    * column 0: minimum time of cluster
+    * column 1: weighted center time of cluster
+    * column 2: maximum time of cluster
+    * column 3: minimum frequency of cluster
+    * column 4: weighted center frequency of cluster
+    * column 5: maximum frequency of cluster
+    * column 6: number of pixels in cluster
+    * column 7: sum-over-cluster map values for each likelihood
+
+Before we do this though, we must re-make our sparse maps.
+for we have zeroed out some pixels in either map that are now part of our
+clusters. i.e. some pixels may have been in the top 1 percent of one but not
+all maps.
+
+.. ipython::
+
+    In [47]: loudest_cluster_idx = clusters['energy_of_cluster'].values.argmax()
+
+    In [48]: min_time = clusters['min_time_of_cluster'][loudest_cluster_idx]; max_time = clusters['max_time_of_cluster'][loudest_cluster_idx]; weighted_center_time = clusters['weighted_center_time'][loudest_cluster_idx]; min_freq = clusters['min_frequency_of_cluster'][loudest_cluster_idx]; max_freq = clusters['max_frequency_of_cluster'][loudest_cluster_idx];
+
+    In [50]: plot = energy_map_zeroed.to_xtimefrequencymapdict().to_coherent().plot()
+
+    In [51]: for ax in plot.axes:
+       ....:     ax.set_xlim(min_time, max_time)
+       ....:     ax.set_epoch(weighted_center_time)
+       ....:     ax.set_xlabel('Time [milliseconds]')
+       ....:     ax.set_ylim(min_freq, max_freq)
+
+    @savefig loudest-cluster-gw150914.png
+    In [32]: plot
 
 The Dominant Polarization Frame
 -------------------------------
 Now the we have a sky location assosciated with the event we can project every time-freqeuncy pixel
-into the Dominant Polarization Frame (DPF). What this means is the is we assume the GW has a plus and cross
+into the Dominant Polarization Frame (DPF). What this means is that we assume the GW has a plus and cross
 polarization there is some orthoganal projection of the pixels onto the plus-cross plane for 2 or more detectors
 
 .. ipython::
@@ -129,159 +271,22 @@ polarization there is some orthoganal projection of the pixels onto the plus-cro
 
     In [15]: antenna_patterns = compute_antenna_patterns(['H1', 'L1'], phi, theta, antenna_patterns=['f_plus', 'f_cross', 'f_scalar'])
 
-    In [16]: frequencies = numpy.in1d(asds['L1:GDS-CALIB_STRAIN'].xindex.to_value(),tfmaps['L1:GDS-CALIB_STRAIN'].yindex.to_value())
+    In [16]: frequencies = numpy.in1d(asds['L1:GDS-CALIB_STRAIN'].xindex.to_value(), fft_grams['L1:GDS-CALIB_STRAIN'].yindex.to_value())
 
     In [17]: sliced_asds = asds.slice_frequencies(frequencies)
 
     In [18]: projected_asds = sliced_asds.project_onto_antenna_patterns(antenna_patterns, to_dominant_polarization_frame=True)
 
-    In [19]: projected_tfmaps = fft_gram_shifted.to_dominant_polarization_frame(projected_asds)
+    In [19]: projected_fftmaps = fft_grams.to_dominant_polarization_frame(projected_asds)
 
-    In [20]: plot = projected_tfmaps['f_plus'].abs().plot(figsize=[ 12, 6])
-
-    In [21]: for ax in plot.axes:
-       ....:     ax.set_xlim(gps - 0.15, gps + 0.05)
-       ....:     ax.set_epoch(gps)
-       ....:     ax.set_xlabel('Time [milliseconds]')
-       ....:     ax.set_ylim(20, 500)
-
-    @savefig plot-time-frequency-map-dpf-plus.png
-    In [22]: plot
-
-xpipeline likelihoods
----------------------
-Now we have a basis to determine whether or not a particular cluster of pixels
-can be considered likely was a gravitational wave
-
-A gravitational wave not only should be coherent between the multiple data streams
-but if it originated from a certain part of the sky the projection of the cluster onto
-the plus and cross polarization plane (i.e. `projected_tfmaps` should also be large.
+Now that we have projected each pixels onto the plus and cross phase + amplitude space
+Let's see what it looks like if we simply take these projections and plot them. 
 
 .. ipython::
 
-    In [21]: from xpipeline.likelihood.xlikelihood import XLikelihoodMap
+    In [19]: sparse_projected_fftmaps = {k : v.to_sparse(tindex, findex) for k, v in projected_fftmaps.items()}
 
-    In [22]: from xpipeline.core.xtimefrequencymap import XTimeFrequencyMapDict
-
-    In [22]: likelihoods = ['standard', 'plusenergy', 'crossenergy', 
-       ....:                'plusinc', 'crossinc']
-
-    In [22]: mpp = projected_asds['f_plus'].to_m_ab()
-
-    In [23]: mcc = projected_asds['f_cross'].to_m_ab()
-
-    In [24]: wfptimefrequencymap = projected_tfmaps['f_plus'].to_coherent()
-
-    In [25]: wfctimefrequencymap = projected_tfmaps['f_cross'].to_coherent()
-
-    In [26]: likelihood_map = XLikelihoodMap(mpp=mpp,
-       ....:                                 mcc=mcc,
-       ....:                                 tfmaps=fft_gram_shifted,
-       ....:                                 projected_asds=projected_asds)
-
-    In [26]: likelihood_maps = XTimeFrequencyMapDict()
-
-    In [26]: for likelihood in likelihoods:
-       ....:     likelihood_function = getattr(likelihood_map, likelihood)
-       ....:     likelihood_maps[likelihood] = likelihood_function()
-
-    In [31]: plot = likelihood_maps.plot(figsize=(16,8))
-
-    In [31]: for ax in plot.axes:
-       ....:     plot.add_colorbar(ax=ax)
-       ....:     ax.set_xlim(gps - 0.15, gps + 0.05)
-       ....:     ax.set_epoch(gps)
-       ....:     ax.set_xlabel('Time [milliseconds]')
-       ....:     ax.set_ylim(20, 500)
-
-    @savefig plot-time-frequency-map-likelihood-maps.png
-    In [32]: plot
-
-
-Clustering Pixels
------------------
-There are a few ways to speed up the processing of the map. Many of the pixels
-are going to not be significant, so we can threhold on what pixels we want
-(say the loudest 1 percent of pixels) and then employ a method to group the pixels
-together in what are referred to as `clusters`. These `clusters` become our possible
-gravitational wave `triggers` on which we evaluate the likelihoods described above
-
-column 0: minimum time of cluster
-column 1: weighted center time of cluster
-column 2: maximum time of cluster
-column 3: minimum frequency of cluster
-column 4: weighted center frequency of cluster
-column 5: maximum frequency of cluster
-column 6: number of pixels in cluster
-column 7-?: sum-over-cluster map values for each likelihood
-
-.. ipython::
-
-    In [34]: from xpipeline.cluster import nearestneighbor
-
-    In [35]: energy_map_shifted_zeroed = energy_map_shifted.blackout_pixels(99)
-
-    In [36]: print(energy_map_shifted_zeroed)
-
-    In [35]: coh_map = energy_map_shifted_zeroed.to_coherent()
-
-    In [35]: pixels = numpy.vstack([coh_map.tindex, coh_map.findex])
-
-    In [37]: coord_dim_array = coh_map.shape
-
-    In [38]: npixels = pixels.shape[1]; connectivity = 8;
-
-    In [39]: labelled_map = nearestneighbor.fastlabel_wrapper(pixels + 1, coord_dim_array, connectivity, npixels).astype(int)
-
-    In [40]: print(labelled_map)
-
-Now the we have labelled are remaining pixels (the non-zeroed out pixels), let's extract
-some fo the cluster properites of these clusters. i.e. how many piels are in the clsuter
-the bounding box of the cluster (i.e. [[min-time, max-time], [min-freq, max-freq]] and the
-sum of energy over the cluster.
-
-Specifically the function `clusterproperities` outputs the following information
-
-column 0: minimum time of cluster
-column 1: weighted center time of cluster
-column 2: maximum time of cluster
-column 3: minimum frequency of cluster
-column 4: weighted center frequency of cluster
-column 5: maximum frequency of cluster
-column 6: number of pixels in cluster
-column 7-?: sum-over-cluster map values for each likelihood
-
-.. ipython::
-
-    In [41]: from xpipeline.cluster import clusterproperties
-
-    In [41]: from gwpy.table import EventTable
-
-    In [41]: total_energy = coh_map.energy 
-
-    In [43]: dim_array = numpy.array([total_energy.shape[0], 1, 2.0])
-
-    In [42]: cluster_array = clusterproperties.clusterproperities_wrapper(dim_array, labelled_map, total_energy, pixels[0,:] + 1, pixels[1,:] + 1).T
-
-    In [43]: cluster_array[:,0:3] = cluster_array[:,0:3]  * coh_map.dx + coh_map.t0
-
-    In [44]: cluster_array[:,3:6] = cluster_array[:,3:6] * coh_map.dy + coh_map.y0
-
-    In [67]: clusters = EventTable(cluster_array,
-       ....:                       names=['min_time_of_cluster',
-       ....:                              'weighted_center_time', 'max_time_of_cluster',
-       ....:                              'min_frequency_of_cluster',
-       ....:                              'weighted_center_frequency',
-       ....:                              'max_frequency_of_cluster',
-       ....:                              'number_of_pixels', 'energy_of_cluster'])
-
-    In [47]: print(clusters)
-
-    In [47]: loudest_cluster_idx = clusters['energy_of_cluster'].argmax()
-
-    In [48]: min_time = clusters['min_time_of_cluster'][loudest_cluster_idx]; max_time = clusters['max_time_of_cluster'][loudest_cluster_idx]; weighted_center_time = clusters['weighted_center_time'][loudest_cluster_idx]; min_freq = clusters['min_frequency_of_cluster'][loudest_cluster_idx]; max_freq = clusters['max_frequency_of_cluster'][loudest_cluster_idx];
-
-    In [50]: plot = coh_map.plot()
+    In [19]: plot = sparse_projected_fftmaps['f_plus'].to_xtimefrequencymapdict().to_coherent().abs().plot()
 
     In [51]: for ax in plot.axes:
        ....:     ax.set_xlim(min_time, max_time)
@@ -289,21 +294,26 @@ column 7-?: sum-over-cluster map values for each likelihood
        ....:     ax.set_xlabel('Time [milliseconds]')
        ....:     ax.set_ylim(min_freq, max_freq)
 
-    @savefig loudest-cluster-gw150914.png
+    @savefig fplus-gw150914.png
     In [32]: plot
 
+    In [20]: plot = sparse_projected_fftmaps['f_cross'].to_xtimefrequencymapdict().to_coherent().abs().plot()
 
-Alright, we now have a labelling of all pixels into clusters and likelihood maps.
-So, let us calculated the likelihood of the clusters
+    In [51]: for ax in plot.axes:
+       ....:     ax.set_xlim(min_time, max_time)
+       ....:     ax.set_epoch(weighted_center_time)
+       ....:     ax.set_xlabel('Time [milliseconds]')
+       ....:     ax.set_ylim(min_freq, max_freq)
 
-.. ipython::
+    @savefig fcross-gw150914.png
+    In [32]: plot
 
-    In [41]: from xpipeline.cluster import clustersum
-
-    In [42]: clustersum.clustersum_wrapper
-
-    In [43]: likelihood = clustersum.clustersum_wrapper(labelled_map, likelihood_map_standard[pixels[0,:], pixels[1,:]])
-
+Likelihoods
+-----------
+So now that we have possible graviational wave candidates in the form
+of clusters of loud pixels and the projected values of those pixels,
+how do we "rank" these clusters in order or more or less likely to have orginiated from
+graviational wave origins.
 
 The Waveform
 ------------
@@ -357,206 +367,3 @@ full of pregenerated waveforms.
 
     @savefig supernova-R4E1FC_L_theta2.094_phi2.094.png
     In [45]: plot
-
-
-The Injection
--------------
-
-In a coherent search it is not enough to simply inject any old signal.
-You must take in a set of sky coordinates and project an individual
-signal with its antenna pattern (for example Fp*hp and Fc*hc)
-just like we do for the data.
-
-.. ipython::
-
-    In [1]: from xpipeline.waveform import xinjectsignal
-
-    In [2]: start_time = 1156609396.0; block_time = 256; channels = ['H1', 'L1', 'V1']; sample_rate = 1024; injection_file_name ='examples/injection_sgc300.txt'; injection_number=0; catalogdirectory='';
-
-    In [3]: [injection_data, gps_s, gps_ns, phi, theta, psi] = xinjectsignal.xinjectsignal(start_time=start_time, block_time=block_time, channels=channels, injection_file_name=injection_file_name, injection_number=injection_number, sample_rate= sample_rate, catalogdirectory=catalogdirectory)
-
-    In [4]: print(gps_s, gps_ns, phi, theta, psi)
-
-    In [7]: peak_time = injection_data['H1'].peak
-
-    In [5]: for det, series in injection_data.items():
-       ...:     injection_data[det] = series * 4.87
-
-    In [5]: plot = injection_data.plot()
-
-    In [6]: plot.add_legend()
-
-    In [8]: plot.set_epoch(peak_time)
-
-    In [9]: plot.set_xlim([peak_time - 0.1, peak_time + 0.1])
-
-    @savefig chirplet-h1-l1-v1.png
-    In [10]: plot
-
-Now let's inject this into some data, we could use real data but let's just generate
-some data and scale it to an amplitude where we would expect this waveform to show up.
-
-.. ipython::
-
-    In [11]: event_time = 1156609524; block_time = 256; channel_names = ['H1', 'L1', 'V1']; sample_frequency = 1024
-
-    In [12]: data = XTimeSeries.generate_data(event_time=event_time,
-       ....:                                  block_time=block_time,
-       ....:                                  channel_names=channel_names,
-       ....:                                  sample_frequency=sample_frequency)
-       ....:
-
-    In [13]: for det, series in data.items():
-       ....:     data[det] = series * 1e-21
-
-    In [14]: injection_series = data.inject(injection_data=injection_data)
-
-    In [15]: injection_series.plot()
-
-    In [16]: plot = injection_series.plot()
-
-    In [17]: plot.add_legend()
-
-    @savefig chirplet-h1-l1-v1-in-data.png
-    In [17]: plot
-
-Now you can see where the injection went in terms of the entire length of data
-we are analyzing (a 256 second block) but let us zoom in a bit.
-
-.. ipython::
-
-    In [18]: plot.set_epoch(peak_time)
-
-    In [19]: plot.set_xlim([peak_time - 0.1, peak_time + 0.1])
-
-    @savefig chirplet-h1-l1-v1-in-data-zoom.png
-    In [20]: plot
-
-You will notice that just like int he case where we read in the data surrounding GW150914
-we now has a variable TimeSeries that is bascially the same as above, except it has
-an injected signal in there. Well let us look at what the likelihoods look like for this waveform
-
-
-.. ipython::
-
-    In [3]: asds = injection_series.asd(1.0)
-
-    In [4]: whitened_timeseries = injection_series.whiten(asds)
-
-    In [5]: tfmaps = whitened_timeseries.spectrogram(1. /64)
-
-    In [7]: plot = tfmaps.plot(figsize=[12, 6])
-
-    In [8]: for ax in plot.axes:
-       ...:     ax.set_xlim(peak_time - 0.05, peak_time + 0.05)
-       ...:     ax.set_epoch(peak_time)
-       ...:     ax.set_xlabel('Time [milliseconds]')
-       ...:     ax.set_ylim(20, 500)
-       ...:
-
-    @savefig chirplet-time-frequency-map.png
-    In [9]: plot
-
-    In [10]: from xpipeline.core.xdetector import Detector
-
-    In [11]: hanford = Detector('H1')
-
-    In [12]: livingston = Detector('L1')
-
-    In [13]: virgo = Detector('V1')
-
-    In [14]: time_shift_livingston = livingston.time_delay_from_earth_center_phi_theta([phi], [theta]) - hanford.time_delay_from_earth_center_phi_theta([phi], [theta])
-
-    In [14]: time_shift_virgo = virgo.time_delay_from_earth_center_phi_theta([phi], [theta]) - hanford.time_delay_from_earth_center_phi_theta([phi], [theta])
-
-    In [15]: whitened_timeseries['L1'].shift(-time_shift_livingston[0]) # In place shift
-
-    In [15]: whitened_timeseries['V1'].shift(-time_shift_virgo[0]) # In place shift
-
-    In [16]: plot = whitened_timeseries.plot()
-
-    In [17]: plot.add_legend()
-
-    In [19]: plot.set_xlim([peak_time - 0.05, peak_time + 0.05])
-
-    @savefig plot-chirplet-wts-shifted.png
-    In [22]: plot
-
-    In [16]: tfmaps_ts_shifted = whitened_timeseries.spectrogram(1. /64)
-
-    In [17]: plot = tfmaps_ts_shifted.plot(figsize=[ 12, 6])
-
-    In [18]: for ax in plot.axes:
-       ....:     ax.set_xlim(peak_time - 0.05, peak_time + 0.05)
-       ....:     ax.set_epoch(peak_time)
-       ....:     ax.set_xlabel('Time [milliseconds]')
-       ....:     ax.set_ylim(20, 500)
-
-    @savefig plot-chirplet-time-frequency-map-ts-shifted.png
-    In [19]: plot
-
-    In [13]: from xpipeline.core.xdetector import compute_antenna_patterns
-
-    In [14]: import numpy as np
-
-    In [15]: antenna_patterns = compute_antenna_patterns(['H1', 'L1', 'V1'],
-       ....:     phi, theta, antenna_patterns=['f_plus', 'f_cross', 'f_scalar'])
-
-    In [16]: frequencies = np.in1d(asds['L1'].xindex.to_value(), tfmaps_ts_shifted['L1'].yindex.to_value())
-
-    In [17]: sliced_asds = asds.slice_frequencies(frequencies)
-
-    In [18]: projected_asds = sliced_asds.project_onto_antenna_patterns(antenna_patterns, to_dominant_polarization_frame=True)
-
-    In [19]: projected_tfmaps = tfmaps_ts_shifted.to_dominant_polarization_frame(projected_asds)
-
-    In [20]: plot = projected_tfmaps['f_plus'].plot(figsize=[12, 6])
-
-    In [21]: for ax in plot.axes:
-       ....:     ax.set_xlim(peak_time - 0.05, peak_time + 0.05)
-       ....:     ax.set_epoch(peak_time)
-       ....:     ax.set_xlabel('Time [milliseconds]')
-       ....:     ax.set_ylim(20, 500)
-
-    @savefig plot-chirplet-time-frequency-map-dpf-plus.png
-    In [22]: plot
-
-    In [21]: from xpipeline.likelihood.xlikelihood import XLikelihood
-
-    In [22]: mpp = projected_asds['f_plus'].to_m_ab()
-
-    In [23]: mcc = projected_asds['f_cross'].to_m_ab()
-
-    In [24]: wfptimefrequencymap = projected_tfmaps['f_plus'].to_coherent()
-
-    In [25]: wfctimefrequencymap = projected_tfmaps['f_cross'].to_coherent()
-
-    In [26]: likelihood_map_standard = XLikelihood.standard(mpp, mcc, wfptimefrequencymap, wfctimefrequencymap)
-
-    In [27]: likelihood_map_circenergy = XLikelihood.circenergy(mpp, mcc, wfptimefrequencymap, wfctimefrequencymap)
-
-    In [28]: likelihood_map_circinc = XLikelihood.circinc(tfmaps, mpp, mcc, projected_asds)
-
-    In [29]: likelihood_map_circnullinc = XLikelihood.circnullinc(tfmaps, mpp, mcc, projected_asds)
-
-    In [30]: likelihood_map_circnullenergy = XLikelihood.circnullenergy(mpp, mcc, wfptimefrequencymap, wfctimefrequencymap)
-
-    In [31]: plot = likelihood_map_standard.plot(figsize=(12,8), label='standard')
-
-    In [32]: plot.add_spectrogram(likelihood_map_circinc, newax=True, label='circinc')
-
-    In [33]: plot.add_spectrogram(likelihood_map_circnullenergy, newax=True, label='circnullenergy')
-
-    In [34]: plot.add_spectrogram(likelihood_map_circnullinc, newax=True, label='circnullinc')
-
-    In [35]: plot.add_spectrogram(likelihood_map_circenergy, newax=True, label='circenergy')
-
-    In [31]: for ax in plot.axes:
-       ....:     plot.add_colorbar(ax=ax)
-       ....:     ax.set_xlim(peak_time - 0.05, peak_time + 0.05)
-       ....:     ax.set_epoch(peak_time)
-       ....:     ax.set_xlabel('Time [milliseconds]')
-       ....:     ax.set_ylim(20, 500)
-
-    @savefig plot-chirplet-time-frequency-map-likelihood-maps.png
-    In [32]: plot
