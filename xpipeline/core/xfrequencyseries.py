@@ -79,7 +79,7 @@ class XFrequencySeriesDict(OrderedDict):
 
 
     def to_array(self):
-        """Convert to number of freq bins by number of detctors array
+        """Convert to number of freq bins by number of detectors array
         """
         number_of_frequencies = list(self.values())[0].size
         number_of_detectors = len(self)
@@ -93,11 +93,14 @@ class XFrequencySeriesDict(OrderedDict):
     def to_m_ab(self):
         """Matrix M_AB components.
 
-           These are the dot products of wFp, with
-           themselves and each other, for each frequency, computed in
-           the DP frame.
+           This is the dot product of the projected_asds, with
+           itself, summed accross detectors.
+
+           Returns:
+               `gwpy.frequencyseries.FrequencySeries`
+                   Units Hz
         """
-        return np.sum(self.to_array()**2, 1)
+        return sum([v**2 for v in self.values()])
 
 
     def slice_frequencies(self, indices):

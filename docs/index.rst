@@ -11,22 +11,22 @@ Welcome to xpipeline's documentation!
 Installing xpipeline
 --------------------
 
-The easiest method to install xpipeline is using `pip <https://pip.pypa.io/en/stable/>`_ directly from the `GitHub repository <https://github.com/xpipeline/xpipeline.git>`_:
+The easiest method to install xpipeline is using `pip <https://pip.pypa.io/en/stable/>`_ directly from the `GitHub repository <https://github.com/X-Pypeline/X-Pypeline.git>`_:
 
 .. code-block:: bash
 
-   $ pip install git+https://github.com/xpipeline/xpipeline.git
+   $ pip install git+https://github.com/X-Pypeline/X-Pypeline.git
 
 How to run xpipeline
 --------------------
 
-The main product of this package is the command-line executable `setUpJobs`, which runs a script that sets up X-Pipeline gravitational-wave searches of SN GRB and ALLSKY/SPHRAD. 
+The main product of this package is the command-line executable `xpipeline-workflow`, which runs a script that sets up X-Pipeline gravitational-wave searches of SN GRB and ALLSKY/SPHRAD. 
 
 To run an analysis:
 
 .. code-block:: bash
 
-   $ setUpJobs -p grb_full.ini --grb-name GRB160830 -g 1156610000 -r 307.65 -d 45.72 -i H1 L1 V1 -s grb --FAP=99.9 
+   $ xpipeline-workflow -p grb_full.ini --grb-name GRB160830 -g 1156610000 -r 307.65 -d 45.72 -i H1 L1 V1 -s grb --FAP=99.9 
 
 where ``-g`` is the GPS time of the GRB event, and ``-p grb_full.ini`` is the path of your configuration file.
 
@@ -34,7 +34,7 @@ For a full list of command-line argument and options, run
 
 .. code-block:: bash
 
-   $ setUpJobs --help
+   $ xpipeline-workflow --help
 
 For more details see :ref:`command-line`.
 

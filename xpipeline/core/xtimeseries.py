@@ -67,10 +67,16 @@ class XTimeSeries(TimeSeriesDict):
         stop_time = event_time + block_time / 2;
 
         # Retrieve data and then resample and set epoch
-        data = cls.get(
-                        channel_names,
-                        start_time, stop_time, verbose=verbose
-                       )
+        try:
+            data = cls.get(
+                           channel_names,
+                           start_time, stop_time, verbose=verbose
+                          )
+        except:
+            data = cls.fetch_open_data(
+                                       channel_names.split(':')[0],
+                                       start_time, stop_time, verbose=verbose
+                                      )
 
         data.resample(sample_frequency)
 
@@ -134,7 +140,6 @@ class XTimeSeries(TimeSeriesDict):
         # for any future coherent combinations
 
         return data
-
 
     def asd(self, fftlength, **kwargs):
         """Obtain the asd of items in this dict.
@@ -204,6 +209,31 @@ class XTimeSeries(TimeSeriesDict):
 
         for (idet, iseries) in self.items():
             tfmaps[idet] = XTimeFrequencyMap(iseries.spectrogram2(
+                                             fftlength=fftlength[idet],
+                                             overlap=0.5*fftlength[idet],
+                                             window='hann'))
+        return tfmaps
+
+
+    def fftgram(self, fftlength):
+        """Obtain the spectrograms of items in this dict.
+
+        Parameters
+        ----------
+        fftlength : `dict`, `float`
+            either a `dict` of (channel, `float`) pairs for key-wise
+            asd calc, or a single float/int to computer as of all items.
+
+        **kwargs
+             other keyword arguments to pass to each item's asd
+             method.
+        """
+        tfmaps = XTimeFrequencyMapDict()
+        if not isinstance(fftlength, dict):
+            fftlength = dict((c, fftlength) for c in self)
+
+        for (idet, iseries) in self.items():
+            tfmaps[idet] = XTimeFrequencyMap(iseries.fftgram(
                                              fftlength=fftlength[idet],
                                              overlap=0.5*fftlength[idet],
                                              window='hann'))
