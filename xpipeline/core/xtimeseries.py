@@ -67,10 +67,16 @@ class XTimeSeries(TimeSeriesDict):
         stop_time = event_time + block_time / 2;
 
         # Retrieve data and then resample and set epoch
-        data = cls.get(
-                        channel_names,
-                        start_time, stop_time, verbose=verbose
-                       )
+        try:
+            data = cls.get(
+                           channel_names,
+                           start_time, stop_time, verbose=verbose
+                          )
+        except:
+            data = cls.fetch_open_data(
+                                       channel_names.split(':')[0],
+                                       start_time, stop_time, verbose=verbose
+                                      )
 
         data.resample(sample_frequency)
 

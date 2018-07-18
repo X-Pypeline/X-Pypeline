@@ -18,7 +18,7 @@ def xinjectsignal(family, start_time, block_time, detectors, sample_rate,
 
     # ----- Parse channel list and load info on corresponding detectors.
     injection_data = XTimeSeries()
-    for det in channels:
+    for det in detectors:
 
         #----- Make timeseries data for given detector.
         injection_data[det] = TimeSeries(numpy.zeros(block_time * sample_rate),
@@ -83,7 +83,7 @@ def xinjectsignal(family, start_time, block_time, detectors, sample_rate,
 
         injection_data[det][injection_samples] = Fp*hp + Fc*hc + Fb*hb
         injection_data[det].t0 = start_time
-        injection_data[det].peak = peak_time
+        injection_data[det].epoch = peak_time
 
     return injection_data
 
