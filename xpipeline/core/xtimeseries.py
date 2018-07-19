@@ -73,10 +73,14 @@ class XTimeSeries(TimeSeriesDict):
                            start_time, stop_time, verbose=verbose
                           )
         except:
-            data = cls.fetch_open_data(
-                                       channel_names.split(':')[0],
-                                       start_time, stop_time, verbose=verbose
-                                      )
+            data = cls()
+            for det in channel_names:
+                data.append({det : TimeSeries.fetch_open_data(
+                                                              det.split(':')[0],
+                                           start_time, stop_time, verbose=verbose,
+                                           sample_rate=sample_frequency
+                                          )
+                             })
 
         data.resample(sample_frequency)
 
