@@ -82,7 +82,9 @@ class XTimeSeries(TimeSeriesDict):
                                           )
                              })
 
-        data.resample(sample_frequency)
+        for key, series in data.items():
+            if series.sample_rate.decompose().value != sample_frequency:
+                data[key] = series.resample(sample_frequency)
 
         for (idet, iseries) in data.items():
             # set epoch of timeseries to the event_time
