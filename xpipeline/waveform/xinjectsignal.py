@@ -318,7 +318,6 @@ def xinjectsignal_fromfile(start_time, block_time, channels, sample_rate,
 
         injection_data[det][injection_samples] = Fp*hp + Fc*hc + Fb*hb
         injection_data[det].t0 = start_time
-        injection_data[det].peak = peak_time
 
     #----- Record for output the peak time and sky angles for each of the
     #      injections.  For glitches record only the parameters for the first
