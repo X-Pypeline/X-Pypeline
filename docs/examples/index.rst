@@ -265,17 +265,11 @@ polarization there is some orthoganal projection of the pixels onto the plus-cro
 
     In [13]: from xpipeline.core.xdetector import compute_antenna_patterns
 
-    In [14]: import numpy
-
     In [14]: phi = -0.3801; theta = 2.7477 # Earth fixed coordinates
 
     In [15]: antenna_patterns = compute_antenna_patterns(['H1', 'L1'], phi, theta, antenna_patterns=['f_plus', 'f_cross', 'f_scalar'])
 
-    In [16]: frequencies = numpy.in1d(asds['L1:GDS-CALIB_STRAIN'].xindex.to_value(), fft_grams['L1:GDS-CALIB_STRAIN'].yindex.to_value())
-
-    In [17]: sliced_asds = asds.slice_frequencies(frequencies)
-
-    In [18]: projected_asds = sliced_asds.project_onto_antenna_patterns(antenna_patterns, to_dominant_polarization_frame=True)
+    In [18]: projected_asds = asds.project_onto_antenna_patterns(antenna_patterns, to_dominant_polarization_frame=True)
 
     In [19]: projected_fftmaps = fft_grams.to_dominant_polarization_frame(projected_asds)
 
@@ -357,8 +351,8 @@ full of pregenerated waveforms.
 
     In [41]: from gwpy.plotter import TimeSeriesPlot
 
-    In [42]: t, hp, hc, hb = xwaveform.xmakewaveform(family='o1snews',
-       ....:     parameters=[1e-21, 1e-21, 'R4E1FC_L_theta2.094_phi2.094'],
+    In [42]: t, hp, hc, hb = xwaveform.xmakewaveform(family='Morozova2018',
+       ....:     parameters=[10, 'M10_LS220'],
        ....:     T=1, T0=0, fs=16384, catalogdirectory='../waveforms/')
 
     In [43]: plot = TimeSeriesPlot(hp, hc)
@@ -367,3 +361,64 @@ full of pregenerated waveforms.
 
     @savefig supernova-R4E1FC_L_theta2.094_phi2.094.png
     In [45]: plot
+
+The Injection
+-------------
+
+In a coherent search it is not enough to simply inject any old signal.
+You must take in a set of sky coordinates and project an individual
+signal with its antenna pattern (for example Fp*hp and Fc*hc)
+just like we do for the data. Let us say we have the SN waveform from above
+now we will assume this SN signal occurred at the same earth fixed coordinates
+of GW150914 from above, but since this is a simulation let us imagine VIRGO was
+on at the time too.
+
+.. ipython::
+
+    In [1]: from xpipeline.waveform import xinjectsignal
+
+    In [3]: start_time = 1156609396.0; block_time = 256; channels = ['H1', 'L1']; sample_rate = 8192; injection_file_name ='examples/injection_Morozova.txt'; injection_number=0; catalogdirectory='../waveforms/'; 
+
+    In [4]: [injection_data, gps_s, gps_ns, phi, theta, psi] = xinjectsignal.xinjectsignal_fromfile(start_time=start_time, block_time=block_time, channels=channels, injection_file_name=injection_file_name, injection_number=injection_number, sample_rate= sample_rate, catalogdirectory=catalogdirectory)
+
+    In [6]: from gwpy.plotter import TimeSeriesPlot
+
+    In [7]: plot = TimeSeriesPlot()
+
+    In [8]: for k, v in injection_data.items():
+       ...:     plot.add_timeseries(v, label=k)
+
+    In [9]: plot.set_xlim([gps_s, gps_s+1])
+
+    In [10]: plot.add_legend()
+
+    @savefig Morozova2018-h1-l1.png
+    In [10]: plot
+
+Now let's inject this into some data, we could use real data but let's just generate
+some data and color it to look like gaussian distributed aLIGO noise.
+
+.. ipython::
+
+    In [1]: colored_gaussian_noise = XTimeSeries.generate_noise_from_file('../noise/aLIGOZeroDetHighPower.h5', event_time=start_time, block_time=256, channel_names=['H1', 'L1'], sample_frequency=8192)
+
+    In [2]: data_plus_signal = colored_gaussian_noise.inject(injection_data)
+
+    In [3]: asds = data_plus_signal.asd(1.0)
+
+    In [4]: whitened_timeseries = data_plus_signal.whiten(asds)
+
+    In [5]: fft_maps = whitened_timeseries.fftgram(1. /64)
+
+    In [6]: energy_maps = fft_maps.abs() 
+
+    In [7]: plot = energy_maps.plot(figsize=[ 12, 6])
+
+    In [8]: for ax in plot.axes:
+       ...:     ax.set_xlim(gps_s - 0.15, gps_s + 1.0)
+       ...:     ax.set_epoch(gps_s)
+       ...:     ax.set_xlabel('Time [milliseconds]')
+       ...:     ax.set_ylim(20, 3000)
+
+    @savefig energy-map-Morozova2018.png
+    In [10]: plot

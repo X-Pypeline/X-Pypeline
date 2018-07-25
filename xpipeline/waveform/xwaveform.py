@@ -1877,4 +1877,4 @@ def xmakewaveform(family, parameters, T, T0, fs, **kwargs):
     #    hc = hc * hrss/normalization
     #    hb = hb * hrss/normalization
 
-    return t, hp , hc, hb
+    return t, hp, hc, hp 
