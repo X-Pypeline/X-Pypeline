@@ -288,12 +288,12 @@ def xinjectsignal_fromfile(start_time, block_time, channels, sample_rate,
         # ---- Apply taper to start and end of snippet to avoid
         #      discontinuous turn-on/off of very long signals.
         # Only taper if there is an signal to taper
-        if numpy.where(hp != 0)[0].size:
-            hp.taper()
-        if numpy.where(hc != 0)[0].size:
-            hc.taper()
-        if numpy.where(hb != 0)[0].size:
-            hb.taper()
+        #if numpy.where(hp != 0)[0].size:
+        #    hp.taper()
+        #if numpy.where(hc != 0)[0].size:
+        #    hc.taper()
+        #if numpy.where(hb != 0)[0].size:
+        #    hb.taper()
 
         #----- Reset t to GPS time.
         t = t + math.floor(peak_time) - snippet_pad
