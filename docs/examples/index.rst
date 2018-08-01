@@ -94,7 +94,7 @@ let us go through the whole process.
 
     In [5]: fft_maps = whitened_timeseries.fftgram(1. /64)
 
-    In [6]: energy_maps = fft_maps.abs() 
+    In [6]: energy_maps = fft_maps.abs()
 
     In [6]: gps = 1126259462.427
 
@@ -274,7 +274,7 @@ polarization there is some orthoganal projection of the pixels onto the plus-cro
     In [19]: projected_fftmaps = fft_grams.to_dominant_polarization_frame(projected_asds)
 
 Now that we have projected each pixels onto the plus and cross phase + amplitude space
-Let's see what it looks like if we simply take these projections and plot them. 
+Let's see what it looks like if we simply take these projections and plot them.
 
 .. ipython::
 
@@ -377,7 +377,7 @@ on at the time too.
 
     In [1]: from xpipeline.waveform import xinjectsignal
 
-    In [3]: start_time = 1156609396.0; block_time = 256; channels = ['H1', 'L1']; sample_rate = 8192; injection_file_name ='examples/injection_Morozova.txt'; injection_number=0; catalogdirectory='../waveforms/'; 
+    In [3]: start_time = 1156609396.0; block_time = 256; channels = ['H1', 'L1']; sample_rate = 8192; injection_file_name ='examples/injection_Morozova.txt'; injection_number=2; catalogdirectory='../waveforms/';
 
     In [4]: [injection_data, gps_s, gps_ns, phi, theta, psi] = xinjectsignal.xinjectsignal_fromfile(start_time=start_time, block_time=block_time, channels=channels, injection_file_name=injection_file_name, injection_number=injection_number, sample_rate= sample_rate, catalogdirectory=catalogdirectory)
 
@@ -388,7 +388,7 @@ on at the time too.
     In [8]: for k, v in injection_data.items():
        ...:     plot.add_timeseries(v, label=k)
 
-    In [9]: plot.set_xlim([gps_s, gps_s+1])
+    In [9]: plot.set_xlim([gps_s, gps_s + 2])
 
     In [10]: plot.add_legend()
 
@@ -410,7 +410,7 @@ some data and color it to look like gaussian distributed aLIGO noise.
 
     In [5]: fft_maps = whitened_timeseries.fftgram(1. /64)
 
-    In [6]: energy_maps = fft_maps.abs() 
+    In [6]: energy_maps = fft_maps.abs()
 
     In [7]: plot = energy_maps.plot(figsize=[ 12, 6])
 
