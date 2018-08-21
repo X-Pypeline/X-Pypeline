@@ -238,7 +238,10 @@ def xmakewaveform(family, parameters, T, T0, fs, **kwargs):
         # ---- Read waveform, which is defined at a range of 10kpc.
         #      Make sure h is same type of vector (column) as t.
         hp = 10./parameters[0] * hp
-        hc = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value)
+        hc = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
+                        name=hp.name)
+        hb = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
+                        name=hp.name)
 
     elif family.lower() in ['murphy09']:
 
@@ -258,7 +261,10 @@ def xmakewaveform(family, parameters, T, T0, fs, **kwargs):
 
         # ---- Find specified waveform type.
         hp = hp / hrss
-        hc = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value)
+        hc = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
+                        name=hp.name)
+        hb = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
+                        name=hp.name)
 
     elif family.lower() in ['adi-a', 'adi-b', 'adi-c',
                             'adi-d','adi-e','ebbh-a','ebbh-d','ebbh-e']:
@@ -279,6 +285,8 @@ def xmakewaveform(family, parameters, T, T0, fs, **kwargs):
         #      l=m=2 mode dominates when applying inclination.
         hp = 0.5 * (1 + ciota**2) * hp / distance
         hc = ciota * hc / distance
+        hb = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
+                        name=hp.name)
 
         # ----  Set "pregenerated" variables.
         pregen = 1
@@ -302,7 +310,10 @@ def xmakewaveform(family, parameters, T, T0, fs, **kwargs):
         pregen_T = hp.duration.value
 
         hp = (1./distance) * hp
-        hc = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value)
+        hc = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
+                        name=hp.name)
+        hb = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
+                        name=hp.name)
 
     elif family.lower() in ['cg']:
 
@@ -314,7 +325,11 @@ def xmakewaveform(family, parameters, T, T0, fs, **kwargs):
         tau = Q / (2**0.5 * math.pi * f0)
         hp = TimeSeries(h_peak * numpy.cos(2 * math.pi * (t-T0) * f0) * numpy.exp(-(t-T0)**2/tau**2),
                         name=family, dx = 1./fs)
-        hc = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value)
+        hc = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
+                        name=hp.name)
+
+        hb = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
+                        name=hp.name)
 
         # ---- Turn off default interpolation (symmetric ad hoc waveform).
         pregen = 0
@@ -356,6 +371,9 @@ def xmakewaveform(family, parameters, T, T0, fs, **kwargs):
         hp = 1./2 * (1 + ciota**2) * h.real
         hc = ciota * h.imag
 
+        hb = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
+                        name=hp.name)
+
         # ---- Turn off default interpolation (ad hoc waveform is designed
         #      to produce desired T0).
         pregen = 0
@@ -378,6 +396,8 @@ def xmakewaveform(family, parameters, T, T0, fs, **kwargs):
         hp = (1./distance) * hp
         hc = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
                         name=hp.name)
+        hb = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
+                        name=hp.name)
 
     elif family.lower() in ['ds']:
 
@@ -397,6 +417,8 @@ def xmakewaveform(family, parameters, T, T0, fs, **kwargs):
         hc[k] = h_peak * (numpy.sin(2 * numpy.pi * 
                                     (t[k] - T0) * f0)
                          * numpy.exp(-(t[k] - T0) / tau))
+        hb = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
+                        name=hp.name)
 
         # ---- Force interpolation to get correct T0, since waveform is
         #      asymmetric.
@@ -426,6 +448,8 @@ def xmakewaveform(family, parameters, T, T0, fs, **kwargs):
                               )
         hp = TimeSeries(hp, name=family, dx=1./fs)
         hc = TimeSeries(hc, name=family, dx=1./fs)
+        hb = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
+                        name=hp.name)
 
         # ---- Force interpolation to get correct T0, since waveform is
         #      asymmetric.
@@ -441,6 +465,8 @@ def xmakewaveform(family, parameters, T, T0, fs, **kwargs):
         hp = TimeSeries(h_peak * numpy.exp(-(t-T0)**2 / tau*2), dx=1./fs,
                         name=family)
         hc = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
+                        name=hp.name)
+        hb = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
                         name=hp.name)
 
         # ---- Turn off default interpolation (symmetric ad hoc waveform).
@@ -522,6 +548,8 @@ def xmakewaveform(family, parameters, T, T0, fs, **kwargs):
 
         hc = TimeSeries.read(os.path.join(filedir, family + '.hdf5'),
                              path='/{0}/{1}/hc'.format(family, name))
+        hb = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
+                        name=hp.name)
 
         pregen_fs = hp.sample_rate.value
         pregen_T = hp.duration.value
@@ -737,6 +765,8 @@ def xmakewaveform(family, parameters, T, T0, fs, **kwargs):
 
         hc = TimeSeries.read(os.path.join(filedir, family + '.hdf5'),
                              path='/{0}/{1}/hc'.format(family, family))
+        hb = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
+                        name=hp.name)
 
         pregen_fs = hp.sample_rate.value
         pregen_T = hp.duration.value
@@ -775,6 +805,8 @@ def xmakewaveform(family, parameters, T, T0, fs, **kwargs):
         hp = 10. / distance * hp
         hc = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
                         name=hp.name)
+        hb = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
+                        name=hp.name)
 
 
     elif family.lower() in ['methodspaper']:
@@ -795,6 +827,9 @@ def xmakewaveform(family, parameters, T, T0, fs, **kwargs):
 
         hc = TimeSeries.read(os.path.join(filedir, family + '.hdf5'),
                              path='/{0}/{1}/hc'.format(family, name))
+
+        hb = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
+                        name=hp.name)
 
         pregen_fs = hp.sample_rate.value
         pregen_T = hp.duration.value
@@ -829,6 +864,8 @@ def xmakewaveform(family, parameters, T, T0, fs, **kwargs):
         #      Make sure h is same type of vector (column) as t.
         hp = 1. / distance * hp
         hc = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
+                        name=hp.name)
+        hb = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
                         name=hp.name)
 
 
@@ -1810,13 +1847,6 @@ def xmakewaveform(family, parameters, T, T0, fs, **kwargs):
     #   Process pre-generated waveforms.
     ###########################################################################
 
-    # ---- Ensure breathing mode output is defined, even if not requested.
-    #      (The interpolation and normalisation code that follows is simpler
-    #      if this variable is defined.)
-    if 'hb' not in locals():
-        hb = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
-                        name=hp.name)
-
     # ---- Resample, time-shift, truncate, and/or zero-pad pregenerated
     #      waveform as needed.
     # ---- KLUDGE: We should issue warnings if any significant amount of the
@@ -1877,4 +1907,4 @@ def xmakewaveform(family, parameters, T, T0, fs, **kwargs):
     #    hc = hc * hrss/normalization
     #    hb = hb * hrss/normalization
 
-    return t, hp, hc, hp 
+    return t, hp, hc, hb
