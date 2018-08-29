@@ -9,6 +9,54 @@ import math
 
 def xinjectsignal(family, start_time, block_time, detectors, sample_rate,
                   phi, theta, psi=0, **kwargs):
+    """Create simulated signals using a file defining the parameters
+
+    Parameters:
+        family (str):
+            waveform family name to be generated
+
+        start_time (int):
+            Start time of the data being analysed.
+
+        block_time (int):
+            Duration (s) of the data being analysed.
+
+        channel (str)
+            channel[j] holds the name of the
+            jth detector channel being analysed.  The detector name is
+            inferred from the first character of the channel name, and
+            must be one of the names recognized by LoadDetectorData.
+
+        sample_rate (int):
+            Sample rates corresponding to channels.
+
+        phi (float):
+            Earth fixed coordinate
+
+        theta (float):
+            Earth fixed coordinate
+
+        **kwargs:
+            catalog_directory (optional, str):
+                Path to directory containing pregenerated waveforms
+
+    Returns:
+        injection_data:
+            `XTimeSeries`
+        
+    Notes:
+
+        The coordinate system is explained in ComputeAntennaResponse. It is
+        assumed that the sky positions in the injection file are supplied in this
+        coordinate system.  For glitch injections the reported times and angles
+        are those for the injection into the first detector.
+
+        Any portion of any signal which lies outside the interval
+        [start_time, start_time+block_time] will be clipped. Otherwise, XINJECTSIGNAL
+        will inject any signal of duration up to block_time without clipping.
+        The edges of long-duration signals will be tapered with
+        a hann window to avoid turn-on/off transients.
+    """
     # ---- Check for optional arguments.
     catalogdirectory = kwargs.pop('catalogdirectory', '')
     parameters = kwargs.pop('parameters', [])
@@ -90,100 +138,74 @@ def xinjectsignal(family, start_time, block_time, detectors, sample_rate,
 def xinjectsignal_fromfile(start_time, block_time, channels, sample_rate,
                   injection_file_name, rescale_by_antenna_response=False,
                   injection_number=0, **kwargs):
-    """Create simulated data streams containing simulated signals
+    """Create simulated signals using a file defining the parameters
 
-    for the specified network of gravitational-wave detectors.
+    Parameters:
+        start_time (int):
+            Start time of the data being analysed.
 
-      [injection_data, gps_s, gps_ns, phi, theta, psi] = xinjectsignal( ...
-        start_time,block_time,channel,sample_rate,injection_file_name, ...
-        rescale_by_antenna_response,injection_number,varargin)
+        block_time (int):
+            Duration (s) of the data being analysed.
 
-      start_time    Scalar.  Start time of the data being analysed.
-      block_time    Scalar.  Duration (s) of the data being analysed.
-      channel      Cell array of strings.  channel{j} holds the name of the
-                   jth detector channel being analysed.  The detector name is
-                   inferred from the first character of the channel name, and
-                   must be one of the names recognized by LoadDetectorData.
-      sample_rate   length(channel)x1 vector.  Sample rates corresponding to
-                   channels.
-      injection_file_name
-                   String.  Name of file specifying simulated signals to be
-                   injected.
-      rescale_by_antenna_response
-                   Scalar.  Optional.  If nonzero then rescale each injection
-                   amplitude by 1/(sum over detectors of Fp^2)^0.5, where Fp
-                   is calculated for each detector using the sky angles of the
-                   injection into the first detector.  This rescaling is
-                   useful for injecting linearly polarized GWBs into identical
-                   detectors so that the sum-squared SNR is held fixed.
-                   WARNING: It is probably not a good idea to use
-                   this rescaling for: (1) glitches simulated using different
-                   sky positions for each detector (2) waveforms with 2
-                   polarizations (3) detectors that are not identical.
-      injection_number
-                   Array (positive integer).  Optional.  If given then only
-                   the injections specified on rows "injection_number" of the
-                   injection file are injected.  This over-rides the default
-                   behaviour, which is to inject all injections in the file
-                  (including those outside the interval [start_time,start_time+block_time]!).
-      varargin     Optional 'name','value' pairs.  Recognized options are:
-                     'do_not_inject',logical
-    # ----- Speed of light (m/s).
-    c = 299792458
+        channel (str)
+            channel[j] holds the name of the
+            jth detector channel being analysed.  The detector name is
+            inferred from the first character of the channel name, and
+            must be one of the names recognized by LoadDetectorData.
 
-    # ----- Parse channel list and load info on corresponding detectors.
-    detector_dict = {}
-    for det in channels:
-        detector_dict[det] = Detector(det)
+        sample_rate (int):
+            Sample rates corresponding to channels.
 
-    # ----- Create appropraite columns for reading the injection
-    #       file based on detectors supplied above
-    injection_file_columns = []
-    for det in channels:
-        for columns in ['gps_s','gps_ns', 'phi', 'theta', 'psi', 'gwb_type',
-                         'gwb_params']:
-            injection_file_columns.append(columns + '_' + det)
+        injection_file_name (str):
+            Name of file specifying simulated signals to be
+            injected.
 
+        injection_number
+            Array (positive integer).  Optional.  If given then only
+            the injections specified on rows "injection_number" of the
+            injection file are injected.  This over-rides the default
+            behaviour, which is to inject all injections in the file
+            (including those outside the interval [start_time,start_time+block_time]!).
 
-    #----- Read injection file and extract parameters of injections
-    injection_file_parameters = Table.read(injection_file_name, format='ascii',
-                                           names=injection_file_columns)
+        **kwargs:
+            catalog_directory (optional, str):
+                Path to directory containing pregenerated waveforms
 
+    Returns:
+        injection_data:
+            `XTimeSeries`
+        
+        gps_s:
+            Vector of peak time (GPS seconds, integer part) of each
+            injection at the center of the Earth.
 
-    #----- If specific injections are specified then keep only those injections.
-    injection_file_parameters = injection_file_parameters[injection_number]                       If set to true, waveform is not injected injection
-                       parameters are calculated only.
-                     'catalogdirectory',string
-                       Absolute path to the directory containing astrophysical
-                       waveform catalogs (e.g., DFM, OB, or ZM).  If not
-                       supplied when constructing such a waveform,
-                       xmakewaveform will attempt to load the appropriate
-                       catalog from a hard-coded location.
+        gps_ns:
+            Vector of peak time (GPS seconds, nanosecond part) of each
+            injection at the center of the Earth.
 
-      injection_data
-                   length(channel)x1 cell array of column vectors.
-                   injection_data{j} is a column vector holding the signal data
-                   for the jth detector.
-      gps_s        Vector of peak time (GPS seconds, integer part) of each
-                   injection at the center of the Earth.
-      gps_ns       Vector of peak time (GPS seconds, nanosecond part) of each
-                   injection at the center of the Earth.
-      phi          Vector of azimuthal sky coordinate of each injection
-                   (radians, Earth-fixed coordinates).
-      theta        Vector of polar sky coordinate of each injection
-      psi          Vector of polarization angle of each injection
-                   (radians Earth-fixed coordinates).
+        phi:
+            Vector of azimuthal sky coordinate of each injection
+            (radians, Earth-fixed coordinates).
 
-     The coordinate system is explained in ComputeAntennaResponse. It is
-     assumed that the sky positions in the injection file are supplied in this
-     coordinate system.  For glitch injections the reported times and angles
-     are those for the injection into the first detector.
+        theta:
+            Vector of polar sky coordinate of each injection
 
-     Any portion of any signal which lies outside the interval
-     [start_time, start_time+block_time] will be clipped. Otherwise, XINJECTSIGNAL
-     will inject any signal of duration up to block_time without clipping.
-     The edges of long-duration signals will be tapered with
-     a hann window to avoid turn-on/off transients.
+        psi:
+            Vector of polarization angle of each injection
+            (radians Earth-fixed coordinates).
+
+    Notes:
+
+        The coordinate system is explained in ComputeAntennaResponse. It is
+        assumed that the sky positions in the injection file are supplied in this
+        coordinate system.  For glitch injections the reported times and angles
+        are those for the injection into the first detector.
+
+        Any portion of any signal which lies outside the interval
+        [start_time, start_time+block_time] will be clipped. Otherwise, XINJECTSIGNAL
+        will inject any signal of duration up to block_time without clipping.
+        The edges of long-duration signals will be tapered with
+        a hann window to avoid turn-on/off transients.
     """
 
     # ---- Check for optional arguments.
