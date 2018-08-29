@@ -81,7 +81,7 @@ install_requires = [
     'astropy',
     'lalsuite',
     'cython',
-    'gwpy>=0.10',
+    'gwpy>=0.12',
     'lscsoft-glue',
 ]
 

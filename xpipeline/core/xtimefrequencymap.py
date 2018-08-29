@@ -172,18 +172,31 @@ class XTimeFrequencyMapDict(OrderedDict):
             all other keyword arguments are passed to the plotter as
             appropriate
         """
-        from gwpy.plotter import SpectrogramPlot
+        from matplotlib import pyplot
+        from gwpy.plot import Plot
+
         figargs = dict()
         for key in ['figsize', 'dpi']:
             if key in kwargs:
                 figargs[key] = kwargs.pop(key)
-        plot_ = SpectrogramPlot(sep=True, **figargs)
-        for lab, tfmap in self.items():
+
+        nrows = len(self.keys())
+        plot_, axes = pyplot.subplots(nrows=nrows, ncols=1, sharex=True,
+                                      subplot_kw={'xscale': 'auto-gps'},
+                                      FigureClass=Plot, **figargs)
+        iaxis = 0
+        for lab, imap in self.items():
             if label.lower() == 'name':
                 lab = tfmap.name
             elif label.lower() != 'key':
                 lab = label
-            plot_.add_spectrogram(tfmap, label=lab, newax=True, **kwargs)
+            axes[iaxis].imshow(imap)
+            axes[iaxis].set_title(str(lab).replace('_','-'))
+            if iaxis != nrows-1:
+                axes[iaxis].set_xlabel(' ')
+            else:
+                break
+            iaxis += 1
         return plot_
 
     def gaussianity(self):
