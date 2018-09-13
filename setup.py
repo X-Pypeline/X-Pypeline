@@ -83,6 +83,9 @@ install_requires = [
     'cython',
     'gwpy>=0.12',
     'lscsoft-glue',
+    'pandas >= 0.22 ; python_version >= \'3.5\'',
+    'pandas < 0.21 ; python_version == \'3.4\'',
+    'pandas >= 0.22 ; python_version == \'2.7\'',
 ]
 
 tests_require = [

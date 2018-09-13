@@ -357,7 +357,7 @@ full of pregenerated waveforms.
 
     In [43]: plot = TimeSeriesPlot(hp, hc)
 
-    In [44]: plot.set_xlim([0, 0.1])
+    In [44]: plot.set_xlim([0, 1.0])
 
     @savefig supernova-R4E1FC_L_theta2.094_phi2.094.png
     In [45]: plot
