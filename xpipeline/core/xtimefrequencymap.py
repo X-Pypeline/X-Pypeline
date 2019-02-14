@@ -17,21 +17,22 @@
 # along with hveto.  If not, see <http://www.gnu.org/licenses/>.
 
 # ---- Import standard modules to the python path.
+from collections import OrderedDict
+from functools import reduce
+
 from gwpy.spectrogram import Spectrogram
 from gwpy.timeseries import TimeSeries
-from collections import OrderedDict
 from gwpy.signal.fft.ui import seconds_to_samples
-from .xfrequencyseries import XFrequencySeriesDict
-from scipy import sparse
-from functools import reduce
 
 from xpipeline.cluster import nearestneighbor
 from xpipeline.cluster import clusterproperties
 from ..cluster.cluster import XCluster
+from .xfrequencyseries import XFrequencySeriesDict
+from .sparse import csc_sparse_map
 
 import operator
 import numpy
-
+import h5py
 
 __author__ = 'Scott Coughlin <scott.coughlin@ligo.org>'
 __all__ = ['csc_XSparseTimeFrequencyMap', 
@@ -345,6 +346,21 @@ class XSparseTimeFrequencyMapDict(OrderedDict):
                 for k, v in self.items()}
         return XTimeFrequencyMapDict(maps)
 
+    def label(self, connectivity=8):
+        """Convert dict fo sparse matrix to `XTimeFrequencyMapDict`
+        """
+        tfmap = list(self.values())[0]
+        pixels = numpy.vstack([tfmap.tindex, tfmap.findex])
+        coord_dim_array = (tfmap.xindex.size, tfmap.yindex.size)
+        npixels = pixels.shape[1]
+        labelled_map = nearestneighbor.fastlabel_wrapper(pixels + 1, coord_dim_array,
+                                                         connectivity, npixels).astype(int)
+
+        for k, v in self.items():
+            v.labels = labelled_map
+        return
+        
+
     def cluster(self, method='nearest_neighbors', **kwargs):
         """Convert dict fo sparse matrix to `XTimeFrequencyMapDict`
         """
@@ -372,6 +388,15 @@ class XSparseTimeFrequencyMapDict(OrderedDict):
         else:
             raise ValueError('Clustering method undefined')
 
+    def to_cnn(self, dim=2):
+        """Sum all maps in the dict
+
+           Returns:
+               `XTimeFrequencyMap`:
+                   A coherent TF-Map
+        """
+        return
+
     def plot(self, label='key', **kwargs):
         """Plot the data for this `XTimeFrequencyMapDict`.
 
@@ -393,76 +418,42 @@ class XSparseTimeFrequencyMapDict(OrderedDict):
         """
         return self.to_xtimefrequencymapdict().plot(label='key', **kwargs)
 
-class csc_XSparseTimeFrequencyMap(sparse.csc_matrix):
-    _metadata_slots = ('energy', 'tindex', 'findex', 'yindex', 'xindex')
-    def __init__(self, matrix, **kwargs):
-        self.yindex = kwargs.pop('yindex', None)
-        self.xindex = kwargs.pop('xindex', None)
-        self.tindex = kwargs.pop('tindex', None)
-        self.findex = kwargs.pop('findex', None)
-        self.energy = kwargs.pop('energy', None)
-        super(csc_XSparseTimeFrequencyMap, self).__init__(matrix, **kwargs)
+class csc_XSparseTimeFrequencyMap(csc_sparse_map):
+    def write(self, filename, path):
+        """Plot the data for this `XTimeFrequencyMapDict`.
 
-    def _repr_helper(self, print_):
-        if print_ is repr:
-            opstr = '='
-        else:
-            opstr = ': '
-
-        # get prefix and suffix
-        prefix = '{}('.format(type(self).__name__)
-        suffix = ')'
-        if print_ is repr:
-            prefix = '<{}'.format(prefix)
-            suffix += '>'
-
-        indent = ' ' * len(prefix)
-
-        # format value
-        nnz = self.getnnz()
-        arrstr = ("<%dx%d sparse matrix of type '%s'\n"
-                 "\twith %d stored elements in %s format>" % \
-                 (self.shape + (self.dtype.type, nnz, "Compressed Sparse Column")))
-
-        # format unit
-        metadata = [('unit', 'dimensionless')]
-
-        # format other metadata
-        try:
-            attrs = self._print_slots
-        except AttributeError:
-            attrs = self._metadata_slots
-        for key in attrs:
-            try:
-                val = getattr(self, key)
-            except (AttributeError, KeyError):
-                val = None
-            thisindent = indent + ' ' * (len(key) + len(opstr))
-            metadata.append((
-                key.lstrip('_'),
-                print_(val).replace('\n', '\n{}'.format(thisindent)),
-            ))
-        metadata = (',\n{}'.format(indent)).join(
-            '{0}{1}{2}'.format(key, opstr, value) for key, value in metadata)
-
-        return "{0}{1}\n{2}{3}{4}".format(
-            prefix, arrstr, indent, metadata, suffix)
-
-    def __repr__(self):
-        """Return a representation of this object
-
-        This just represents each of the metadata objects appropriately
-        after the core data array
+        Parameters
+        ----------
+        **kwargs
+            all other keyword arguments are passed to the plotter as
+            appropriate
         """
-        return self._repr_helper(repr)
+        f = h5py.File(filename,'w')
+        g = f.create_group(path)
+        g.create_dataset('value', data=self.energy)
+        g.create_dataset('tindex', data=self.tindex)
+        g.create_dataset('findex', data=self.findex)
+        g.attrs['shape'] = self.shape
+        import pdb
+        pdb.set_trace()
 
-    def __str__(self):
-        """Return a printable string format representation of this object
+    @classmethod
+    def read(cls, filename, path):
+        """Plot the data for this `XTimeFrequencyMapDict`.
 
-        This just prints each of the metadata objects appropriately
-        after the core data array
+        Parameters
+        ----------
+        **kwargs
+            all other keyword arguments are passed to the plotter as
+            appropriate
         """
-        return self._repr_helper(str)
+        f = h5py.File(filename,'r')
+        g = f[path]
+        import pdb
+        pdb.set_trace()
+        return cls((g['value'], (g2['tindex'], g2['tindex'])),
+                    shape=g.attrs['shape'], tindex=tindex, findex=findex,
+                    energy=g['value'])
 
     def plot(self, **kwargs):
         """Plot the data for this `XTimeFrequencyMapDict`.
