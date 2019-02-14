@@ -33,6 +33,7 @@ from .sparse import csc_sparse_map
 import operator
 import numpy
 import h5py
+import pdb
 
 __author__ = 'Scott Coughlin <scott.coughlin@ligo.org>'
 __all__ = ['csc_XSparseTimeFrequencyMap', 
@@ -433,9 +434,14 @@ class csc_XSparseTimeFrequencyMap(csc_sparse_map):
         g.create_dataset('value', data=self.energy)
         g.create_dataset('tindex', data=self.tindex)
         g.create_dataset('findex', data=self.findex)
-        g.attrs['shape'] = self.shape
-        import pdb
         pdb.set_trace()
+        g.attrs['dt'] = self.xindex[1] - self.xindex[0]
+        g.attrs['df'] = self.yindex[1] - self.yindex[0]
+        g.attrs['t0'] = self.xindex[0]
+        g.attrs['f0'] = self.yindex[0]
+        g.attrs['tmax'] = self.xindex[-1]
+        g.attrs['fmax'] = self.yindex[-1]
+        g.attrs['shape'] = self.shape
 
     @classmethod
     def read(cls, filename, path):
@@ -449,7 +455,6 @@ class csc_XSparseTimeFrequencyMap(csc_sparse_map):
         """
         f = h5py.File(filename,'r')
         g = f[path]
-        import pdb
         pdb.set_trace()
         return cls((g['value'], (g['tindex'], g['findex'])),
                     shape=g.attrs['shape'], tindex=tindex, findex=findex,
