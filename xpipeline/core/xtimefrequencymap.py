@@ -451,7 +451,7 @@ class csc_XSparseTimeFrequencyMap(csc_sparse_map):
         g = f[path]
         import pdb
         pdb.set_trace()
-        return cls((g['value'], (g2['tindex'], g2['tindex'])),
+        return cls((g['value'], (g['tindex'], g['findex'])),
                     shape=g.attrs['shape'], tindex=tindex, findex=findex,
                     energy=g['value'])
 
