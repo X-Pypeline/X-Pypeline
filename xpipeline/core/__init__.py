@@ -23,5 +23,3 @@ from .xtimefrequencymap import (XTimeFrequencyMapDict,
                                 XTimeFrequencyMap,
                                 csc_XSparseTimeFrequencyMap,
                                 XSparseTimeFrequencyMapDict)
-
-from . import io  # register I/O

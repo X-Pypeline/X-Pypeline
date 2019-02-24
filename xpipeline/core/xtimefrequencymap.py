@@ -237,7 +237,8 @@ class XTimeFrequencyMap(Spectrogram):
                                            findex=freq,
                                            energy=data,
                                            xindex=self.xindex,
-                                           yindex=self.yindex)
+                                           yindex=self.yindex,
+                                           name=self.name)
 
     def gaussianity(self):
         """Calculate the gaussianity of this map
@@ -261,7 +262,6 @@ class XTimeFrequencyMap(Spectrogram):
             The amount by which to shift (in seconds if `float`), give
             a negative value to shift backwards in time
         """
-        sqrt_of_neg_1 = numpy.sqrt(numpy.array([-1], dtype=complex))
         frequency_shift = residual_time_shift(delta,
                                               self.frequencies.to_value())
         return self * frequency_shift
@@ -327,7 +327,8 @@ class XTimeFrequencyMap(Spectrogram):
         return csc_XSparseTimeFrequencyMap((data, (tindex, findex)),
                                            shape=shape, yindex=self.yindex,
                                            xindex=self.xindex, tindex=tindex,
-                                           findex=findex, energy=data)
+                                           findex=findex, energy=data,
+                                           name=self.name)
 
 class XSparseTimeFrequencyMapDict(OrderedDict):
     def to_coherent(self):
@@ -420,7 +421,7 @@ class XSparseTimeFrequencyMapDict(OrderedDict):
         return self.to_xtimefrequencymapdict().plot(label='key', **kwargs)
 
 class csc_XSparseTimeFrequencyMap(csc_sparse_map):
-    def write(self, filename, path):
+    def write(self, filename, path, **kwargs):
         """Plot the data for this `XTimeFrequencyMapDict`.
 
         Parameters
@@ -429,12 +430,11 @@ class csc_XSparseTimeFrequencyMap(csc_sparse_map):
             all other keyword arguments are passed to the plotter as
             appropriate
         """
-        f = h5py.File(filename,'w')
+        f = h5py.File(filename,'a')
         g = f.create_group(path)
         g.create_dataset('value', data=self.energy)
         g.create_dataset('tindex', data=self.tindex)
         g.create_dataset('findex', data=self.findex)
-        pdb.set_trace()
         g.attrs['dt'] = self.xindex[1] - self.xindex[0]
         g.attrs['df'] = self.yindex[1] - self.yindex[0]
         g.attrs['t0'] = self.xindex[0]
@@ -442,6 +442,8 @@ class csc_XSparseTimeFrequencyMap(csc_sparse_map):
         g.attrs['tmax'] = self.xindex[-1]
         g.attrs['fmax'] = self.yindex[-1]
         g.attrs['shape'] = self.shape
+        f.close()
+        return
 
     @classmethod
     def read(cls, filename, path):
@@ -453,12 +455,15 @@ class csc_XSparseTimeFrequencyMap(csc_sparse_map):
             all other keyword arguments are passed to the plotter as
             appropriate
         """
-        f = h5py.File(filename,'r')
+        f = h5py.File(filename, 'r')
         g = f[path]
-        pdb.set_trace()
-        return cls((g['value'], (g['tindex'], g['findex'])),
-                    shape=g.attrs['shape'], tindex=tindex, findex=findex,
-                    energy=g['value'])
+        return cls((g['value'][()], (g['tindex'][()], g['findex'][()])),
+                    shape=g.attrs['shape'],
+                    tindex=g['tindex'][()],
+                    findex=g['findex'][()],
+                    energy=g['value'][()],
+                    xindex=numpy.arange(g.attrs['t0'], g.attrs['tmax'] + g.attrs['dt'], g.attrs['dt']),
+                    yindex=numpy.arange(g.attrs['f0'], g.attrs['fmax'] + g.attrs['df'], g.attrs['df']))
 
     def plot(self, **kwargs):
         """Plot the data for this `XTimeFrequencyMapDict`.

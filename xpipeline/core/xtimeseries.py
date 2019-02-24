@@ -32,7 +32,7 @@ class XTimeSeries(TimeSeriesDict):
     @classmethod
     def retrieve_data(cls, event_time, block_time,
                       channel_names, sample_frequency,
-                      frame_types=[], verbose=False):
+                      frametype=None, **kwargs):
         """Obtain data for either on source, off source, or injections.
 
         This uses the gwpy `TimeSeriesDict.get` method
@@ -70,15 +70,18 @@ class XTimeSeries(TimeSeriesDict):
         try:
             data = cls.get(
                            channel_names,
-                           start_time, stop_time, verbose=verbose
+                           start_time, stop_time,
+                           frametype=frametype,
+                           **kwargs
                           )
         except:
             data = cls()
             for det in channel_names:
                 data.append({det : TimeSeries.fetch_open_data(
                                                               det.split(':')[0],
-                                           start_time, stop_time, verbose=verbose,
-                                           sample_rate=sample_frequency
+                                           start_time, stop_time,
+                                           sample_rate=sample_frequency,
+                                           **kwargs
                                           )
                              })
 

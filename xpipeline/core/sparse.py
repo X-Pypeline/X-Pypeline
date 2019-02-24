@@ -22,7 +22,7 @@ from scipy import sparse
 
 class csc_sparse_map(sparse.csc_matrix):
     _metadata_slots = ('energy', 'tindex', 'findex',
-                       'yindex', 'xindex', 'labels')
+                       'yindex', 'xindex', 'labels', 'name')
     def __init__(self, matrix, **kwargs):
         self.yindex = kwargs.pop('yindex', None)
         self.xindex = kwargs.pop('xindex', None)
@@ -30,6 +30,7 @@ class csc_sparse_map(sparse.csc_matrix):
         self.findex = kwargs.pop('findex', None)
         self.energy = kwargs.pop('energy', None)
         self.labels = kwargs.pop('labels', None)
+        self.labels = kwargs.pop('name', None)
         super(csc_sparse_map, self).__init__(matrix, **kwargs)
 
     def _repr_helper(self, print_):

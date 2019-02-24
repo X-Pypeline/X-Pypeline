@@ -3,6 +3,7 @@ from .xwaveform import xmakewaveform
 from gwpy.timeseries import TimeSeries
 from xpipeline.core.xtimeseries import XTimeSeries
 from gwpy.table import Table
+from astropy.table import hstack
 
 import numpy
 import math
@@ -69,7 +70,7 @@ def xinjectsignal(family, start_time, block_time, detectors, sample_rate,
     for det in detectors:
 
         #----- Make timeseries data for given detector.
-        injection_data[det] = TimeSeries(numpy.zeros(block_time * sample_rate),
+        injection_data[det] = TimeSeries(numpy.zeros(int(block_time * sample_rate)),
                                          dx= 1./sample_rate,
                                          name=det)
 
@@ -131,7 +132,6 @@ def xinjectsignal(family, start_time, block_time, detectors, sample_rate,
 
         injection_data[det][injection_samples] = Fp*hp + Fc*hc + Fb*hb
         injection_data[det].t0 = start_time
-        injection_data[det].epoch = peak_time
 
     return injection_data
 
@@ -207,6 +207,9 @@ def xinjectsignal_fromfile(start_time, block_time, channels, sample_rate,
         The edges of long-duration signals will be tapered with
         a hann window to avoid turn-on/off transients.
     """
+    ifos = [ifo.split(':')[0] for ifo in channels]
+
+    injection_number = int(injection_number)
 
     # ---- Check for optional arguments.
     do_not_inject = kwargs.pop('do_not_inject', 0)
@@ -217,21 +220,33 @@ def xinjectsignal_fromfile(start_time, block_time, channels, sample_rate,
 
     # ----- Parse channel list and load info on corresponding detectors.
     detector_dict = {}
-    for det in channels:
+    for det in ifos:
         detector_dict[det] = Detector(det)
 
-    # ----- Create appropraite columns for reading the injection
-    #       file based on detectors supplied above
-    injection_file_columns = []
-    for det in channels:
-        for columns in ['gps_s','gps_ns', 'phi', 'theta', 'psi', 'gwb_type',
-                         'gwb_params']:
-            injection_file_columns.append(columns + '_' + det)
-
-
-    #----- Read injection file and extract parameters of injections
-    injection_file_parameters = Table.read(injection_file_name, format='ascii',
-                                           names=injection_file_columns)
+    # We must check if there are detector specific injection
+    # parameters
+    injection_file_parameters = Table.read(injection_file_name, format='ascii',)
+    _injection_file_columns = ['gps_s','gps_ns', 'phi', 'theta', 'psi',
+                               'gwb_type', 'gwb_params']
+    if len(injection_file_parameters.keys()) > 7:
+        # ----- Create appropriate columns for reading the injection
+        #       file based on detectors supplied above
+         
+        injection_file_columns = []
+        for det in ifos:
+            for columns in _injection_file_columns:
+                injection_file_columns.append(columns + '_' + det)
+        #----- Read injection file and extract parameters of injections
+        injection_file_parameters = Table.read(injection_file_name, format='ascii',
+                                               names=injection_file_columns)
+    else:
+        # There is a single set of parameters for ever detector
+        injection_file_parameters = Table()
+        for det in ifos:
+            injection_file_columns = []
+            for columns in _injection_file_columns:
+                injection_file_columns.append(columns + '_' + det)
+            injection_file_parameters = hstack((injection_file_parameters, Table.read(injection_file_name, format='ascii',names=injection_file_columns)))
 
 
     #----- If specific injections are specified then keep only those injections.
@@ -259,9 +274,9 @@ def xinjectsignal_fromfile(start_time, block_time, channels, sample_rate,
 
     #----- Loop over detectors and construct simulated signals.
     injection_data = {}
-    for det in channels:
+    for channel, det in zip(channels, ifos):
         #----- Make timeseries data for given detector.
-        injection_data[det] = TimeSeries(numpy.zeros(block_time * sample_rate),
+        injection_data[channel] = TimeSeries(numpy.zeros(int(block_time * sample_rate)),
                                          dx= 1./sample_rate,
                                          name=det)
         #---------- Extract parameters for current injection.
@@ -338,19 +353,19 @@ def xinjectsignal_fromfile(start_time, block_time, channels, sample_rate,
                              *sample_rate)
                             ).astype(int)
 
-        injection_data[det][injection_samples] = Fp*hp + Fc*hc + Fb*hb
-        injection_data[det].t0 = start_time
+        injection_data[channel][injection_samples] = Fp*hp + Fc*hc + Fb*hb
+        injection_data[channel].t0 = start_time
 
     #----- Record for output the peak time and sky angles for each of the
     #      injections.  For glitches record only the parameters for the first
     #      detector.
     #----- Loop over simulated signals and record peak time, sky angles.
     #---------- Extract parameters for current injection.
-    gps_s = injection_file_parameters['gps_s_' + channels[0]]
-    gps_ns = injection_file_parameters['gps_ns_' + channels[0]]
-    phi = injection_file_parameters['phi_' + channels[0]]
-    theta = injection_file_parameters['theta_' + channels[0]]
-    psi = injection_file_parameters['psi_' + channels[0]]
+    gps_s = injection_file_parameters['gps_s_' + ifos[0]]
+    gps_ns = injection_file_parameters['gps_ns_' + ifos[0]]
+    phi = injection_file_parameters['phi_' + ifos[0]]
+    theta = injection_file_parameters['theta_' + ifos[0]]
+    psi = injection_file_parameters['psi_' + ifos[0]]
 
     #----- Done
     return XTimeSeries(injection_data), gps_s, gps_ns, phi, theta, psi
