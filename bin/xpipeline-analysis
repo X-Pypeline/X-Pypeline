@@ -13,6 +13,7 @@ from gwpy.table import EventTable
 import pandas
 import numpy
 import argparse
+import tables
 
 def parse_commandline():
     parser = argparse.ArgumentParser(description="This executable processes "
@@ -85,6 +86,7 @@ block_time = int(parameters['blocktime'])
 
 minimum_frequency = int(parameters['minimumfrequency'])
 maximum_frequency = int(parameters['maximumfrequency'])
+offset_fraction = float(parameters['offsetfraction'])
 
 frame_file = parameters['frameCacheFile']
 whitening_length = int(parameters['whiteningtime'])
@@ -106,6 +108,7 @@ sky_positions = EventTable.read(sky_positions, format='ascii',
 
 seed = int(parameters['seed'])
 fft_lengths = [float(fft) for fft in parameters['analysistimes'].split(',')]
+min_fftlength = min(fft_lengths)
 likelihoods = parameters['likelihoodtype'].split(',')
 
 channel_names = parameters['channelFileName']
@@ -117,7 +120,22 @@ ifos = [chan.split(':')[0] for chan in channel_names]
 sample_frequency = float(parameters['samplefrequency'])
 
 numpy.random.seed(seed)
+max_pixels = int(1./offset_fraction * 1./min_fftlength * block_time * (sample_frequency/2 * min_fftlength + 1) *len(ifos)* 0.01)
 
+table_description = {
+'dx' : tables.Float64Col(1),
+'dy' : tables.Float64Col(1),
+'x0' : tables.Float64Col(1),
+'y0' : tables.Float64Col(1),
+'shape' : tables.Int64Col(2),
+'phi' : tables.Float32Col(1),
+'theta' : tables.Float32Col(1),
+'map_type' : tables.StringCol(20),
+'ifo' : tables.StringCol(max([len(i) for i in channel_names])),
+'x' : tables.Float64Col(shape=max_pixels),
+'y' : tables.Float64Col(shape=max_pixels),
+'energy' : tables.ComplexCol(itemsize=16, shape=max_pixels),
+}
 
 # presets
 events = pandas.read_csv(event_file,header=None, delimiter=' ').values
@@ -240,12 +258,13 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                     # let's reconstruct the sparse tf map
                     # Now with pixels from both detectors
                     surviving_pixels = {k : v.to_sparse(tindex, findex) for k, v in projected_fftmaps.items()}
-                    surviving_pixels['tfmap'] = fft_grams.to_sparse(tindex, findex)
+                    surviving_pixels['excess_energy'] = fft_grams.to_sparse(tindex, findex, phi=phi, theta=theta)
                     for k, v in surviving_pixels.items():
-                        for k1, v1 in v.items():
-                            if args.job_type == 'injection':
-                                v1.write('training_set.hdf5',
-                                         path='{0}/{1}_{2}/{3}/{4}/{5}/{6}/{7}_{8}/{9}/{10}'.format(args.job_type, event_time, '_'.join(time_slide.astype(str).tolist()), waveform_name, injection_scale, injection_number, fft_length, phi, theta, k, k1))
-                            else:
-                                v1.write('training_set.hdf5',
-                                         path='{0}/{1}_{2}/{3}/{4}_{5}/{6}'.format(args.job_type, event_time, '_'.join(time_slide.astype(str).tolist()), fft_length, phi, theta, k, k1))
+                        if args.job_type == 'injection':
+                            v.write(filename='sn-analysis.h5',
+                                  path='/{0}/event_{1}_slide_{2}/waveform_{3}/injection_scale_{4}/injection_number_{5}'.format(args.job_type, event_time, '_'.join(time_slide.astype(str).tolist()), waveform_name, str(injection_scale).replace('.', 'd'), injection_number,),
+                                  table_description=table_description)
+                        else:
+                            v.write(filename='sn-analysis.h5',
+                                  path='/{0}/event_{1}_slide_{2}/'.format(args.job_type, event_time, '_'.join(time_slide.astype(str).tolist()),),
+                                  table_description=table_description)
