@@ -8,9 +8,8 @@
 import sys, os, shutil, math, random, copy, getopt, re, string, time
 import glob, operator, argparse, socket, socket, uuid, pdb
 import numpy as np
-from glue import segments
-#from glue import pipeline
 from glue import datafind
+from glue import pipeline
 from numpy import loadtxt
 
 from six.moves.configparser import ConfigParser
@@ -20,8 +19,7 @@ import lal
 
 import json
 
-#from xpipeline import xcondor, xparseoutputtype
-from xpipeline import xparseoutputtype
+from xpipeline import xcondor, xparseoutputtype
 from xpipeline.skyutils import skyutils
 from xpipeline.io import utils as ioutils
 from xpipeline.setuputils import utils as setuputils
@@ -389,7 +387,7 @@ if xtmvaFlag:
     logger.info("       running XTMVA: yes")
 logger.info("\n")
 
-# ---- Write ASCII file holding setUpJobs command.
+# ---- Write ASCII file holding xpipeline-workflow command.
 
 summary_file = 'grb_summary.txt'
 # ---- Append to summary file.
@@ -398,12 +396,12 @@ sfile.write('\t'.join(['\nname','gps','ra','dec','network','numSky','numBG','ana
 sfile.write('\t'.join([grb_name,str(trigger_time),str(ra),str(decl)]))
 sfile.close()
 
-# ---- We will record the command line arguments to setUpJobs in a file called
+# ---- We will record the command line arguments to xpipeline-workflow in a file called
 #      grb.param.
 #      This file is used by xgrbwebpage.py which expects the short form of
 #      the options to have been used
-command_string = 'setUpJobs '
-with open('setUpJobs.param', 'w') as f:
+command_string = 'xpipeline-workflow '
+with open('xpipeline-workflow.param', 'w') as f:
     f.write(command_string + ' '.join(sys.argv[1:]))
 
 # -------------------------------------------------------------------------
@@ -949,9 +947,9 @@ for iSeg in range(len(coincidence_on_source_segment_chunks)):
         # ---- If user has set usexchooseskylocations flag to 1 in params file we now
         #      compute a list of sky positions we need to search and write these to a
         #      file.
+        skyPosFilename = 'input/sky_positions_' + str(iSeg) + '.txt'
 
         if int(cp.get('input','usexchooseskylocations')) and sky_pos_err:
-            skyPosFilename = 'input/sky_positions_' + str(iSeg) + '.txt'
             logger.info("Calling xconvertskylocations to generate {0}".format(skyPosFilename))
             xconvertskylocationsCall = ' '.join([ "xconvertskylocations",
                 str(skyPosFilename_trigger),
@@ -988,7 +986,9 @@ for iSeg in range(len(coincidence_on_source_segment_chunks)):
 
             # ---- Set skyPositionList arg that will be written to matlab format
             #      parameters files.
-            skyPositionList = '[' + str(theta) + ',' + str(phi) + ']'
+            with open(skyPosFilename, 'w') as f:
+                f.write(str(theta) + ' ' + str(phi) + ' 1.00000 0.02716')
+            skyPositionList = skyPosFilename
 
     elif args.search_type in ['sn', 'allsky']:
 
@@ -1456,7 +1456,7 @@ if cp.has_section('waveforms') :
             os.system(command)
             logger.info("    Using-premade injection file: {0}".format(injfilename))
 
-  	# ---- setUpJobs script that was here before [SARAH]
+  	# ---- xpipeline-workflow script that was here before [SARAH]
         else:
             # ---- Construct command to make injection file for this waveform set.
             # ---- Wrap waveforms string in single quotes to escape any ; characters,

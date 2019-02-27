@@ -155,7 +155,7 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
         logger.info('Injecting a signal... Reading injections pecific parameters')
         injection_file_name = parameters['injectionFileName']
         waveform_name = injection_file_name.split('_')[1].split('.')[0]
-        injection_scales = [float(i) for i in parameters['injectionScale'].split(',')]
+        injection_scales = [float(i) for i in parameters['injectionScales'].split(',')]
         injection_numbers = args.injection_numbers
         catalogdirectory = parameters['catalogdirectory']
     else:
