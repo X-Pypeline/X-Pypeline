@@ -1638,6 +1638,8 @@ if cp.has_section('waveforms') :
             if smartCluster == True:
               try: os.mkdir( 'output_clustered/simulations_' + set + '_' + str(scale_counter) )
               except: pass
+
+
 if cp.has_option('mdc','mdc_sets') :
     mdc_setsList = cp.get('mdc','mdc_sets')
     mdc_sets = mdc_setsList.split(',')
@@ -1927,13 +1929,25 @@ if maxOffNum == 0 :
     #      be distributed over the cluster nodes.
     for i in range(nOffEvents):
         node = xcondor.XsearchNode(job)
+
+        # set range of event numbers to be processed in this job
+        node.set_x_jobnum("{0}".format(i))
+
+        # this is background trial
+        node.set_output_dir("background")
+
+        # set path to param file
         matlab_param_file = cwdstr + "/input/parameters_off_source.txt"
         node.set_param_file(matlab_param_file)
-        node.set_x_jobnum(i)
-        # ---- Output file to local output/off_source directory.
-        node.set_output_dir( os.path.join( cwdstr + "/output/off_source" ) )
+
+        #node.set_output_dir(os.path.join(cwdstr, "output", "off_source"))
+
+        # Set injection number which for background jobs is 0
         node.set_x_injnum('0')
-        mergenode.add_parent(node)
+
+        # add this as a depednecy to the merge jobs dag
+        #mergenode.add_parent(node)
+
         node.set_retry(retryNumber)
         # ---- Prepend human readable description to node name.
         node.set_name("xdetection_off_source_seg" + str(i) + "_" + node.get_name())
@@ -1946,12 +1960,29 @@ else:
     nSets = int(math.ceil(float(nOffEvents)/float(maxOffNum)))
     for i in range(nSets) :
         node = xcondor.XsearchNode(job)
-        matlab_param_file = cwdstr + "/input/parameters_off_source_" + str(int(math.floor((jobsPerWindow*i)/nSets))) + ".txt"
+        upper_event_number = min((i+1)*maxOffNum, nOffEvents)
+        lower_event_number = i*maxOffNum
+        job_range = [str(i) for i in range(lower_event_number, upper_event_number)]
+        segmentstr = str(int(math.floor((jobsPerWindow*i)/nSets)))
+
+        # set range of event numbers to be processed in this job
+        node.set_x_jobnum("{0}".format(' '.join(job_range)))
+
+        # this is background trial
+        node.set_output_dir("background")
+
+        # set path to param file
+        matlab_param_file = cwdstr + "/input/parameters_off_source_" + segmentstr + ".txt"
         node.set_param_file(matlab_param_file)
-        node.set_x_jobnum("%d-"%(i*maxOffNum) + "%d"%(min((i+1)*maxOffNum-1,nOffEvents-1)))
-        node.set_output_dir( os.path.join( cwdstr + "/output/off_source" ) )
+
+        #node.set_output_dir(os.path.join(cwdstr, "output", "off_source"))
+
+        # Set injection number which for background jobs is 0
         node.set_x_injnum('0')
-        mergenode.add_parent(node)
+
+        # add this as a depednecy to the merge jobs dag
+        #mergenode.add_parent(node)
+
         node.set_retry(retryNumber)
         # ---- Prepend human readable description to node name.
         node.set_name("xdetection_off_source_seg" + str(i) + "_" + node.get_name())
@@ -2121,16 +2152,21 @@ if cp.has_section('waveforms') :
                 if thisInjSeg :
                   thisInjSeg.sort()
                   node = xcondor.XsearchNode(job)
-                  matlab_param_file = cwdstr + "/input/parameters_simulation_" + set + "_0_" + str(thisInjSeg[i]) + ".txt"
+                  # set range of event numbers to be processed in this job
+                  node.set_x_jobnum("{0}".format(thisInjSeg[i]))
+
+                  # this is background trial
+                  node.set_output_dir("injection")
+
+                  # set path to param file
+                  matlab_param_file = cwdstr + "/input/parameters_simulation_" + set + "_0_" + str(thisInjSeg[i]) + ".txt" 
                   node.set_param_file(matlab_param_file)
-                  # --- method of grouping together segments for one condor job
-                  #node.set_x_jobnum("%d-"%(thisInjSeg[0]) + "%d"%(thisInjSeg[-1]))
-                  # --- we use multiple jobs but output written to a common trigger mat file
-                  node.set_x_jobnum(thisInjSeg[i])
-                  node.set_output_dir( os.path.join( cwdstr + '/output/simulations_' + set + '_' ) )
-                  node.set_x_injnum(str(iInj+1))
-                  for scale_counter in range(len(injectionScales)) :
-                    mergenode[scale_counter].add_parent(node)
+
+                  #node.set_output_dir(os.path.join(cwdstr, "output", "off_source"))
+
+                  # Set injection number which for background jobs is 0
+                  node.set_x_injnum(str(iInj))
+
                   node.set_retry(retryNumber)
                   # ---- Prepend human readable description to node name.
                   node.set_name("xdetection_simulation_" + set + "_inj" + str(iInj+1) + "_" + node.get_name())
@@ -2183,89 +2219,43 @@ if cp.has_section('waveforms') :
         else:
           # ---- Loop over injection scales.
           scale_counter = 0
-          for injectionScale in injectionScales :
-            mergenode = xcondor.XmergeNode(mergejob)
-            if xtmvaFlag:
-              xtmvanode.add_parent(mergenode)
-            if smartCluster == True:
-              mergeclusterednode = xcondor.XmergeClusteredNode(mergeclusteredjob)
-            # Skip injection trigger production if path to already available triggers provided
-            if not(reUseInj):
-              # ---- Loop over segments
-              for i in range(len(segmentList)):
-                # ---- For debug only
-                #print('We do not have injections that are done at the block border, we use standard GRB injection placing')
-                if  0 == maxInjNum:
+          mergenode = xcondor.XmergeNode(mergejob)
+          if xtmvaFlag:
+            xtmvanode.add_parent(mergenode)
+          if smartCluster == True:
+            mergeclusterednode = xcondor.XmergeClusteredNode(mergeclusteredjob)
+          # Skip injection trigger production if path to already available triggers provided
+          if not(reUseInj):
+            # ---- Loop over segments
+            for i in range(len(segmentList)):
+              # ---- For debug only
+              #print('We do not have injections that are done at the block border, we use standard GRB injection placing')
+              if  0 == maxInjNum:
                     # ---- Create job node.
                     node = xcondor.XsearchNode(job)
-                    # ---- Assign first argument: parameters file
+
+                    node.set_x_jobnum("{0}".format(i))
+
+                    # this is background trial
+                    node.set_output_dir("injection")
+
+                    # set path to param file
                     matlab_param_file = cwdstr + "/input/parameters_simulation_" \
                         + set + "_" + str(scale_counter) + '_' + str(i) + ".txt"
                     node.set_param_file(matlab_param_file)
-                    # ---- Assign second argument: job (segment) number
-                    #node.set_x_jobnum("%d-"%(thisInjSeg[0]) + "%d"%(thisInjSeg[-1]))
-                    node.set_x_jobnum(i)
-                    # ---- Assign third argument: output directory
-                    # ---- Check to see if distributing results files over nodes.
-                    if 1 == distributeSimulation & 0 == maxInjNum:
-                        # ---- Yes: determine output directories and make sure they exist.
-                        #      Record directories in a file.
-                        jobNumber = (jobNumber+1-nodeOffset)%nNodes + nodeOffset
-                        nodeList = open( jobNodeFileSimulationPrefix + '_' + set \
-                            + "_seg%d"%(i) + "_injScale" + injectionScale + '.txt'  ,'w')
-                        nodeList.write("Number_of_detectors %d\n"%(len(detector)))
-                        for j in range(0,len(detector)) :
-                            nodeList.write("%s\t"%(detector[j]))
-                        nodeList.write("\n")
-                        nodeList.write('event_simulation_file ')
-                        nodeList.write(cwdstr + "/input/event_on_source.txt \n")
-                        nodeList.write('Injection_file ')
-                        nodeList.write(cwdstr + "/input/injection_" + set + ".txt \n")
-                        nodeList.write('Number_of_jobs ')
-                        nodeList.write("%d \n"%(numberOfInjections))
-                        #nJobsPerNode = int(numberOfInjections/nNodes) + 1
-                        nJobsPerNode = numberOfInjections
-                        nodeList.write('Number_of_jobs_per_node ')
-                        nodeList.write("%d \n"%(nJobsPerNode))
-                        # write path for each result file, on each node write results from
-                        # nJobsPerNode jobs
-                        #jobNumber = int((injectionNumber-1)/nJobsPerNode) + nodeOffset
-                        while ~(os.path.isdir (nodePath + "%d/"%(jobNumber))) &1:
-                            logger.info("Waiting for automount to unmount ...\n")
-                            time.sleep(10)
-                        # Write name of node before changing nodes
-                        #if 0 == (injectionNumber-1) % nJobsPerNode:
-                        logger.info("Node number %d"%(jobNumber))
-                        nodeList.write(nodePath + "%d/ \n"%(jobNumber))
-                        # Create directory for results files
-                        fullPath = nodePath + "%d/"%(jobNumber) + onNodeSimulationPath \
-                            + "simulations_" + set + '_' + str(scale_counter)
-                        if ~(os.path.isdir (fullPath))& 1 :
-                            os.makedirs(fullPath)
-                        else:
-                            logger.warning("**WARNING** path: " + fullPath \
-                            + " already exists, previous results may be overwritten\n")
-                        node.set_output_dir(os.path.join( fullPath))
-                        for injectionNumber in range(1,numberOfInjections+1) :
-                            nodeList.write(fullPath + "/results_%d"%(i) \
-                                +  "_%d.mat \n"%(injectionNumber) )
-                        nodeList.close()
-                    else:
-                        # ---- No: Set output directory to local.
-                        node.set_output_dir( os.path.join( cwdstr + \
-                            '/output/simulations_' + set + '_' + str(scale_counter) ) )
-                        # ---- Assign fourth argument: injection number
-                        #      KLUDGE: This will screw up injections if more than
-                        #      one segment; injection number iterates only over
-                        #      injections that fall within analysis interval.
-                    node.set_x_injnum("1-%d"%(numberOfInjections))
-                    mergenode.add_parent(node)
+
+                    #node.set_output_dir(os.path.join(cwdstr, "output", "off_source"))
+
+                    # Set injection number which for background jobs is 0
+                    node.set_x_injnum(' '.join(list(range(0, numberOfInjections))))
+
+                    #mergenode.add_parent(node)
                     node.set_retry(retryNumber)
                     # ---- Prepend human readable description to node name.
                     node.set_name("xdetection_simulation_" + set + "_seg" \
                         + str(i) + "_injScale" + str(scale_counter) + "_" + node.get_name())
                     dag.add_node(node)
-                else:
+              else:
                     for iWindow in range(len(injCenterTime)):
                         thisSegmentInjStart = 1e10
                         thisSegmentInjNumber = 0
@@ -2275,15 +2265,25 @@ if cp.has_section('waveforms') :
                                 thisSegmentInjStart = min(thisSegmentInjStart,iInj)
                         for iInjRange in range(int(math.ceil(float(thisSegmentInjNumber)/float(maxInjNum)))) :
                             node = xcondor.XsearchNode(job)
+
+                            node.set_x_jobnum("{0}".format(i+iWindow*jobsPerWindow))
+
+                            # this is background trial
+                            node.set_output_dir("injection")
+
+                            # set path to param file
                             matlab_param_file = cwdstr + "/input/parameters_simulation_" \
                                 + set + "_" + str(scale_counter) + "_" + str(i) + ".txt"
                             node.set_param_file(matlab_param_file)
-                            node.set_x_jobnum(i+iWindow*jobsPerWindow)
-                            node.set_output_dir( os.path.join( cwdstr \
-                                + '/output/simulations_' + set + '_' + str(scale_counter) ) )
-                            node.set_x_injnum("%d"%(thisSegmentInjStart+iInjRange*maxInjNum+1) + "-" \
-                                + "%d"%(thisSegmentInjStart+min((iInjRange+1)*maxInjNum,thisSegmentInjNumber)))
-                            mergenode.add_parent(node)
+
+                            #node.set_output_dir(os.path.join(cwdstr, "output", "off_source"))
+                            min_injection_number = thisSegmentInjStart + iInjRange*maxInjNum
+                            max_injection_number = thisSegmentInjStart + min((iInjRange+1)*maxInjNum, thisSegmentInjNumber)
+                            job_range = [str(i) for i in range(min_injection_number, max_injection_number)]
+
+                            # Set injection number which for background jobs is 0
+                            node.set_x_injnum(' '.join(job_range))
+
                             node.set_retry(retryNumber)
                             # ---- Prepend human readable description to node name.
                             node.set_name("xdetection_simulation_" + set +  "_seg" + \
@@ -2291,19 +2291,19 @@ if cp.has_section('waveforms') :
                                 + "_injRange" + str(iInjRange) + "_" + node.get_name())
                             dag.add_node(node)
                             # ---- Add job node to the dag.
-            # ---- Continue on to the next injection scale.
-            # point to already produced injection results if provided
-            if reUseInj:
+          # ---- Continue on to the next injection scale.
+          # point to already produced injection results if provided
+          if reUseInj:
                 mergenode.set_dir_prefix(mergingCutsPath + '/../output/simulations_' + set + '_' + str(scale_counter) + '/')
-            else:
+          else:
                 mergenode.set_dir_prefix('simulations_' + set + '_' + str(scale_counter) + '/')
-            mergenode.set_sn_flag("0 " + mergingCutsString)
-            mergenode.set_retry(retryNumber)
-            # ---- Prepend human readable description to node name.
-            mergenode.set_name("xmerge_simulation_" + set + "_injScale" \
+          mergenode.set_sn_flag("0 " + mergingCutsString)
+          mergenode.set_retry(retryNumber)
+          # ---- Prepend human readable description to node name.
+          mergenode.set_name("xmerge_simulation_" + set + "_injScale" \
                             + str(scale_counter) + "_" + mergenode.get_name())
-            dag.add_node(mergenode)
-            if smartCluster == True:
+          dag.add_node(mergenode)
+          if smartCluster == True:
               # ---- Point to already produced injection results if provided.
               if reUseInj:
                   mergeclusterednode.set_dir_prefix(mergingCutsPath + '/../output/simulations_' \
@@ -2317,7 +2317,6 @@ if cp.has_section('waveforms') :
               mergeclusterednode.set_name("xmergeclustered_simulation_" + set + "_injScale" \
                   + str(scale_counter) + "_" + mergeclusterednode.get_name())
               dag_clustered.add_node(mergeclusterednode)
-            scale_counter = scale_counter + 1
 
         # ---- Write out the submit files needed by condor.
         dag.write_sub_files()
@@ -2493,6 +2492,7 @@ if cp.has_option('mdc','mdc_sets') :
                 for iSegRange in segJobs :
                     for iInjRange in injJobs :
                         node = xcondor.XsearchNode(job)
+
                         matlab_param_file = cwdstr + "/input/parameters_" + set \
                             + "_" + str(scale_counter) + ".txt"
                         node.set_param_file(matlab_param_file)

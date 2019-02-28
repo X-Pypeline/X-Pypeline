@@ -9,6 +9,7 @@ from xpipeline.core.xtimefrequencymap import csc_XSparseTimeFrequencyMap
 from xpipeline.waveform import xinjectsignal
 from xpipeline.setuputils import log
 from gwpy.table import EventTable
+from gwpy.signal import filter_design
 
 import pandas
 import numpy
@@ -111,9 +112,12 @@ fft_lengths = [float(fft) for fft in parameters['analysistimes'].split(',')]
 min_fftlength = min(fft_lengths)
 likelihoods = parameters['likelihoodtype'].split(',')
 
-channel_names = parameters['channelFileName']
+channel_names_file = parameters['channelFileName']
 channel_names = [chan.rstrip('\n').split(' ')[0]
-                 for chan in open(channel_names)]
+                 for chan in open(channel_names_file)]
+frame_types = [chan.rstrip('\n').split(' ')[1]
+               for chan in open(channel_names_file)]
+frame_types = dict(zip(channel_names, frame_types))
 
 ifos = [chan.split(':')[0] for chan in channel_names]
 
@@ -144,11 +148,10 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
     start_time = event_time - block_time / 2;
 
     # likelihoods to analze
-    try:
-        analysis_data = XTimeSeries.read('examples/Oct_10_2015_data.hdf5',)
-    except:
-        analysis_data = XTimeSeries.retrieve_data(event_time, block_time,
-                                         channel_names, sample_frequency)
+    time_slides = dict(zip(channel_names, time_slide))
+    analysis_data = XTimeSeries.retrieve_data(event_time, block_time,
+                                              channel_names, sample_frequency,
+                                              frame_types=frame_types, time_slides=time_slides)
 
     # Are we doing injections and if so how many injection scales are we doing?
     if args.job_type == 'injection':
@@ -161,8 +164,8 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
     else:
     # If not doing injections there are no injections scales (similarly there
     # are no injection numbers to be done)
-        injection_scales = []
-        injection_numbers = []
+        injection_scales = [None]
+        injection_numbers = [None]
 
     for injection_scale in injection_scales:
         for injection_number in injection_numbers:
@@ -177,6 +180,9 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                 data = analysis_data.inject(injection_data)
             else:
                 data = analysis_data.copy()
+
+            # high pass filter the data
+            data = data.highpass(minimum_frequency,)
 
             # Get the ASDs that will be used to whiten the data
             asds = data.asd(whitening_length)
@@ -261,10 +267,10 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                     surviving_pixels['excess_energy'] = fft_grams.to_sparse(tindex, findex, phi=phi, theta=theta)
                     for k, v in surviving_pixels.items():
                         if args.job_type == 'injection':
-                            v.write(filename='sn-analysis.h5',
-                                  path='/{0}/event_{1}_slide_{2}/waveform_{3}/injection_scale_{4}/injection_number_{5}'.format(args.job_type, event_time, '_'.join(time_slide.astype(str).tolist()), waveform_name, str(injection_scale).replace('.', 'd'), injection_number,),
+                            v.write(filename='grb.h5',
+                                  path='/{0}/event_{1}_slide_{2}/waveform_{3}/injection_scale_{4}/injection_number_{5}'.format(args.job_type, int(event_time), '_'.join(time_slide.astype(str).tolist()), waveform_name, str(injection_scale).replace('.', 'd'), injection_number,),
                                   table_description=table_description)
                         else:
-                            v.write(filename='sn-analysis.h5',
-                                  path='/{0}/event_{1}_slide_{2}/'.format(args.job_type, event_time, '_'.join(time_slide.astype(str).tolist()),),
+                            v.write(filename='grb.h5',
+                                  path='/{0}/event_{1}_slide_{2}'.format(args.job_type, int(event_time), '_'.join(time_slide.astype(str).tolist()),),
                                   table_description=table_description)

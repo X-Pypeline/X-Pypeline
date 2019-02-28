@@ -29,6 +29,7 @@ from xpipeline.cluster import clusterproperties
 from ..cluster.cluster import XCluster
 from .xfrequencyseries import XFrequencySeriesDict
 from .sparse import csc_sparse_map
+from filelock import Timeout, FileLock
 
 import operator
 import numpy
@@ -484,39 +485,41 @@ class csc_XSparseTimeFrequencyMap(csc_sparse_map):
             'energy' : tables.ComplexCol(itemsize=16, shape=self.energy.size),
             }
         
-        h5file = tables.open_file('{0}'.format(filename), mode="a", title="Sparse Time Frequency Maps")
-        # check if table already exists in this path
-        try:
-            table = list(h5file.walk_nodes(path, "Table"))[0]
-        except:
-            # If these groups do not exist then create a new table inside of path
-            table = h5file.create_table(path, 'event', table_description, "maps", createparents=True)
+        lock = FileLock(filename + '.lock',)
+        with lock:
+            h5file = tables.open_file('{0}'.format(filename), mode="a", title="Sparse Time Frequency Maps")
+            # check if table already exists in this path
+            try:
+                table = list(h5file.walk_nodes(path, "Table"))[0]
+            except:
+                # If these groups do not exist then create a new table inside of path
+                table = h5file.create_table(path, 'event', table_description, "maps", createparents=True)
 
-        event = table.row
-        x = numpy.zeros(event['x'].size)
-        x[:self.tindex.size] = self.tindex
+            event = table.row
+            x = numpy.zeros(event['x'].size)
+            x[:self.tindex.size] = self.tindex
 
-        y = numpy.zeros(event['y'].size)
-        y[:self.findex.size] = self.findex
+            y = numpy.zeros(event['y'].size)
+            y[:self.findex.size] = self.findex
 
-        energy = numpy.zeros(event['energy'].size, dtype='complex')
-        energy[:self.energy.size] = self.energy
+            energy = numpy.zeros(event['energy'].size, dtype='complex')
+            energy[:self.energy.size] = self.energy
 
-        event['dx'] = self.dx
-        event['dy'] = self.dy
-        event['x0'] = self.x0
-        event['y0'] = self.y0
-        event['phi'] = self.phi
-        event['theta'] = self.theta
-        event['shape'] = self.shape
-        event['map_type'] = self.map_type
-        event['ifo'] = self.name
-        event['x'] = x
-        event['y'] = y
-        event['energy'] = energy
-        event.append()
-        table.flush()
-        h5file.close()
+            event['dx'] = self.dx
+            event['dy'] = self.dy
+            event['x0'] = self.x0
+            event['y0'] = self.y0
+            event['phi'] = self.phi
+            event['theta'] = self.theta
+            event['shape'] = self.shape
+            event['map_type'] = self.map_type
+            event['ifo'] = self.name
+            event['x'] = x
+            event['y'] = y
+            event['energy'] = energy
+            event.append()
+            table.flush()
+            h5file.close()
         return
 
     @classmethod

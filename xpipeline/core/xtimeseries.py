@@ -21,6 +21,7 @@ import numpy
 
 from gwpy.timeseries import TimeSeriesDict
 from gwpy.timeseries import TimeSeries
+from gwpy.signal import filter_design
 from .xfrequencyseries import XFrequencySeriesDict
 from .xtimefrequencymap import XTimeFrequencyMapDict, XTimeFrequencyMap
 from collections import OrderedDict
@@ -32,7 +33,7 @@ class XTimeSeries(TimeSeriesDict):
     @classmethod
     def retrieve_data(cls, event_time, block_time,
                       channel_names, sample_frequency,
-                      frametype=None, **kwargs):
+                      **kwargs):
         """Obtain data for either on source, off source, or injections.
 
         This uses the gwpy `TimeSeriesDict.get` method
@@ -51,9 +52,8 @@ class XTimeSeries(TimeSeriesDict):
         sample_frequency (`int`):
             sample rate of the data desired
 
-        frame_types : `str`, optional
-            name of frametype in which this channel is stored, by default
-            will search for all required frame types
+        frame_types : `dict`, optional
+            key channel and value frametype in whcih the channel is stored
 
         verbose : `bool`, optional
             print verbose output about NDS progress.
@@ -62,36 +62,54 @@ class XTimeSeries(TimeSeriesDict):
 
             `TimeSeriesDict` :
         """
+        # Default is you do not want a timeslided dictionary
+        # of timeseries
+        time_slides = kwargs.pop('time_slides', {det : 0 for det in channel_names})
+        if not isinstance(time_slides, dict):
+            raise ValueError("time_slides must be supplied "
+                              "in the form of a dict "
+                              "with key channel and value integer "
+                              "time to slide start and stop time")
+
+        # If frametype is None then make dictionary
+        # of key channel and value None
+        frame_types = kwargs.pop('frame_types', {det : None for det in channel_names})
+        if not isinstance(time_slides, dict):
+            raise ValueError("frame_types must be supplied "
+                              "in the form of a dict "
+                              "with key channel and value frametype "
+                              "assosciated with that channel")
+
         #----- Start and stop time for this event.
         start_time = event_time - block_time / 2;
         stop_time = event_time + block_time / 2;
 
-        # Retrieve data and then resample and set epoch
         try:
-            data = cls.get(
-                           channel_names,
-                           start_time, stop_time,
-                           frametype=frametype,
-                           **kwargs
-                          )
+            data = cls()
+            for det in channel_names:
+                data.append({det : TimeSeries.get(det,
+                                           start_time + time_slides[det],
+                                           stop_time + time_slides[det],
+                                           frametype=frame_types[det],
+                                           **kwargs
+                                          )
+                             })
         except:
+            # Retrieve data useing the get classmethod 
             data = cls()
             for det in channel_names:
                 data.append({det : TimeSeries.fetch_open_data(
                                                               det.split(':')[0],
-                                           start_time, stop_time,
+                                           start_time + time_slides[det],
+                                           stop_time + time_slides[det],
                                            sample_rate=sample_frequency,
                                            **kwargs
                                           )
-                             })
+                                 })
 
         for key, series in data.items():
             if series.sample_rate.decompose().value != sample_frequency:
                 data[key] = series.resample(sample_frequency)
-
-        for (idet, iseries) in data.items():
-            # set epoch of timeseries to the event_time
-            iseries.epoch = start_time
 
         # set one of the detectors to be the reference detecotr
         # for any future coherent combinations
@@ -250,6 +268,18 @@ class XTimeSeries(TimeSeriesDict):
 
         return whitened_timeseries
 
+    def highpass(self, frequency):
+        """Design a high-pass filter.
+        
+        Parameters
+        ----------
+        fhigh : `float`
+            high-pass corner frequency
+        """
+        for k, v in self.items():
+            self[k] = v.highpass(frequency)
+
+        return self
 
     def spectrogram(self, fftlength):
         """Obtain the spectrograms of items in this dict.
