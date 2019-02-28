@@ -8,7 +8,6 @@
 import sys, os, shutil, math, random, copy, getopt, re, string, time
 import glob, operator, argparse, socket, socket, uuid, pdb
 import numpy as np
-from glue import segments
 #from glue import pipeline
 from glue import datafind
 from numpy import loadtxt
@@ -20,8 +19,7 @@ import lal
 
 import json
 
-#from xpipeline import xcondor, xparseoutputtype
-from xpipeline import xparseoutputtype
+from xpipeline import xcondor, xparseoutputtype
 from xpipeline.skyutils import skyutils
 from xpipeline.io import utils as ioutils
 from xpipeline.setuputils import utils as setuputils
