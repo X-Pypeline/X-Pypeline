@@ -82,7 +82,7 @@ install_requires = [
     'lalsuite',
     'cython',
     'gwpy>=0.12',
-    'lscsoft-glue',
+    'lscsoft-glue>=2.0.0',
     'pandas >= 0.22 ; python_version >= \'3.5\'',
     'pandas < 0.21 ; python_version == \'3.4\'',
     'pandas >= 0.22 ; python_version == \'2.7\'',
