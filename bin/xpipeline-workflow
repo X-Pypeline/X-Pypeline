@@ -8,14 +8,15 @@
 import sys, os, shutil, math, random, copy, getopt, re, string, time
 import glob, operator, argparse, socket, socket, uuid, pdb
 import numpy as np
-#from glue import pipeline
-from glue import datafind
+from glue import pipeline
 from numpy import loadtxt
 
 from six.moves.configparser import ConfigParser
 from six.moves import reduce
 
 import lal
+import gwdatafind
+from lal.utils import CacheEntry
 
 import json
 
@@ -27,6 +28,7 @@ from xpipeline.setuputils import xnetworkselection, log
 
 from gwpy.detector import Channel
 from gwpy.segments import SegmentList, Segment
+from gwpy.io.cache import write_cache
 
 def parse_commandline():
     parser = argparse.ArgumentParser(description="Script for setting up \
@@ -608,11 +610,15 @@ else:
     logger.info("Writing framecache file for ifo data...")
     f = open(frameCacheAll, 'w')
     f.close()
-    connection = datafind.GWDataFindHTTPConnection()
+    connection = gwdatafind.connect()
     for (iframetype, idet) in zip(frameType, detector):
         logger.info("Writing framecache file for detector {0} and frameType {1}...".format(idet, iframetype))
-        cache = connection.find_frame_urls(idet.strip('1')[0], iframetype, start_time, end_time, urltype='file')
-        cache.tofile(open(frameCacheAll, 'a+'))
+        cache = connection.find_urls(idet[0], iframetype, start_time, end_time, urltype='file')
+        with open(frameCacheAll, 'a+') as fobj:
+            write_cache(map(CacheEntry.from_T050017, cache), fobj)
+    logger.info("Convert lal style frame cache to MATLAB style")
+    os.system('convertlalcache.pl {0} {0}_temp.txt'.format(frameCacheAll))
+    os.system('cat {0}_temp.txt > {0}'.format(frameCacheAll))
 
     # ---- Status message.
     logger.info("... finished writing framecache file for ifo data")
@@ -948,8 +954,8 @@ for iSeg in range(len(coincidence_on_source_segment_chunks)):
         #      compute a list of sky positions we need to search and write these to a
         #      file.
 
+        skyPosFilename = 'input/sky_positions_' + str(iSeg) + '.txt'
         if int(cp.get('input','usexchooseskylocations')) and sky_pos_err:
-            skyPosFilename = 'input/sky_positions_' + str(iSeg) + '.txt'
             logger.info("Calling xconvertskylocations to generate {0}".format(skyPosFilename))
             xconvertskylocationsCall = ' '.join([ "xconvertskylocations",
                 str(skyPosFilename_trigger),
@@ -986,7 +992,9 @@ for iSeg in range(len(coincidence_on_source_segment_chunks)):
 
             # ---- Set skyPositionList arg that will be written to matlab format
             #      parameters files.
-            skyPositionList = '[' + str(theta) + ',' + str(phi) + ']'
+            with open(skyPosFilename, 'w') as f:
+                f.write(str(theta) + ' ' + str(phi) + ' 1.00000 0.02716')
+            skyPositionList = skyPosFilename
 
     elif args.search_type in ['sn', 'allsky']:
 
@@ -2179,9 +2187,6 @@ if cp.has_section('waveforms') :
                     + str(scale_counter) + "_" + mergeclusterednode[scale_counter].get_name())
                 dag_clustered.add_node(mergeclusterednode[scale_counter])
         else:
-          # ---- Loop over injection scales.
-          scale_counter = 0
-          for injectionScale in injectionScales :
             mergenode = xcondor.XmergeNode(mergejob)
             if xtmvaFlag:
               xtmvanode.add_parent(mergenode)
@@ -2274,18 +2279,18 @@ if cp.has_section('waveforms') :
                         for iInjRange in range(int(math.ceil(float(thisSegmentInjNumber)/float(maxInjNum)))) :
                             node = xcondor.XsearchNode(job)
                             matlab_param_file = cwdstr + "/input/parameters_simulation_" \
-                                + set + "_" + str(scale_counter) + "_" + str(i) + ".txt"
+                                + set + "_" + str(0) + "_" + str(i) + ".txt"
                             node.set_param_file(matlab_param_file)
                             node.set_x_jobnum(i+iWindow*jobsPerWindow)
                             node.set_output_dir( os.path.join( cwdstr \
-                                + '/output/simulations_' + set + '_' + str(scale_counter) ) )
+                                + '/output/simulations_' + set + '_' + str(0) ) )
                             node.set_x_injnum("%d"%(thisSegmentInjStart+iInjRange*maxInjNum+1) + "-" \
                                 + "%d"%(thisSegmentInjStart+min((iInjRange+1)*maxInjNum,thisSegmentInjNumber)))
                             mergenode.add_parent(node)
                             node.set_retry(retryNumber)
                             # ---- Prepend human readable description to node name.
                             node.set_name("xdetection_simulation_" + set +  "_seg" + \
-                                str(i+iWindow*jobsPerWindow) + "_injScale" + str(scale_counter) \
+                                str(i+iWindow*jobsPerWindow) + "_injScale" + str(0) \
                                 + "_injRange" + str(iInjRange) + "_" + node.get_name())
                             dag.add_node(node)
                             # ---- Add job node to the dag.
@@ -2315,7 +2320,6 @@ if cp.has_section('waveforms') :
               mergeclusterednode.set_name("xmergeclustered_simulation_" + set + "_injScale" \
                   + str(scale_counter) + "_" + mergeclusterednode.get_name())
               dag_clustered.add_node(mergeclusterednode)
-            scale_counter = scale_counter + 1
 
         # ---- Write out the submit files needed by condor.
         dag.write_sub_files()
