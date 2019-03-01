@@ -10,6 +10,7 @@ from xpipeline.waveform import xinjectsignal
 from xpipeline.setuputils import log
 from gwpy.table import EventTable
 from gwpy.signal import filter_design
+from functools import reduce
 
 import pandas
 import numpy
@@ -83,10 +84,27 @@ parameters = dict(line.rstrip('\n').split(':', 1) for line in open(args.paramete
 
 applycalibcorrection = parameters['applycalibcorrection']
 
+# How mcuh data are you analyzing (standard is 256s)
 block_time = int(parameters['blocktime'])
 
+# Determine channels and frames being used for the analysis
+channel_names_file = parameters['channelFileName']
+channel_names = [chan.rstrip('\n').split(' ')[0]
+                 for chan in open(channel_names_file)]
+frame_types = [chan.rstrip('\n').split(' ')[1]
+               for chan in open(channel_names_file)]
+frame_types = dict(zip(channel_names, frame_types))
+
+ifos = [chan.split(':')[0] for chan in channel_names]
+
+# Minimum and Maximum search frequency range
 minimum_frequency = int(parameters['minimumfrequency'])
 maximum_frequency = int(parameters['maximumfrequency'])
+
+# Sample frequency
+sample_frequency = float(parameters['samplefrequency'])
+
+# What overlap are you using for our ffts (standard is 50%)
 offset_fraction = float(parameters['offsetfraction'])
 
 frame_file = parameters['frameCacheFile']
@@ -94,7 +112,28 @@ whitening_length = int(parameters['whiteningtime'])
 transient_time = 4.0
 
 if 'circtimeslidestep' in parameters.keys():
+    slides = {}
     circ_time_slides = int(parameters['circtimeslidestep'])
+    nchannels = len(channel_names)
+    if nchannels == 1:
+        slides[channel_names[0]] = numpy.zeros(1)
+    elif nchannels == 2:
+        internal_slides = numpy.arange(0, (block_time - 2*transient_time -
+                                           circ_time_slides),
+                                       circ_time_slides).astype(int)
+        slides[channel_names[0]] = numpy.zeros(internal_slides.size)
+        slides[channel_names[1]] = internal_slides
+    elif nchannels == 3:
+        internal_slides = numpy.arange(0, (block_time / 2 - transient_time -
+                                           circ_time_slides),
+                                       circ_time_slides).astype(int)
+        slides[channel_names[0]] = numpy.zeros(internal_slides.size)
+        slides[channel_names[1]] = internal_slides
+        slides[channel_names[2]] = -internal_slides
+    else:
+        raise ValueError("The circular time slides are not "
+                         "implemented for the requested "
+                         "number of detectors: {0}".format(nchannels))
 else:
     circ_time_slides = None
 
@@ -111,17 +150,6 @@ seed = int(parameters['seed'])
 fft_lengths = [float(fft) for fft in parameters['analysistimes'].split(',')]
 min_fftlength = min(fft_lengths)
 likelihoods = parameters['likelihoodtype'].split(',')
-
-channel_names_file = parameters['channelFileName']
-channel_names = [chan.rstrip('\n').split(' ')[0]
-                 for chan in open(channel_names_file)]
-frame_types = [chan.rstrip('\n').split(' ')[1]
-               for chan in open(channel_names_file)]
-frame_types = dict(zip(channel_names, frame_types))
-
-ifos = [chan.split(':')[0] for chan in channel_names]
-
-sample_frequency = float(parameters['samplefrequency'])
 
 numpy.random.seed(seed)
 max_pixels = int(1./offset_fraction * 1./min_fftlength * block_time * (sample_frequency/2 * min_fftlength + 1) *len(ifos)* 0.01)
@@ -211,6 +239,15 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
 
                 # Make a spectrogram that contains phase information
                 fft_grams_fixed = whitened_timeseries.fftgram(fft_length)
+
+                # determine how many indices every pixel needs to move
+                # with respect to the internal time slides
+                final_time_bin_idx = fft_grams_fixed[channel_names[0]].shape[0]
+                if circ_time_slides is not None:
+                    slide_pixels = {k: v * 1./fft_length * 1./offset_fraction for k,v in slides.items()}
+                else:
+                    slide_pixels = {k: [0] for k in channel_names}
+
                 fft_grams = fft_grams_fixed.copy()
                 for (sky_position, time_delay) in zip(sky_positions, time_delays):
                     phi = sky_position['phi']
@@ -245,32 +282,38 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                     # Turn off the bottom 99 percent of pixels (i.e. set to 0)
                     energy_maps_zeroed = energy_maps.blackout_pixels(99)
 
-                    # Add maps together and then back extract the t-f indices
-                    # of the pixels, these will represent all t-f pixels used
-                    # in our analysis and new sparse tf maps will need
-                    # to be made for the individual ifos
-                    coh_energy_maps_zeroed = energy_maps_zeroed.to_coherent()
+                    # Calculate all time slides
+                    tindex_findex_slided = {k : zip(numpy.mod(numpy.repeat(numpy.atleast_2d(energy_maps_zeroed[k].nonzero()[0]), len(v),0) + numpy.atleast_2d(v).T, final_time_bin_idx).astype(int), numpy.repeat(numpy.atleast_2d(energy_maps_zeroed[k].nonzero()[1]), len(v), 0))  for k,v in slides.items()}
 
-                    # find nonzero pixels indicies
-                    tf_indices = coh_energy_maps_zeroed.nonzero()
+                    # Make every TF pixels pair in all maps
+                    all_maps_pixel_pairs = [zip(i[0], i[1]) for k,v in tindex_findex_slided.items() for i in v]
+                    array_of_tf_pixels_per_slide_per_det = numpy.asarray(all_maps_pixel_pairs).reshape(-1, internal_slides.size,)
 
-                    # If we are doing internal time slides we should register the time bins
-                    # as these are the only things that will be shifted for any
-                    # detectors
-                    tindex = {k : tf_indices[0] for k in energy_maps}
-                    findex = {k : tf_indices[1] for k in energy_maps}
+                    # all coherent tf pixels accross all maps
+                    all_pixels = numpy.apply_along_axis(lambda x: reduce(lambda x, y: set(x).union(y), x.tolist()), 0, array_of_tf_pixels_per_slide_per_det)
 
-                    # Now that we have the pixels that are in each map
-                    # let's reconstruct the sparse tf map
-                    # Now with pixels from both detectors
-                    surviving_pixels = {k : v.to_sparse(tindex, findex) for k, v in projected_fftmaps.items()}
-                    surviving_pixels['excess_energy'] = fft_grams.to_sparse(tindex, findex, phi=phi, theta=theta)
-                    for k, v in surviving_pixels.items():
-                        if args.job_type == 'injection':
-                            v.write(filename='grb.h5',
-                                  path='/{0}/event_{1}_slide_{2}/waveform_{3}/injection_scale_{4}/injection_number_{5}'.format(args.job_type, int(event_time), '_'.join(time_slide.astype(str).tolist()), waveform_name, str(injection_scale).replace('.', 'd'), injection_number,),
-                                  table_description=table_description)
-                        else:
-                            v.write(filename='grb.h5',
-                                  path='/{0}/event_{1}_slide_{2}'.format(args.job_type, int(event_time), '_'.join(time_slide.astype(str).tolist()),),
-                                  table_description=table_description)
+                    for coherent_pixels, circular_time_slide in zip(all_pixels, internal_slides):
+                        
+                        # extract the tindices and the findices
+                        tindex, findex = zip(*coherent_pixels)
+                        tindex = numpy.asarray(tindex)
+                        findex = numpy.asarray(findex)
+                           
+                        # extract the tindices and the findices
+                        tindex = {k : tindex for k in channel_names}
+                        findex = {k : findex for k in channel_names}
+
+                        # Now that we have the pixels that are in each map
+                        # let's reconstruct the sparse tf map
+                        # Now with pixels from both detectors
+                        surviving_pixels = {k : v.to_sparse(tindex, findex) for k, v in projected_fftmaps.items()}
+                        surviving_pixels['excess_energy'] = fft_grams.to_sparse(tindex, findex, phi=phi, theta=theta)
+                        for k, v in surviving_pixels.items():
+                            if args.job_type == 'injection':
+                                v.write(filename='grb.h5',
+                                      path='/{0}/event_{1}_slide_{2}/waveform_{3}/injection_scale_{4}/injection_number_{5}'.format(args.job_type, int(event_time), '_'.join(time_slide.astype(str).tolist()), waveform_name, str(injection_scale).replace('.', 'd'), injection_number,),
+                                      table_description=table_description)
+                            else:
+                                v.write(filename='grb.h5',
+                                      path='/{0}/event_{1}_external_slide_{2}/internal_slide_{3}'.format(args.job_type, int(event_time), '_'.join(time_slide.astype(str).tolist()), circular_time_slide),
+                                      table_description=table_description)

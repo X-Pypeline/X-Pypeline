@@ -8,7 +8,6 @@
 import sys, os, shutil, math, random, copy, getopt, re, string, time
 import glob, operator, argparse, socket, socket, uuid, pdb
 import numpy as np
-from glue import datafind
 from glue import pipeline
 from numpy import loadtxt
 
@@ -16,6 +15,8 @@ from six.moves.configparser import ConfigParser
 from six.moves import reduce
 
 import lal
+import gwdatafind
+from lal.utils import CacheEntry
 
 import json
 
@@ -27,6 +28,7 @@ from xpipeline.setuputils import xnetworkselection, log
 
 from gwpy.detector import Channel
 from gwpy.segments import SegmentList, Segment
+from gwpy.io.cache import write_cache
 
 def parse_commandline():
     parser = argparse.ArgumentParser(description="Script for setting up \
@@ -608,11 +610,15 @@ else:
     logger.info("Writing framecache file for ifo data...")
     f = open(frameCacheAll, 'w')
     f.close()
-    connection = datafind.GWDataFindHTTPConnection()
+    connection = gwdatafind.connect()
     for (iframetype, idet) in zip(frameType, detector):
         logger.info("Writing framecache file for detector {0} and frameType {1}...".format(idet, iframetype))
-        cache = connection.find_frame_urls(idet.strip('1')[0], iframetype, start_time, end_time, urltype='file')
-        cache.tofile(open(frameCacheAll, 'a+'))
+        cache = connection.find_urls(idet[0], iframetype, start_time, end_time, urltype='file')
+        with open(frameCacheAll, 'a+') as fobj:
+            write_cache(map(CacheEntry.from_T050017, cache), fobj)
+    logger.info("Convert lal style frame cache to MATLAB style")
+    os.system('convertlalcache.pl {0} {0}_temp.txt'.format(frameCacheAll))
+    os.system('cat {0}_temp.txt > {0}'.format(frameCacheAll))
 
     # ---- Status message.
     logger.info("... finished writing framecache file for ifo data")
@@ -949,6 +955,7 @@ for iSeg in range(len(coincidence_on_source_segment_chunks)):
         #      file.
         skyPosFilename = 'input/sky_positions_' + str(iSeg) + '.txt'
 
+        skyPosFilename = 'input/sky_positions_' + str(iSeg) + '.txt'
         if int(cp.get('input','usexchooseskylocations')) and sky_pos_err:
             logger.info("Calling xconvertskylocations to generate {0}".format(skyPosFilename))
             xconvertskylocationsCall = ' '.join([ "xconvertskylocations",
@@ -2217,20 +2224,18 @@ if cp.has_section('waveforms') :
                     + str(scale_counter) + "_" + mergeclusterednode[scale_counter].get_name())
                 dag_clustered.add_node(mergeclusterednode[scale_counter])
         else:
-          # ---- Loop over injection scales.
-          scale_counter = 0
-          mergenode = xcondor.XmergeNode(mergejob)
-          if xtmvaFlag:
-            xtmvanode.add_parent(mergenode)
-          if smartCluster == True:
-            mergeclusterednode = xcondor.XmergeClusteredNode(mergeclusteredjob)
-          # Skip injection trigger production if path to already available triggers provided
-          if not(reUseInj):
-            # ---- Loop over segments
-            for i in range(len(segmentList)):
-              # ---- For debug only
-              #print('We do not have injections that are done at the block border, we use standard GRB injection placing')
-              if  0 == maxInjNum:
+            mergenode = xcondor.XmergeNode(mergejob)
+            if xtmvaFlag:
+              xtmvanode.add_parent(mergenode)
+            if smartCluster == True:
+              mergeclusterednode = xcondor.XmergeClusteredNode(mergeclusteredjob)
+            # Skip injection trigger production if path to already available triggers provided
+            if not(reUseInj):
+              # ---- Loop over segments
+              for i in range(len(segmentList)):
+                # ---- For debug only
+                #print('We do not have injections that are done at the block border, we use standard GRB injection placing')
+                if  0 == maxInjNum:
                     # ---- Create job node.
                     node = xcondor.XsearchNode(job)
 
@@ -2273,7 +2278,7 @@ if cp.has_section('waveforms') :
 
                             # set path to param file
                             matlab_param_file = cwdstr + "/input/parameters_simulation_" \
-                                + set + "_" + str(scale_counter) + "_" + str(i) + ".txt"
+                                + set + "_" + str(0) + "_" + str(i) + ".txt"
                             node.set_param_file(matlab_param_file)
 
                             #node.set_output_dir(os.path.join(cwdstr, "output", "off_source"))
@@ -2287,36 +2292,36 @@ if cp.has_section('waveforms') :
                             node.set_retry(retryNumber)
                             # ---- Prepend human readable description to node name.
                             node.set_name("xdetection_simulation_" + set +  "_seg" + \
-                                str(i+iWindow*jobsPerWindow) + "_injScale" + str(scale_counter) \
+                                str(i+iWindow*jobsPerWindow) + "_injScale" + str(0) \
                                 + "_injRange" + str(iInjRange) + "_" + node.get_name())
                             dag.add_node(node)
                             # ---- Add job node to the dag.
-          # ---- Continue on to the next injection scale.
-          # point to already produced injection results if provided
-          if reUseInj:
-                mergenode.set_dir_prefix(mergingCutsPath + '/../output/simulations_' + set + '_' + str(scale_counter) + '/')
-          else:
-                mergenode.set_dir_prefix('simulations_' + set + '_' + str(scale_counter) + '/')
-          mergenode.set_sn_flag("0 " + mergingCutsString)
-          mergenode.set_retry(retryNumber)
-          # ---- Prepend human readable description to node name.
-          mergenode.set_name("xmerge_simulation_" + set + "_injScale" \
-                            + str(scale_counter) + "_" + mergenode.get_name())
-          dag.add_node(mergenode)
-          if smartCluster == True:
-              # ---- Point to already produced injection results if provided.
-              if reUseInj:
-                  mergeclusterednode.set_dir_prefix(mergingCutsPath + '/../output/simulations_' \
-                      + set + '_' + str(scale_counter) + '/')
-              else :
-                  mergeclusterednode.set_dir_prefix('simulations_' + set + '_' + str(scale_counter) + '/')
-              mergeclusterednode.set_sn_flag("1 " + mergingCutsString)
-              mergeclusterednode.set_sc_flag("1")
-              mergeclusterednode.set_retry(retryNumberClustered)
-              # ---- Prepend human readable description to node name.
-              mergeclusterednode.set_name("xmergeclustered_simulation_" + set + "_injScale" \
-                  + str(scale_counter) + "_" + mergeclusterednode.get_name())
-              dag_clustered.add_node(mergeclusterednode)
+            # ---- Continue on to the next injection scale.
+            # point to already produced injection results if provided
+            if reUseInj:
+                    mergenode.set_dir_prefix(mergingCutsPath + '/../output/simulations_' + set + '_' + str(scale_counter) + '/')
+            else:
+                    mergenode.set_dir_prefix('simulations_' + set + '_' + str(scale_counter) + '/')
+            mergenode.set_sn_flag("0 " + mergingCutsString)
+            mergenode.set_retry(retryNumber)
+            # ---- Prepend human readable description to node name.
+            mergenode.set_name("xmerge_simulation_" + set + "_injScale" \
+                                + str(scale_counter) + "_" + mergenode.get_name())
+            dag.add_node(mergenode)
+            if smartCluster == True:
+                  # ---- Point to already produced injection results if provided.
+                  if reUseInj:
+                      mergeclusterednode.set_dir_prefix(mergingCutsPath + '/../output/simulations_' \
+                          + set + '_' + str(scale_counter) + '/')
+                  else :
+                      mergeclusterednode.set_dir_prefix('simulations_' + set + '_' + str(scale_counter) + '/')
+                  mergeclusterednode.set_sn_flag("1 " + mergingCutsString)
+                  mergeclusterednode.set_sc_flag("1")
+                  mergeclusterednode.set_retry(retryNumberClustered)
+                  # ---- Prepend human readable description to node name.
+                  mergeclusterednode.set_name("xmergeclustered_simulation_" + set + "_injScale" \
+                      + str(scale_counter) + "_" + mergeclusterednode.get_name())
+                  dag_clustered.add_node(mergeclusterednode)
 
         # ---- Write out the submit files needed by condor.
         dag.write_sub_files()
