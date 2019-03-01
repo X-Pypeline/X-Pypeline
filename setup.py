@@ -75,12 +75,9 @@ setup_requires = [
 ]
 
 install_requires = [
-    'six',
-    'numpy>=1.10',
-    'scipy>=1.0',
-    'astropy',
-    'lalsuite',
-    'cython',
+    'lalsuite>6.52',
+    'cython>=0.29.5',
+    'filelock>=3.0.10',
     'gwpy>=0.12',
     'lscsoft-glue>=2.0.0',
     'pandas >= 0.22 ; python_version >= \'3.5\'',
