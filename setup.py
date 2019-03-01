@@ -78,7 +78,7 @@ install_requires = [
     'lalsuite>6.52',
     'cython>=0.29.5',
     'filelock>=3.0.10',
-    'tables>=3.4.4'
+    'tables>=3.4.4',
     'gwpy>=0.12',
     'lscsoft-glue>=2.0.0',
     'pandas >= 0.22 ; python_version >= \'3.5\'',
