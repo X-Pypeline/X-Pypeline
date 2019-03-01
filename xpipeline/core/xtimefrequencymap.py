@@ -101,27 +101,6 @@ class XTimeFrequencyMapDict(OrderedDict):
         return XSparseTimeFrequencyMapDict({k: self[k].blackout_pixels(v, **kwargs)
                                      for k,v in blackpixel_percentile.items()})
 
-    def circular_time_slide(self, npixels_to_shift):
-        """slide all maps in dict by specified number of pixels
-
-        Parameters:
-
-            npixels_to_shift : `dict`, `int`
-                either a `dict` of (channel, `int`) pairs for key-wise
-                internal time slide calc. Since it does not make sense
-                to slide all the tfmaps the same number of pixels
-                you must specify a dict with all detectors and pixels to slide.
-
-        Returns:
-            `dict`: key-wise pair of channel
-        """
-        if not isinstance(npixels_to_shift, dict):
-            raise ValueError("Must be a dict")
-
-        return XTimeFrequencyMapDict({key :
-                self[key].circular_time_slide(npixels_to_shift=npix_to_shift)
-                for key, npix_to_shift in npixels_to_shift.items()})
-
     def to_sparse(self, tindex, findex, **kwargs):
         """
 
@@ -270,38 +249,6 @@ class XTimeFrequencyMap(Spectrogram):
                                               self.frequencies.to_value())
         return self * frequency_shift
 
-    def circular_time_slide(self, npixels_to_shift):
-        """Slide the TF pixels of this map
-
-        This should move the appropriate number of time bins
-        such that slide represents a slide in seconds.
-
-        Parameters
-        ----------
-        seconds : `int`,
-            How many seconds we are sliding the map
-
-        sample_frequency : `float`
-            what is the sample frequency of the data
-
-        offset : `float`
-            what offset was used to make this spectrogram
-
-        Returns:
-            `XTimeFrequencyMap`:
-                A time frequency map slide by the appropriate number
-                of seconds
-        """
-        if not npixels_to_shift:
-            return self
-
-        idx = numpy.searchsorted(self.xindex.value,
-                                 numpy.roll(self.xindex.value,
-                                            npixels_to_shift
-                                ))
-
-        return self[idx]
-
     def to_dominant_polarization_frame(self, dpf_asd):
         return self * dpf_asd
 
@@ -360,8 +307,8 @@ class XSparseTimeFrequencyMapDict(OrderedDict):
                                            findex=v.findex, energy=numpy.abs(v.energy),
                                            dx=v.xindex[1] - v.xindex[0],
                                            dy=v.yindex[1] - v.yindex[0],
-                                           x0=self.xindex[0],
-                                           y0=self.yindex[0],
+                                           x0=v.xindex[0],
+                                           y0=v.yindex[0],
                                            name=v.name,
                                            phi=v.phi, theta=v.theta,) for k,v in self.items()})
 

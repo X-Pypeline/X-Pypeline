@@ -300,6 +300,9 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
 
                     for coherent_pixels, circular_time_slide in zip(all_pixels, internal_slides):
                         
+                        # make sure that the coherent time frequency pixels are sorted
+                        coherent_pixels = sorted(coherent_pixels)
+
                         # extract the tindices and the findices
                         tindex, findex = zip(*coherent_pixels)
                         tindex = numpy.asarray(tindex)
