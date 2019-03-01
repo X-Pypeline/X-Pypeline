@@ -22,7 +22,6 @@ from functools import reduce
 
 from gwpy.spectrogram import Spectrogram
 from gwpy.timeseries import TimeSeries
-from gwpy.signal.fft.ui import seconds_to_samples
 
 from xpipeline.cluster import nearestneighbor
 from xpipeline.cluster import clusterproperties
