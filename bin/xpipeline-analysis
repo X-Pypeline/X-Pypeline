@@ -116,7 +116,7 @@ if 'circtimeslidestep' in parameters.keys():
     circ_time_slides = int(parameters['circtimeslidestep'])
     nchannels = len(channel_names)
     if nchannels == 1:
-        slides[channel_names[0]] = numpy.zeros(1)
+        slides[channel_names[0]] = numpy.zeros(1).astype(int)
     elif nchannels == 2:
         internal_slides = numpy.arange(0, (block_time - 2*transient_time -
                                            circ_time_slides),
@@ -136,7 +136,7 @@ if 'circtimeslidestep' in parameters.keys():
                          "number of detectors: {0}".format(nchannels))
 else:
     circ_time_slides = None
-    internal_slides = numpy.zeros(1)
+    internal_slides = numpy.zeros(1).astype(int)
     slides = {k: internal_slides for k in channel_names}
 
 event_file = parameters['eventFileName']
@@ -157,13 +157,13 @@ numpy.random.seed(seed)
 max_pixels = int(1./offset_fraction * 1./min_fftlength * block_time * (sample_frequency/2 * min_fftlength + 1) *len(ifos)* 0.01)
 
 table_description = {
-'dx' : tables.Float64Col(1),
-'dy' : tables.Float64Col(1),
-'x0' : tables.Float64Col(1),
-'y0' : tables.Float64Col(1),
+'dx' : tables.Float64Col(),
+'dy' : tables.Float64Col(),
+'x0' : tables.Float64Col(),
+'y0' : tables.Float64Col(),
 'shape' : tables.Int64Col(2),
-'phi' : tables.Float32Col(1),
-'theta' : tables.Float32Col(1),
+'phi' : tables.Float32Col(),
+'theta' : tables.Float32Col(),
 'map_type' : tables.StringCol(20),
 'ifo' : tables.StringCol(max([len(i) for i in channel_names])),
 'x' : tables.Float64Col(shape=max_pixels),
@@ -315,7 +315,7 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                         # Now that we have the pixels that are in each map
                         # let's reconstruct the sparse tf map
                         # Now with pixels from both detectors
-                        surviving_pixels = {k : v.to_sparse(tindex, findex) for k, v in projected_fftmaps.items()}
+                        surviving_pixels = {k : v.to_sparse(tindex, findex, phi=phi, theta=theta, map_type=k) for k, v in projected_fftmaps.items()}
                         surviving_pixels['excess_energy'] = fft_grams.to_sparse(tindex, findex, phi=phi, theta=theta)
                         for k, v in surviving_pixels.items():
                             if args.job_type == 'injection':

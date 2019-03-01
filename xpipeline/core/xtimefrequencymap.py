@@ -36,7 +36,7 @@ import h5py
 import tables
 
 __author__ = 'Scott Coughlin <scott.coughlin@ligo.org>'
-__all__ = ['csc_XSparseTimeFrequencyMap', 
+__all__ = ['csc_XSparseTimeFrequencyMap',
            'XSparseTimeFrequencyMapDict'
            'XTimeFrequencyMapDict',
            'residual_time_shift', 'XTimeFrequencyMap']
@@ -333,7 +333,7 @@ class XSparseTimeFrequencyMapDict(OrderedDict):
         for k, v in self.items():
             v.pixel_labels = labelled_map
         return
-        
+
 
     def cluster(self, method='nearest_neighbors', **kwargs):
         """Convert dict fo sparse matrix to `XTimeFrequencyMapDict`
@@ -417,20 +417,20 @@ class csc_XSparseTimeFrequencyMap(csc_sparse_map):
         """
         if table_description is None:
             table_description = {
-            'dx' : tables.Float64Col(1),
-            'dy' : tables.Float64Col(1),
-            'x0' : tables.Float64Col(1),
-            'y0' : tables.Float64Col(1),
+            'dx' : tables.Float64Col(),
+            'dy' : tables.Float64Col(),
+            'x0' : tables.Float64Col(),
+            'y0' : tables.Float64Col(),
             'shape' : tables.Int64Col(2),
-            'phi' : tables.Float32Col(1),
-            'theta' : tables.Float32Col(1),
+            'phi' : tables.Float32Col(),
+            'theta' : tables.Float32Col(),
             'map_type' : tables.StringCol(20),
             'ifo' : tables.StringCol(2),
             'x' : tables.Float64Col(shape=self.tindex.size),
             'y' : tables.Float64Col(shape=self.findex.size),
             'energy' : tables.ComplexCol(itemsize=16, shape=self.energy.size),
             }
-        
+
         lock = FileLock(filename + '.lock',)
         with lock:
             h5file = tables.open_file('{0}'.format(filename), mode="a", title="Sparse Time Frequency Maps")
@@ -451,10 +451,10 @@ class csc_XSparseTimeFrequencyMap(csc_sparse_map):
             energy = numpy.zeros(event['energy'].size, dtype='complex')
             energy[:self.energy.size] = self.energy
 
-            event['dx'] = self.dx
-            event['dy'] = self.dy
-            event['x0'] = self.x0
-            event['y0'] = self.y0
+            event['dx'] = self.dx.value
+            event['dy'] = self.dy.value
+            event['x0'] = self.x0.value
+            event['y0'] = self.y0.value
             event['phi'] = self.phi
             event['theta'] = self.theta
             event['shape'] = self.shape
@@ -478,15 +478,7 @@ class csc_XSparseTimeFrequencyMap(csc_sparse_map):
             all other keyword arguments are passed to the plotter as
             appropriate
         """
-        f = h5py.File(filename, 'r')
-        g = f[path]
-        return cls((g['value'][()], (g['tindex'][()], g['findex'][()])),
-                    shape=g.attrs['shape'],
-                    tindex=g['tindex'][()],
-                    findex=g['findex'][()],
-                    energy=g['value'][()],
-                    xindex=numpy.arange(g.attrs['t0'], g.attrs['tmax'] + g.attrs['dt'], g.attrs['dt']),
-                    yindex=numpy.arange(g.attrs['f0'], g.attrs['fmax'] + g.attrs['df'], g.attrs['df']))
+        return
 
     def label(self, connectivity=8):
         """Convert dict fo sparse matrix to `XTimeFrequencyMapDict`
