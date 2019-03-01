@@ -136,6 +136,8 @@ if 'circtimeslidestep' in parameters.keys():
                          "number of detectors: {0}".format(nchannels))
 else:
     circ_time_slides = None
+    internal_slides = numpy.zeros(1)
+    slides = {k: internal_slides for k in channel_names}
 
 event_file = parameters['eventFileName']
 
@@ -171,15 +173,19 @@ table_description = {
 
 # presets
 events = pandas.read_csv(event_file,header=None, delimiter=' ').values
+events = events.astype(int)
 event = events[args.event_numbers]
 for event_time, time_slide in zip(event[:,0], event[:,1:]):
     start_time = event_time - block_time / 2;
 
     # likelihoods to analze
     time_slides = dict(zip(channel_names, time_slide))
-    analysis_data = XTimeSeries.retrieve_data(event_time, block_time,
-                                              channel_names, sample_frequency,
-                                              frame_types=frame_types, time_slides=time_slides)
+    try:
+        analysis_data = XTimeSeries.read('examples/Oct_10_2015_data.hdf5')
+    except:
+        analysis_data = XTimeSeries.retrieve_data(event_time, block_time,
+                                                  channel_names, sample_frequency,
+                                                  frame_types=frame_types, time_slides=time_slides)
 
     # Are we doing injections and if so how many injection scales are we doing?
     if args.job_type == 'injection':
@@ -246,7 +252,7 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                 if circ_time_slides is not None:
                     slide_pixels = {k: v * 1./fft_length * 1./offset_fraction for k,v in slides.items()}
                 else:
-                    slide_pixels = {k: [0] for k in channel_names}
+                    slide_pixels = {k: numpy.zeros(1) for k in channel_names}
 
                 fft_grams = fft_grams_fixed.copy()
                 for (sky_position, time_delay) in zip(sky_positions, time_delays):
