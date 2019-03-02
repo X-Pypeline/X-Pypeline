@@ -20,7 +20,7 @@
 /.coverage
 
 # Cython created CPP codes
-/xpipeline/cluster/src/nearestneighbors.pyx
+/xpipeline/cluster/src/nearestneighbors.cpp
 /xpipeline/cluster/src/superclustertriggers.cpp
 /xpipeline/cluster/src/clusterproperties.cpp
 /xpipeline/cluster/src/clustersum.cpp
