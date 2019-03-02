@@ -3,15 +3,17 @@
 
 import numpy as np
 cimport numpy as np
+from libcpp cimport bool
 
 cdef extern from "fastsparseclusterprop.h" nogil:
     void fastsparseclusterprop(np.double_t *dimArray, np.double_t *labelledMap,
                                np.double_t *likelihoodMap, np.double_t *pixTime,
-                               np.double_t *pixFreq, np.double_t *clusterArray)
+                               np.double_t *pixFreq, np.double_t *clusterArray,
+                               const bool tf_properties)
 
 def clusterproperities_wrapper(object dimension_array, object labelled_map,
                                object likelihood_map, object pixel_time,
-                               object pixel_freq):
+                               object pixel_freq, tf_properties):
     """This outputs properities of every cluster on the TF map
         Returns:
             cluster_array (array):
@@ -50,5 +52,5 @@ def clusterproperities_wrapper(object dimension_array, object labelled_map,
     fastsparseclusterprop(&dimension_array_tmp[0], &labelled_map_tmp[0],
                           &likelihood_map_tmp[0],
                           &pixel_time_tmp[0], &pixel_freq_tmp[0],
-                          &cluster_array[0,0])
+                          &cluster_array[0,0], tf_properties)
     return cluster_array

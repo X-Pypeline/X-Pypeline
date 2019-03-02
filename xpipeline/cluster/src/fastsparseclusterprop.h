@@ -5,4 +5,4 @@
 
 using namespace std;
 
-void fastsparseclusterprop(const double *dimArray, const double *labelledMap, const double * likelihoodMap, const double * pixTime, const double * pixFreq, double *clusterArray);
+void fastsparseclusterprop(const double *dimArray, const double *labelledMap, const double * likelihoodMap, const double * pixTime, const double * pixFreq, double *clusterArray, const bool doTFprops);

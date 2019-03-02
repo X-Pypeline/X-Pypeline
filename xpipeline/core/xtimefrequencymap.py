@@ -352,7 +352,7 @@ class XSparseTimeFrequencyMapDict(OrderedDict):
 
             dim_array = numpy.array([total_energy.shape[0], 1, 2.0])
 
-            cluster_array = clusterproperties.clusterproperities_wrapper(dim_array, labelled_map, total_energy, pixels[0,:] + 1, pixels[1,:] + 1).T
+            cluster_array = clusterproperties.clusterproperities_wrapper(dim_array, labelled_map, total_energy, pixels[0,:] + 1, pixels[1,:] + 1, True).T
 
             cluster_array[:, 0:3] = cluster_array[:, 0:3] * (v.xindex[2] - v.xindex[1])  + v.xindex[0]
 

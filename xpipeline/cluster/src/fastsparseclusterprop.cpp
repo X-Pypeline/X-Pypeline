@@ -19,18 +19,23 @@ inline double min(double a,double b)
   return b;
 }
 
-void fastsparseclusterprop(const double *dimArray, const double *labelledMap, const double *likelihoodMap, const double *pixTime, const double *pixFreq, double *clusterArray)
+void fastsparseclusterprop(const double *dimArray, const double *labelledMap, const double *likelihoodMap, const double *pixTime, const double *pixFreq, double *clusterArray, const bool doTFprops)
 {
   //Declaration
   int nDims;
 
   // check input variable, if time/frequency scale information is
   // available do produce the cluster time/frequency information
-  bool doTFprops;
   int nTFcols;
 
-  doTFprops = true;
-  nTFcols = 7;
+  if (doTFprops)
+    { 
+      nTFcols = 7;
+    }
+  else
+    {
+      nTFcols = 0;
+    }
 
   // Number of dimesnion and size
   nDims=dimArray[2];
