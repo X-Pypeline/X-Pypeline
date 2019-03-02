@@ -120,6 +120,12 @@ extensions = [
               extra_compile_args=['-std=c++11'],
               language='c++'
               ),
+    Extension('xpipeline.cluster.superclustertriggers',
+              ['xpipeline/cluster/src/superclustertriggers.pyx'],
+              include_dirs=[numpy.get_include()],
+              extra_compile_args=['-std=c++11'],
+              language='c++'
+              ),
 ]
 
 # -- run setup ----------------------------------------------------------------

@@ -6,7 +6,7 @@
         "depends": [
             "/Users/scottcoughlin/anaconda/envs/xpipeline-py36/lib/python3.6/site-packages/numpy/core/include/numpy/arrayobject.h",
             "/Users/scottcoughlin/anaconda/envs/xpipeline-py36/lib/python3.6/site-packages/numpy/core/include/numpy/ufuncobject.h",
-            "xpipeline/cluster/src/fastlabel.h"
+            "xpipeline/cluster/src/fastsupercluster.h"
         ],
         "extra_compile_args": [
             "-std=c++11"
@@ -16,13 +16,13 @@
             "/Users/scottcoughlin/anaconda/envs/xpipeline-py36/lib/python3.6/site-packages/numpy/core/include"
         ],
         "language": "c++",
-        "name": "xpipeline.cluster.nearestneighbor",
+        "name": "xpipeline.cluster.fastsupercluster",
         "sources": [
-            "xpipeline/cluster/src/nearestneighbors.pyx",
-            "xpipeline/cluster/src/fastlabel.cpp"
+            "xpipeline/cluster/src/superclustertriggers.pyx",
+            "xpipeline/cluster/src/fastsupercluster.cpp"
         ]
     },
-    "module_name": "xpipeline.cluster.nearestneighbor"
+    "module_name": "xpipeline.cluster.fastsupercluster"
 }
 END: Cython Metadata */
 
@@ -625,14 +625,14 @@ static CYTHON_INLINE float __PYX_NAN() {
   #endif
 #endif
 
-#define __PYX_HAVE__xpipeline__cluster__nearestneighbor
-#define __PYX_HAVE_API__xpipeline__cluster__nearestneighbor
+#define __PYX_HAVE__xpipeline__cluster__fastsupercluster
+#define __PYX_HAVE_API__xpipeline__cluster__fastsupercluster
 /* Early includes */
 #include <string.h>
 #include <stdio.h>
 #include "numpy/arrayobject.h"
 #include "numpy/ufuncobject.h"
-#include "fastlabel.h"
+#include "fastsupercluster.h"
 #ifdef _OPENMP
 #include <omp.h>
 #endif /* _OPENMP */
@@ -862,7 +862,7 @@ static const char *__pyx_filename;
 
 
 static const char *__pyx_f[] = {
-  "xpipeline/cluster/src/nearestneighbors.pyx",
+  "xpipeline/cluster/src/superclustertriggers.pyx",
   "__init__.pxd",
   "type.pxd",
 };
@@ -1680,19 +1680,20 @@ static PyTypeObject *__pyx_ptype_5numpy_ndarray = 0;
 static PyTypeObject *__pyx_ptype_5numpy_ufunc = 0;
 static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *, char *, char *, int *); /*proto*/
 
-/* Module declarations from 'xpipeline.cluster.nearestneighbor' */
+/* Module declarations from 'xpipeline.cluster.fastsupercluster' */
 static __Pyx_TypeInfo __Pyx_TypeInfo_nn___pyx_t_5numpy_double_t = { "double_t", NULL, sizeof(__pyx_t_5numpy_double_t), { 0 }, 0, 'R', 0, 0 };
-#define __Pyx_MODULE_NAME "xpipeline.cluster.nearestneighbor"
-extern int __pyx_module_is_main_xpipeline__cluster__nearestneighbor;
-int __pyx_module_is_main_xpipeline__cluster__nearestneighbor = 0;
+#define __Pyx_MODULE_NAME "xpipeline.cluster.fastsupercluster"
+extern int __pyx_module_is_main_xpipeline__cluster__fastsupercluster;
+int __pyx_module_is_main_xpipeline__cluster__fastsupercluster = 0;
 
-/* Implementation of 'xpipeline.cluster.nearestneighbor' */
+/* Implementation of 'xpipeline.cluster.fastsupercluster' */
 static PyObject *__pyx_builtin_ValueError;
 static PyObject *__pyx_builtin_range;
 static PyObject *__pyx_builtin_RuntimeError;
 static PyObject *__pyx_builtin_ImportError;
 static const char __pyx_k_np[] = "np";
 static const char __pyx_k_main[] = "__main__";
+static const char __pyx_k_mask[] = "mask";
 static const char __pyx_k_name[] = "__name__";
 static const char __pyx_k_test[] = "__test__";
 static const char __pyx_k_dtype[] = "dtype";
@@ -1702,19 +1703,15 @@ static const char __pyx_k_zeros[] = "zeros";
 static const char __pyx_k_double[] = "double";
 static const char __pyx_k_import[] = "__import__";
 static const char __pyx_k_float64[] = "float64";
-static const char __pyx_k_npixels[] = "npixels";
+static const char __pyx_k_ntriggers[] = "ntriggers";
 static const char __pyx_k_ValueError[] = "ValueError";
-static const char __pyx_k_label_list[] = "label_list";
+static const char __pyx_k_rectangles[] = "rectangles";
 static const char __pyx_k_ImportError[] = "ImportError";
-static const char __pyx_k_coord_array[] = "coord_array";
 static const char __pyx_k_RuntimeError[] = "RuntimeError";
-static const char __pyx_k_connectivity[] = "connectivity";
-static const char __pyx_k_coord_array_tmp[] = "coord_array_tmp";
-static const char __pyx_k_coord_dim_array[] = "coord_dim_array";
+static const char __pyx_k_rectangles_tmp[] = "rectangles_tmp";
 static const char __pyx_k_ascontiguousarray[] = "ascontiguousarray";
-static const char __pyx_k_fastlabel_wrapper[] = "fastlabel_wrapper";
 static const char __pyx_k_cline_in_traceback[] = "cline_in_traceback";
-static const char __pyx_k_coord_dim_array_tmp[] = "coord_dim_array_tmp";
+static const char __pyx_k_fastsupercluster_wrapper[] = "fastsupercluster_wrapper";
 static const char __pyx_k_ndarray_is_not_C_contiguous[] = "ndarray is not C contiguous";
 static const char __pyx_k_numpy_core_multiarray_failed_to[] = "numpy.core.multiarray failed to import";
 static const char __pyx_k_unknown_dtype_code_in_numpy_pxd[] = "unknown dtype code in numpy.pxd (%d)";
@@ -1722,8 +1719,8 @@ static const char __pyx_k_Format_string_allocated_too_shor[] = "Format string al
 static const char __pyx_k_Non_native_byte_order_not_suppor[] = "Non-native byte order not supported";
 static const char __pyx_k_ndarray_is_not_Fortran_contiguou[] = "ndarray is not Fortran contiguous";
 static const char __pyx_k_numpy_core_umath_failed_to_impor[] = "numpy.core.umath failed to import";
-static const char __pyx_k_xpipeline_cluster_nearestneighbo[] = "xpipeline.cluster.nearestneighbor";
-static const char __pyx_k_xpipeline_cluster_src_nearestnei[] = "xpipeline/cluster/src/nearestneighbors.pyx";
+static const char __pyx_k_xpipeline_cluster_fastsuperclust[] = "xpipeline.cluster.fastsupercluster";
+static const char __pyx_k_xpipeline_cluster_src_superclust[] = "xpipeline/cluster/src/superclustertriggers.pyx";
 static const char __pyx_k_Format_string_allocated_too_shor_2[] = "Format string allocated too short.";
 static PyObject *__pyx_kp_u_Format_string_allocated_too_shor;
 static PyObject *__pyx_kp_u_Format_string_allocated_too_shor_2;
@@ -1733,33 +1730,30 @@ static PyObject *__pyx_n_s_RuntimeError;
 static PyObject *__pyx_n_s_ValueError;
 static PyObject *__pyx_n_s_ascontiguousarray;
 static PyObject *__pyx_n_s_cline_in_traceback;
-static PyObject *__pyx_n_s_connectivity;
-static PyObject *__pyx_n_s_coord_array;
-static PyObject *__pyx_n_s_coord_array_tmp;
-static PyObject *__pyx_n_s_coord_dim_array;
-static PyObject *__pyx_n_s_coord_dim_array_tmp;
 static PyObject *__pyx_n_s_double;
 static PyObject *__pyx_n_s_dtype;
-static PyObject *__pyx_n_s_fastlabel_wrapper;
+static PyObject *__pyx_n_s_fastsupercluster_wrapper;
 static PyObject *__pyx_n_s_float64;
 static PyObject *__pyx_n_s_import;
-static PyObject *__pyx_n_s_label_list;
 static PyObject *__pyx_n_s_main;
+static PyObject *__pyx_n_s_mask;
 static PyObject *__pyx_n_s_name;
 static PyObject *__pyx_kp_u_ndarray_is_not_C_contiguous;
 static PyObject *__pyx_kp_u_ndarray_is_not_Fortran_contiguou;
 static PyObject *__pyx_n_s_np;
-static PyObject *__pyx_n_s_npixels;
+static PyObject *__pyx_n_s_ntriggers;
 static PyObject *__pyx_n_s_numpy;
 static PyObject *__pyx_kp_s_numpy_core_multiarray_failed_to;
 static PyObject *__pyx_kp_s_numpy_core_umath_failed_to_impor;
 static PyObject *__pyx_n_s_range;
+static PyObject *__pyx_n_s_rectangles;
+static PyObject *__pyx_n_s_rectangles_tmp;
 static PyObject *__pyx_n_s_test;
 static PyObject *__pyx_kp_u_unknown_dtype_code_in_numpy_pxd;
-static PyObject *__pyx_n_s_xpipeline_cluster_nearestneighbo;
-static PyObject *__pyx_kp_s_xpipeline_cluster_src_nearestnei;
+static PyObject *__pyx_n_s_xpipeline_cluster_fastsuperclust;
+static PyObject *__pyx_kp_s_xpipeline_cluster_src_superclust;
 static PyObject *__pyx_n_s_zeros;
-static PyObject *__pyx_pf_9xpipeline_7cluster_15nearestneighbor_fastlabel_wrapper(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_coord_array, PyObject *__pyx_v_coord_dim_array, PyObject *__pyx_v_connectivity, PyObject *__pyx_v_npixels); /* proto */
+static PyObject *__pyx_pf_9xpipeline_7cluster_16fastsupercluster_fastsupercluster_wrapper(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_ntriggers, PyObject *__pyx_v_rectangles); /* proto */
 static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, Py_buffer *__pyx_v_info, int __pyx_v_flags); /* proto */
 static void __pyx_pf_5numpy_7ndarray_2__releasebuffer__(PyArrayObject *__pyx_v_self, Py_buffer *__pyx_v_info); /* proto */
 static PyObject *__pyx_tuple_;
@@ -1773,36 +1767,30 @@ static PyObject *__pyx_tuple__8;
 static PyObject *__pyx_codeobj__9;
 /* Late includes */
 
-/* "xpipeline/cluster/src/nearestneighbors.pyx":12
- *                     np.double_t * labelList)
+/* "xpipeline/cluster/src/superclustertriggers.pyx":10
+ *      void fastsupercluster(const int N, np.double_t * rectangles, np.double_t * uncoveredMask)
  * 
- * def fastlabel_wrapper(object coord_array, object coord_dim_array,             # <<<<<<<<<<<<<<
- *                       connectivity, npixels):
+ * def fastsupercluster_wrapper(ntriggers, object rectangles,):             # <<<<<<<<<<<<<<
  *     cdef:
+ *         np.ndarray[np.double_t, ndim=2, mode='c'] rectangles_tmp
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_9xpipeline_7cluster_15nearestneighbor_1fastlabel_wrapper(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static PyMethodDef __pyx_mdef_9xpipeline_7cluster_15nearestneighbor_1fastlabel_wrapper = {"fastlabel_wrapper", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_9xpipeline_7cluster_15nearestneighbor_1fastlabel_wrapper, METH_VARARGS|METH_KEYWORDS, 0};
-static PyObject *__pyx_pw_9xpipeline_7cluster_15nearestneighbor_1fastlabel_wrapper(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
-  PyObject *__pyx_v_coord_array = 0;
-  PyObject *__pyx_v_coord_dim_array = 0;
-  PyObject *__pyx_v_connectivity = 0;
-  PyObject *__pyx_v_npixels = 0;
+static PyObject *__pyx_pw_9xpipeline_7cluster_16fastsupercluster_1fastsupercluster_wrapper(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static PyMethodDef __pyx_mdef_9xpipeline_7cluster_16fastsupercluster_1fastsupercluster_wrapper = {"fastsupercluster_wrapper", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_9xpipeline_7cluster_16fastsupercluster_1fastsupercluster_wrapper, METH_VARARGS|METH_KEYWORDS, 0};
+static PyObject *__pyx_pw_9xpipeline_7cluster_16fastsupercluster_1fastsupercluster_wrapper(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+  PyObject *__pyx_v_ntriggers = 0;
+  PyObject *__pyx_v_rectangles = 0;
   PyObject *__pyx_r = 0;
   __Pyx_RefNannyDeclarations
-  __Pyx_RefNannySetupContext("fastlabel_wrapper (wrapper)", 0);
+  __Pyx_RefNannySetupContext("fastsupercluster_wrapper (wrapper)", 0);
   {
-    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_coord_array,&__pyx_n_s_coord_dim_array,&__pyx_n_s_connectivity,&__pyx_n_s_npixels,0};
-    PyObject* values[4] = {0,0,0,0};
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_ntriggers,&__pyx_n_s_rectangles,0};
+    PyObject* values[2] = {0,0};
     if (unlikely(__pyx_kwds)) {
       Py_ssize_t kw_args;
       const Py_ssize_t pos_args = PyTuple_GET_SIZE(__pyx_args);
       switch (pos_args) {
-        case  4: values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
-        CYTHON_FALLTHROUGH;
-        case  3: values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
-        CYTHON_FALLTHROUGH;
         case  2: values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
         CYTHON_FALLTHROUGH;
         case  1: values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
@@ -1813,68 +1801,49 @@ static PyObject *__pyx_pw_9xpipeline_7cluster_15nearestneighbor_1fastlabel_wrapp
       kw_args = PyDict_Size(__pyx_kwds);
       switch (pos_args) {
         case  0:
-        if (likely((values[0] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_coord_array)) != 0)) kw_args--;
+        if (likely((values[0] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_ntriggers)) != 0)) kw_args--;
         else goto __pyx_L5_argtuple_error;
         CYTHON_FALLTHROUGH;
         case  1:
-        if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_coord_dim_array)) != 0)) kw_args--;
+        if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_rectangles)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("fastlabel_wrapper", 1, 4, 4, 1); __PYX_ERR(0, 12, __pyx_L3_error)
-        }
-        CYTHON_FALLTHROUGH;
-        case  2:
-        if (likely((values[2] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_connectivity)) != 0)) kw_args--;
-        else {
-          __Pyx_RaiseArgtupleInvalid("fastlabel_wrapper", 1, 4, 4, 2); __PYX_ERR(0, 12, __pyx_L3_error)
-        }
-        CYTHON_FALLTHROUGH;
-        case  3:
-        if (likely((values[3] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_npixels)) != 0)) kw_args--;
-        else {
-          __Pyx_RaiseArgtupleInvalid("fastlabel_wrapper", 1, 4, 4, 3); __PYX_ERR(0, 12, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("fastsupercluster_wrapper", 1, 2, 2, 1); __PYX_ERR(0, 10, __pyx_L3_error)
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "fastlabel_wrapper") < 0)) __PYX_ERR(0, 12, __pyx_L3_error)
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "fastsupercluster_wrapper") < 0)) __PYX_ERR(0, 10, __pyx_L3_error)
       }
-    } else if (PyTuple_GET_SIZE(__pyx_args) != 4) {
+    } else if (PyTuple_GET_SIZE(__pyx_args) != 2) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
       values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
-      values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
-      values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
     }
-    __pyx_v_coord_array = values[0];
-    __pyx_v_coord_dim_array = values[1];
-    __pyx_v_connectivity = values[2];
-    __pyx_v_npixels = values[3];
+    __pyx_v_ntriggers = values[0];
+    __pyx_v_rectangles = values[1];
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("fastlabel_wrapper", 1, 4, 4, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 12, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("fastsupercluster_wrapper", 1, 2, 2, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 10, __pyx_L3_error)
   __pyx_L3_error:;
-  __Pyx_AddTraceback("xpipeline.cluster.nearestneighbor.fastlabel_wrapper", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("xpipeline.cluster.fastsupercluster.fastsupercluster_wrapper", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  __pyx_r = __pyx_pf_9xpipeline_7cluster_15nearestneighbor_fastlabel_wrapper(__pyx_self, __pyx_v_coord_array, __pyx_v_coord_dim_array, __pyx_v_connectivity, __pyx_v_npixels);
+  __pyx_r = __pyx_pf_9xpipeline_7cluster_16fastsupercluster_fastsupercluster_wrapper(__pyx_self, __pyx_v_ntriggers, __pyx_v_rectangles);
 
   /* function exit code */
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_9xpipeline_7cluster_15nearestneighbor_fastlabel_wrapper(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_coord_array, PyObject *__pyx_v_coord_dim_array, PyObject *__pyx_v_connectivity, PyObject *__pyx_v_npixels) {
-  PyArrayObject *__pyx_v_coord_array_tmp = 0;
-  PyArrayObject *__pyx_v_coord_dim_array_tmp = 0;
-  PyArrayObject *__pyx_v_label_list = 0;
-  __Pyx_LocalBuf_ND __pyx_pybuffernd_coord_array_tmp;
-  __Pyx_Buffer __pyx_pybuffer_coord_array_tmp;
-  __Pyx_LocalBuf_ND __pyx_pybuffernd_coord_dim_array_tmp;
-  __Pyx_Buffer __pyx_pybuffer_coord_dim_array_tmp;
-  __Pyx_LocalBuf_ND __pyx_pybuffernd_label_list;
-  __Pyx_Buffer __pyx_pybuffer_label_list;
+static PyObject *__pyx_pf_9xpipeline_7cluster_16fastsupercluster_fastsupercluster_wrapper(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_ntriggers, PyObject *__pyx_v_rectangles) {
+  PyArrayObject *__pyx_v_rectangles_tmp = 0;
+  PyArrayObject *__pyx_v_mask = 0;
+  __Pyx_LocalBuf_ND __pyx_pybuffernd_mask;
+  __Pyx_Buffer __pyx_pybuffer_mask;
+  __Pyx_LocalBuf_ND __pyx_pybuffernd_rectangles_tmp;
+  __Pyx_Buffer __pyx_pybuffer_rectangles_tmp;
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   PyObject *__pyx_t_1 = NULL;
@@ -1888,117 +1857,110 @@ static PyObject *__pyx_pf_9xpipeline_7cluster_15nearestneighbor_fastlabel_wrappe
   PyObject *__pyx_t_9 = NULL;
   PyObject *__pyx_t_10 = NULL;
   PyObject *__pyx_t_11 = NULL;
-  PyArrayObject *__pyx_t_12 = NULL;
+  Py_ssize_t __pyx_t_12;
   Py_ssize_t __pyx_t_13;
-  Py_ssize_t __pyx_t_14;
-  int __pyx_t_15;
-  Py_ssize_t __pyx_t_16;
-  Py_ssize_t __pyx_t_17;
-  int __pyx_t_18;
-  __Pyx_RefNannySetupContext("fastlabel_wrapper", 0);
-  __pyx_pybuffer_coord_array_tmp.pybuffer.buf = NULL;
-  __pyx_pybuffer_coord_array_tmp.refcount = 0;
-  __pyx_pybuffernd_coord_array_tmp.data = NULL;
-  __pyx_pybuffernd_coord_array_tmp.rcbuffer = &__pyx_pybuffer_coord_array_tmp;
-  __pyx_pybuffer_coord_dim_array_tmp.pybuffer.buf = NULL;
-  __pyx_pybuffer_coord_dim_array_tmp.refcount = 0;
-  __pyx_pybuffernd_coord_dim_array_tmp.data = NULL;
-  __pyx_pybuffernd_coord_dim_array_tmp.rcbuffer = &__pyx_pybuffer_coord_dim_array_tmp;
-  __pyx_pybuffer_label_list.pybuffer.buf = NULL;
-  __pyx_pybuffer_label_list.refcount = 0;
-  __pyx_pybuffernd_label_list.data = NULL;
-  __pyx_pybuffernd_label_list.rcbuffer = &__pyx_pybuffer_label_list;
+  int __pyx_t_14;
+  Py_ssize_t __pyx_t_15;
+  __Pyx_RefNannySetupContext("fastsupercluster_wrapper", 0);
+  __pyx_pybuffer_rectangles_tmp.pybuffer.buf = NULL;
+  __pyx_pybuffer_rectangles_tmp.refcount = 0;
+  __pyx_pybuffernd_rectangles_tmp.data = NULL;
+  __pyx_pybuffernd_rectangles_tmp.rcbuffer = &__pyx_pybuffer_rectangles_tmp;
+  __pyx_pybuffer_mask.pybuffer.buf = NULL;
+  __pyx_pybuffer_mask.refcount = 0;
+  __pyx_pybuffernd_mask.data = NULL;
+  __pyx_pybuffernd_mask.rcbuffer = &__pyx_pybuffer_mask;
 
-  /* "xpipeline/cluster/src/nearestneighbors.pyx":17
- *         np.ndarray[np.double_t, ndim=2, mode='c'] coord_array_tmp
- *         np.ndarray[np.double_t, ndim=1, mode='c'] coord_dim_array_tmp
- *         np.ndarray[np.double_t, ndim=1, mode='c'] label_list = np.zeros((npixels,), dtype=np.double)             # <<<<<<<<<<<<<<
+  /* "xpipeline/cluster/src/superclustertriggers.pyx":13
+ *     cdef:
+ *         np.ndarray[np.double_t, ndim=2, mode='c'] rectangles_tmp
+ *         np.ndarray[np.double_t, ndim=1, mode='c'] mask = np.zeros((ntriggers,), dtype=np.double)             # <<<<<<<<<<<<<<
  * 
- *     coord_array_tmp = np.ascontiguousarray(coord_array, dtype=np.float64)
+ *     rectangles_tmp = np.ascontiguousarray(rectangles, dtype=np.float64)
  */
-  __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_n_s_np); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 17, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_n_s_np); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 13, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_zeros); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 17, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_zeros); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 13, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-  __pyx_t_1 = PyTuple_New(1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 17, __pyx_L1_error)
+  __pyx_t_1 = PyTuple_New(1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 13, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  __Pyx_INCREF(__pyx_v_npixels);
-  __Pyx_GIVEREF(__pyx_v_npixels);
-  PyTuple_SET_ITEM(__pyx_t_1, 0, __pyx_v_npixels);
-  __pyx_t_3 = PyTuple_New(1); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 17, __pyx_L1_error)
+  __Pyx_INCREF(__pyx_v_ntriggers);
+  __Pyx_GIVEREF(__pyx_v_ntriggers);
+  PyTuple_SET_ITEM(__pyx_t_1, 0, __pyx_v_ntriggers);
+  __pyx_t_3 = PyTuple_New(1); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 13, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
   __Pyx_GIVEREF(__pyx_t_1);
   PyTuple_SET_ITEM(__pyx_t_3, 0, __pyx_t_1);
   __pyx_t_1 = 0;
-  __pyx_t_1 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 17, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 13, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  __Pyx_GetModuleGlobalName(__pyx_t_4, __pyx_n_s_np); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 17, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_4, __pyx_n_s_np); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 13, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
-  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_4, __pyx_n_s_double); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 17, __pyx_L1_error)
+  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_4, __pyx_n_s_double); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 13, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-  if (PyDict_SetItem(__pyx_t_1, __pyx_n_s_dtype, __pyx_t_5) < 0) __PYX_ERR(0, 17, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_1, __pyx_n_s_dtype, __pyx_t_5) < 0) __PYX_ERR(0, 13, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  __pyx_t_5 = __Pyx_PyObject_Call(__pyx_t_2, __pyx_t_3, __pyx_t_1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 17, __pyx_L1_error)
+  __pyx_t_5 = __Pyx_PyObject_Call(__pyx_t_2, __pyx_t_3, __pyx_t_1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 13, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-  if (!(likely(((__pyx_t_5) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_5, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 17, __pyx_L1_error)
+  if (!(likely(((__pyx_t_5) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_5, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 13, __pyx_L1_error)
   __pyx_t_6 = ((PyArrayObject *)__pyx_t_5);
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_label_list.rcbuffer->pybuffer, (PyObject*)__pyx_t_6, &__Pyx_TypeInfo_nn___pyx_t_5numpy_double_t, PyBUF_FORMAT| PyBUF_C_CONTIGUOUS, 1, 0, __pyx_stack) == -1)) {
-      __pyx_v_label_list = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_label_list.rcbuffer->pybuffer.buf = NULL;
-      __PYX_ERR(0, 17, __pyx_L1_error)
-    } else {__pyx_pybuffernd_label_list.diminfo[0].strides = __pyx_pybuffernd_label_list.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_label_list.diminfo[0].shape = __pyx_pybuffernd_label_list.rcbuffer->pybuffer.shape[0];
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_mask.rcbuffer->pybuffer, (PyObject*)__pyx_t_6, &__Pyx_TypeInfo_nn___pyx_t_5numpy_double_t, PyBUF_FORMAT| PyBUF_C_CONTIGUOUS, 1, 0, __pyx_stack) == -1)) {
+      __pyx_v_mask = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_mask.rcbuffer->pybuffer.buf = NULL;
+      __PYX_ERR(0, 13, __pyx_L1_error)
+    } else {__pyx_pybuffernd_mask.diminfo[0].strides = __pyx_pybuffernd_mask.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_mask.diminfo[0].shape = __pyx_pybuffernd_mask.rcbuffer->pybuffer.shape[0];
     }
   }
   __pyx_t_6 = 0;
-  __pyx_v_label_list = ((PyArrayObject *)__pyx_t_5);
+  __pyx_v_mask = ((PyArrayObject *)__pyx_t_5);
   __pyx_t_5 = 0;
 
-  /* "xpipeline/cluster/src/nearestneighbors.pyx":19
- *         np.ndarray[np.double_t, ndim=1, mode='c'] label_list = np.zeros((npixels,), dtype=np.double)
+  /* "xpipeline/cluster/src/superclustertriggers.pyx":15
+ *         np.ndarray[np.double_t, ndim=1, mode='c'] mask = np.zeros((ntriggers,), dtype=np.double)
  * 
- *     coord_array_tmp = np.ascontiguousarray(coord_array, dtype=np.float64)             # <<<<<<<<<<<<<<
- *     coord_dim_array_tmp = np.ascontiguousarray(coord_dim_array, dtype=np.float64)
+ *     rectangles_tmp = np.ascontiguousarray(rectangles, dtype=np.float64)             # <<<<<<<<<<<<<<
  * 
+ *     fastsupercluster(ntriggers, &rectangles_tmp[0,0], &mask[0])
  */
-  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_n_s_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 19, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_n_s_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 15, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_n_s_ascontiguousarray); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 19, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_n_s_ascontiguousarray); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 15, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  __pyx_t_5 = PyTuple_New(1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 19, __pyx_L1_error)
+  __pyx_t_5 = PyTuple_New(1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 15, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __Pyx_INCREF(__pyx_v_coord_array);
-  __Pyx_GIVEREF(__pyx_v_coord_array);
-  PyTuple_SET_ITEM(__pyx_t_5, 0, __pyx_v_coord_array);
-  __pyx_t_3 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 19, __pyx_L1_error)
+  __Pyx_INCREF(__pyx_v_rectangles);
+  __Pyx_GIVEREF(__pyx_v_rectangles);
+  PyTuple_SET_ITEM(__pyx_t_5, 0, __pyx_v_rectangles);
+  __pyx_t_3 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 15, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_n_s_np); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 19, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_n_s_np); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 15, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
-  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_n_s_float64); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 19, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_n_s_float64); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 15, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-  if (PyDict_SetItem(__pyx_t_3, __pyx_n_s_dtype, __pyx_t_4) < 0) __PYX_ERR(0, 19, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_3, __pyx_n_s_dtype, __pyx_t_4) < 0) __PYX_ERR(0, 15, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-  __pyx_t_4 = __Pyx_PyObject_Call(__pyx_t_1, __pyx_t_5, __pyx_t_3); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 19, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyObject_Call(__pyx_t_1, __pyx_t_5, __pyx_t_3); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 15, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-  if (!(likely(((__pyx_t_4) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_4, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 19, __pyx_L1_error)
+  if (!(likely(((__pyx_t_4) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_4, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 15, __pyx_L1_error)
   __pyx_t_7 = ((PyArrayObject *)__pyx_t_4);
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_coord_array_tmp.rcbuffer->pybuffer);
-    __pyx_t_8 = __Pyx_GetBufferAndValidate(&__pyx_pybuffernd_coord_array_tmp.rcbuffer->pybuffer, (PyObject*)__pyx_t_7, &__Pyx_TypeInfo_nn___pyx_t_5numpy_double_t, PyBUF_FORMAT| PyBUF_C_CONTIGUOUS, 2, 0, __pyx_stack);
+    __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_rectangles_tmp.rcbuffer->pybuffer);
+    __pyx_t_8 = __Pyx_GetBufferAndValidate(&__pyx_pybuffernd_rectangles_tmp.rcbuffer->pybuffer, (PyObject*)__pyx_t_7, &__Pyx_TypeInfo_nn___pyx_t_5numpy_double_t, PyBUF_FORMAT| PyBUF_C_CONTIGUOUS, 2, 0, __pyx_stack);
     if (unlikely(__pyx_t_8 < 0)) {
       PyErr_Fetch(&__pyx_t_9, &__pyx_t_10, &__pyx_t_11);
-      if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_coord_array_tmp.rcbuffer->pybuffer, (PyObject*)__pyx_v_coord_array_tmp, &__Pyx_TypeInfo_nn___pyx_t_5numpy_double_t, PyBUF_FORMAT| PyBUF_C_CONTIGUOUS, 2, 0, __pyx_stack) == -1)) {
+      if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_rectangles_tmp.rcbuffer->pybuffer, (PyObject*)__pyx_v_rectangles_tmp, &__Pyx_TypeInfo_nn___pyx_t_5numpy_double_t, PyBUF_FORMAT| PyBUF_C_CONTIGUOUS, 2, 0, __pyx_stack) == -1)) {
         Py_XDECREF(__pyx_t_9); Py_XDECREF(__pyx_t_10); Py_XDECREF(__pyx_t_11);
         __Pyx_RaiseBufferFallbackError();
       } else {
@@ -2006,144 +1968,63 @@ static PyObject *__pyx_pf_9xpipeline_7cluster_15nearestneighbor_fastlabel_wrappe
       }
       __pyx_t_9 = __pyx_t_10 = __pyx_t_11 = 0;
     }
-    __pyx_pybuffernd_coord_array_tmp.diminfo[0].strides = __pyx_pybuffernd_coord_array_tmp.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_coord_array_tmp.diminfo[0].shape = __pyx_pybuffernd_coord_array_tmp.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_coord_array_tmp.diminfo[1].strides = __pyx_pybuffernd_coord_array_tmp.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_coord_array_tmp.diminfo[1].shape = __pyx_pybuffernd_coord_array_tmp.rcbuffer->pybuffer.shape[1];
-    if (unlikely(__pyx_t_8 < 0)) __PYX_ERR(0, 19, __pyx_L1_error)
+    __pyx_pybuffernd_rectangles_tmp.diminfo[0].strides = __pyx_pybuffernd_rectangles_tmp.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_rectangles_tmp.diminfo[0].shape = __pyx_pybuffernd_rectangles_tmp.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_rectangles_tmp.diminfo[1].strides = __pyx_pybuffernd_rectangles_tmp.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_rectangles_tmp.diminfo[1].shape = __pyx_pybuffernd_rectangles_tmp.rcbuffer->pybuffer.shape[1];
+    if (unlikely(__pyx_t_8 < 0)) __PYX_ERR(0, 15, __pyx_L1_error)
   }
   __pyx_t_7 = 0;
-  __pyx_v_coord_array_tmp = ((PyArrayObject *)__pyx_t_4);
+  __pyx_v_rectangles_tmp = ((PyArrayObject *)__pyx_t_4);
   __pyx_t_4 = 0;
 
-  /* "xpipeline/cluster/src/nearestneighbors.pyx":20
+  /* "xpipeline/cluster/src/superclustertriggers.pyx":17
+ *     rectangles_tmp = np.ascontiguousarray(rectangles, dtype=np.float64)
  * 
- *     coord_array_tmp = np.ascontiguousarray(coord_array, dtype=np.float64)
- *     coord_dim_array_tmp = np.ascontiguousarray(coord_dim_array, dtype=np.float64)             # <<<<<<<<<<<<<<
- * 
- *     fastlabel(npixels, &coord_array_tmp[0,0], &coord_dim_array_tmp[0],
+ *     fastsupercluster(ntriggers, &rectangles_tmp[0,0], &mask[0])             # <<<<<<<<<<<<<<
+ *     return mask
  */
-  __Pyx_GetModuleGlobalName(__pyx_t_4, __pyx_n_s_np); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 20, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_4);
-  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_4, __pyx_n_s_ascontiguousarray); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 20, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_3);
-  __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-  __pyx_t_4 = PyTuple_New(1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 20, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_4);
-  __Pyx_INCREF(__pyx_v_coord_dim_array);
-  __Pyx_GIVEREF(__pyx_v_coord_dim_array);
-  PyTuple_SET_ITEM(__pyx_t_4, 0, __pyx_v_coord_dim_array);
-  __pyx_t_5 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 20, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_5);
-  __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_n_s_np); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 20, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_float64); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 20, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_2);
-  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-  if (PyDict_SetItem(__pyx_t_5, __pyx_n_s_dtype, __pyx_t_2) < 0) __PYX_ERR(0, 20, __pyx_L1_error)
-  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-  __pyx_t_2 = __Pyx_PyObject_Call(__pyx_t_3, __pyx_t_4, __pyx_t_5); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 20, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_2);
-  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-  __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  if (!(likely(((__pyx_t_2) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_2, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 20, __pyx_L1_error)
-  __pyx_t_12 = ((PyArrayObject *)__pyx_t_2);
-  {
-    __Pyx_BufFmt_StackElem __pyx_stack[1];
-    __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_coord_dim_array_tmp.rcbuffer->pybuffer);
-    __pyx_t_8 = __Pyx_GetBufferAndValidate(&__pyx_pybuffernd_coord_dim_array_tmp.rcbuffer->pybuffer, (PyObject*)__pyx_t_12, &__Pyx_TypeInfo_nn___pyx_t_5numpy_double_t, PyBUF_FORMAT| PyBUF_C_CONTIGUOUS, 1, 0, __pyx_stack);
-    if (unlikely(__pyx_t_8 < 0)) {
-      PyErr_Fetch(&__pyx_t_11, &__pyx_t_10, &__pyx_t_9);
-      if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_coord_dim_array_tmp.rcbuffer->pybuffer, (PyObject*)__pyx_v_coord_dim_array_tmp, &__Pyx_TypeInfo_nn___pyx_t_5numpy_double_t, PyBUF_FORMAT| PyBUF_C_CONTIGUOUS, 1, 0, __pyx_stack) == -1)) {
-        Py_XDECREF(__pyx_t_11); Py_XDECREF(__pyx_t_10); Py_XDECREF(__pyx_t_9);
-        __Pyx_RaiseBufferFallbackError();
-      } else {
-        PyErr_Restore(__pyx_t_11, __pyx_t_10, __pyx_t_9);
-      }
-      __pyx_t_11 = __pyx_t_10 = __pyx_t_9 = 0;
-    }
-    __pyx_pybuffernd_coord_dim_array_tmp.diminfo[0].strides = __pyx_pybuffernd_coord_dim_array_tmp.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_coord_dim_array_tmp.diminfo[0].shape = __pyx_pybuffernd_coord_dim_array_tmp.rcbuffer->pybuffer.shape[0];
-    if (unlikely(__pyx_t_8 < 0)) __PYX_ERR(0, 20, __pyx_L1_error)
-  }
+  __pyx_t_8 = __Pyx_PyInt_As_int(__pyx_v_ntriggers); if (unlikely((__pyx_t_8 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 17, __pyx_L1_error)
   __pyx_t_12 = 0;
-  __pyx_v_coord_dim_array_tmp = ((PyArrayObject *)__pyx_t_2);
-  __pyx_t_2 = 0;
-
-  /* "xpipeline/cluster/src/nearestneighbors.pyx":22
- *     coord_dim_array_tmp = np.ascontiguousarray(coord_dim_array, dtype=np.float64)
- * 
- *     fastlabel(npixels, &coord_array_tmp[0,0], &coord_dim_array_tmp[0],             # <<<<<<<<<<<<<<
- *               connectivity, &label_list[0])
- *     return label_list
- */
-  __pyx_t_8 = __Pyx_PyInt_As_int(__pyx_v_npixels); if (unlikely((__pyx_t_8 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 22, __pyx_L1_error)
   __pyx_t_13 = 0;
-  __pyx_t_14 = 0;
-  __pyx_t_15 = -1;
+  __pyx_t_14 = -1;
+  if (__pyx_t_12 < 0) {
+    __pyx_t_12 += __pyx_pybuffernd_rectangles_tmp.diminfo[0].shape;
+    if (unlikely(__pyx_t_12 < 0)) __pyx_t_14 = 0;
+  } else if (unlikely(__pyx_t_12 >= __pyx_pybuffernd_rectangles_tmp.diminfo[0].shape)) __pyx_t_14 = 0;
   if (__pyx_t_13 < 0) {
-    __pyx_t_13 += __pyx_pybuffernd_coord_array_tmp.diminfo[0].shape;
-    if (unlikely(__pyx_t_13 < 0)) __pyx_t_15 = 0;
-  } else if (unlikely(__pyx_t_13 >= __pyx_pybuffernd_coord_array_tmp.diminfo[0].shape)) __pyx_t_15 = 0;
-  if (__pyx_t_14 < 0) {
-    __pyx_t_14 += __pyx_pybuffernd_coord_array_tmp.diminfo[1].shape;
-    if (unlikely(__pyx_t_14 < 0)) __pyx_t_15 = 1;
-  } else if (unlikely(__pyx_t_14 >= __pyx_pybuffernd_coord_array_tmp.diminfo[1].shape)) __pyx_t_15 = 1;
-  if (unlikely(__pyx_t_15 != -1)) {
-    __Pyx_RaiseBufferIndexError(__pyx_t_15);
-    __PYX_ERR(0, 22, __pyx_L1_error)
+    __pyx_t_13 += __pyx_pybuffernd_rectangles_tmp.diminfo[1].shape;
+    if (unlikely(__pyx_t_13 < 0)) __pyx_t_14 = 1;
+  } else if (unlikely(__pyx_t_13 >= __pyx_pybuffernd_rectangles_tmp.diminfo[1].shape)) __pyx_t_14 = 1;
+  if (unlikely(__pyx_t_14 != -1)) {
+    __Pyx_RaiseBufferIndexError(__pyx_t_14);
+    __PYX_ERR(0, 17, __pyx_L1_error)
   }
-  __pyx_t_16 = 0;
-  __pyx_t_15 = -1;
-  if (__pyx_t_16 < 0) {
-    __pyx_t_16 += __pyx_pybuffernd_coord_dim_array_tmp.diminfo[0].shape;
-    if (unlikely(__pyx_t_16 < 0)) __pyx_t_15 = 0;
-  } else if (unlikely(__pyx_t_16 >= __pyx_pybuffernd_coord_dim_array_tmp.diminfo[0].shape)) __pyx_t_15 = 0;
-  if (unlikely(__pyx_t_15 != -1)) {
-    __Pyx_RaiseBufferIndexError(__pyx_t_15);
-    __PYX_ERR(0, 22, __pyx_L1_error)
+  __pyx_t_15 = 0;
+  __pyx_t_14 = -1;
+  if (__pyx_t_15 < 0) {
+    __pyx_t_15 += __pyx_pybuffernd_mask.diminfo[0].shape;
+    if (unlikely(__pyx_t_15 < 0)) __pyx_t_14 = 0;
+  } else if (unlikely(__pyx_t_15 >= __pyx_pybuffernd_mask.diminfo[0].shape)) __pyx_t_14 = 0;
+  if (unlikely(__pyx_t_14 != -1)) {
+    __Pyx_RaiseBufferIndexError(__pyx_t_14);
+    __PYX_ERR(0, 17, __pyx_L1_error)
   }
+  fastsupercluster(__pyx_t_8, (&(*__Pyx_BufPtrCContig2d(__pyx_t_5numpy_double_t *, __pyx_pybuffernd_rectangles_tmp.rcbuffer->pybuffer.buf, __pyx_t_12, __pyx_pybuffernd_rectangles_tmp.diminfo[0].strides, __pyx_t_13, __pyx_pybuffernd_rectangles_tmp.diminfo[1].strides))), (&(*__Pyx_BufPtrCContig1d(__pyx_t_5numpy_double_t *, __pyx_pybuffernd_mask.rcbuffer->pybuffer.buf, __pyx_t_15, __pyx_pybuffernd_mask.diminfo[0].strides))));
 
-  /* "xpipeline/cluster/src/nearestneighbors.pyx":23
+  /* "xpipeline/cluster/src/superclustertriggers.pyx":18
  * 
- *     fastlabel(npixels, &coord_array_tmp[0,0], &coord_dim_array_tmp[0],
- *               connectivity, &label_list[0])             # <<<<<<<<<<<<<<
- *     return label_list
- */
-  __pyx_t_15 = __Pyx_PyInt_As_int(__pyx_v_connectivity); if (unlikely((__pyx_t_15 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 23, __pyx_L1_error)
-  __pyx_t_17 = 0;
-  __pyx_t_18 = -1;
-  if (__pyx_t_17 < 0) {
-    __pyx_t_17 += __pyx_pybuffernd_label_list.diminfo[0].shape;
-    if (unlikely(__pyx_t_17 < 0)) __pyx_t_18 = 0;
-  } else if (unlikely(__pyx_t_17 >= __pyx_pybuffernd_label_list.diminfo[0].shape)) __pyx_t_18 = 0;
-  if (unlikely(__pyx_t_18 != -1)) {
-    __Pyx_RaiseBufferIndexError(__pyx_t_18);
-    __PYX_ERR(0, 23, __pyx_L1_error)
-  }
-
-  /* "xpipeline/cluster/src/nearestneighbors.pyx":22
- *     coord_dim_array_tmp = np.ascontiguousarray(coord_dim_array, dtype=np.float64)
- * 
- *     fastlabel(npixels, &coord_array_tmp[0,0], &coord_dim_array_tmp[0],             # <<<<<<<<<<<<<<
- *               connectivity, &label_list[0])
- *     return label_list
- */
-  fastlabel(__pyx_t_8, (&(*__Pyx_BufPtrCContig2d(__pyx_t_5numpy_double_t *, __pyx_pybuffernd_coord_array_tmp.rcbuffer->pybuffer.buf, __pyx_t_13, __pyx_pybuffernd_coord_array_tmp.diminfo[0].strides, __pyx_t_14, __pyx_pybuffernd_coord_array_tmp.diminfo[1].strides))), (&(*__Pyx_BufPtrCContig1d(__pyx_t_5numpy_double_t *, __pyx_pybuffernd_coord_dim_array_tmp.rcbuffer->pybuffer.buf, __pyx_t_16, __pyx_pybuffernd_coord_dim_array_tmp.diminfo[0].strides))), __pyx_t_15, (&(*__Pyx_BufPtrCContig1d(__pyx_t_5numpy_double_t *, __pyx_pybuffernd_label_list.rcbuffer->pybuffer.buf, __pyx_t_17, __pyx_pybuffernd_label_list.diminfo[0].strides))));
-
-  /* "xpipeline/cluster/src/nearestneighbors.pyx":24
- *     fastlabel(npixels, &coord_array_tmp[0,0], &coord_dim_array_tmp[0],
- *               connectivity, &label_list[0])
- *     return label_list             # <<<<<<<<<<<<<<
+ *     fastsupercluster(ntriggers, &rectangles_tmp[0,0], &mask[0])
+ *     return mask             # <<<<<<<<<<<<<<
  */
   __Pyx_XDECREF(__pyx_r);
-  __Pyx_INCREF(((PyObject *)__pyx_v_label_list));
-  __pyx_r = ((PyObject *)__pyx_v_label_list);
+  __Pyx_INCREF(((PyObject *)__pyx_v_mask));
+  __pyx_r = ((PyObject *)__pyx_v_mask);
   goto __pyx_L0;
 
-  /* "xpipeline/cluster/src/nearestneighbors.pyx":12
- *                     np.double_t * labelList)
+  /* "xpipeline/cluster/src/superclustertriggers.pyx":10
+ *      void fastsupercluster(const int N, np.double_t * rectangles, np.double_t * uncoveredMask)
  * 
- * def fastlabel_wrapper(object coord_array, object coord_dim_array,             # <<<<<<<<<<<<<<
- *                       connectivity, npixels):
+ * def fastsupercluster_wrapper(ntriggers, object rectangles,):             # <<<<<<<<<<<<<<
  *     cdef:
+ *         np.ndarray[np.double_t, ndim=2, mode='c'] rectangles_tmp
  */
 
   /* function exit code */
@@ -2157,21 +2038,18 @@ static PyObject *__pyx_pf_9xpipeline_7cluster_15nearestneighbor_fastlabel_wrappe
     __Pyx_PyThreadState_declare
     __Pyx_PyThreadState_assign
     __Pyx_ErrFetch(&__pyx_type, &__pyx_value, &__pyx_tb);
-    __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_coord_array_tmp.rcbuffer->pybuffer);
-    __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_coord_dim_array_tmp.rcbuffer->pybuffer);
-    __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_label_list.rcbuffer->pybuffer);
+    __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_mask.rcbuffer->pybuffer);
+    __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_rectangles_tmp.rcbuffer->pybuffer);
   __Pyx_ErrRestore(__pyx_type, __pyx_value, __pyx_tb);}
-  __Pyx_AddTraceback("xpipeline.cluster.nearestneighbor.fastlabel_wrapper", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("xpipeline.cluster.fastsupercluster.fastsupercluster_wrapper", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   goto __pyx_L2;
   __pyx_L0:;
-  __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_coord_array_tmp.rcbuffer->pybuffer);
-  __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_coord_dim_array_tmp.rcbuffer->pybuffer);
-  __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_label_list.rcbuffer->pybuffer);
+  __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_mask.rcbuffer->pybuffer);
+  __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_rectangles_tmp.rcbuffer->pybuffer);
   __pyx_L2:;
-  __Pyx_XDECREF((PyObject *)__pyx_v_coord_array_tmp);
-  __Pyx_XDECREF((PyObject *)__pyx_v_coord_dim_array_tmp);
-  __Pyx_XDECREF((PyObject *)__pyx_v_label_list);
+  __Pyx_XDECREF((PyObject *)__pyx_v_rectangles_tmp);
+  __Pyx_XDECREF((PyObject *)__pyx_v_mask);
   __Pyx_XGIVEREF(__pyx_r);
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
@@ -4602,17 +4480,17 @@ static PyMethodDef __pyx_methods[] = {
 #if PY_MAJOR_VERSION >= 3
 #if CYTHON_PEP489_MULTI_PHASE_INIT
 static PyObject* __pyx_pymod_create(PyObject *spec, PyModuleDef *def); /*proto*/
-static int __pyx_pymod_exec_nearestneighbor(PyObject* module); /*proto*/
+static int __pyx_pymod_exec_fastsupercluster(PyObject* module); /*proto*/
 static PyModuleDef_Slot __pyx_moduledef_slots[] = {
   {Py_mod_create, (void*)__pyx_pymod_create},
-  {Py_mod_exec, (void*)__pyx_pymod_exec_nearestneighbor},
+  {Py_mod_exec, (void*)__pyx_pymod_exec_fastsupercluster},
   {0, NULL}
 };
 #endif
 
 static struct PyModuleDef __pyx_moduledef = {
     PyModuleDef_HEAD_INIT,
-    "nearestneighbor",
+    "fastsupercluster",
     0, /* m_doc */
   #if CYTHON_PEP489_MULTI_PHASE_INIT
     0, /* m_size */
@@ -4649,31 +4527,28 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_ValueError, __pyx_k_ValueError, sizeof(__pyx_k_ValueError), 0, 0, 1, 1},
   {&__pyx_n_s_ascontiguousarray, __pyx_k_ascontiguousarray, sizeof(__pyx_k_ascontiguousarray), 0, 0, 1, 1},
   {&__pyx_n_s_cline_in_traceback, __pyx_k_cline_in_traceback, sizeof(__pyx_k_cline_in_traceback), 0, 0, 1, 1},
-  {&__pyx_n_s_connectivity, __pyx_k_connectivity, sizeof(__pyx_k_connectivity), 0, 0, 1, 1},
-  {&__pyx_n_s_coord_array, __pyx_k_coord_array, sizeof(__pyx_k_coord_array), 0, 0, 1, 1},
-  {&__pyx_n_s_coord_array_tmp, __pyx_k_coord_array_tmp, sizeof(__pyx_k_coord_array_tmp), 0, 0, 1, 1},
-  {&__pyx_n_s_coord_dim_array, __pyx_k_coord_dim_array, sizeof(__pyx_k_coord_dim_array), 0, 0, 1, 1},
-  {&__pyx_n_s_coord_dim_array_tmp, __pyx_k_coord_dim_array_tmp, sizeof(__pyx_k_coord_dim_array_tmp), 0, 0, 1, 1},
   {&__pyx_n_s_double, __pyx_k_double, sizeof(__pyx_k_double), 0, 0, 1, 1},
   {&__pyx_n_s_dtype, __pyx_k_dtype, sizeof(__pyx_k_dtype), 0, 0, 1, 1},
-  {&__pyx_n_s_fastlabel_wrapper, __pyx_k_fastlabel_wrapper, sizeof(__pyx_k_fastlabel_wrapper), 0, 0, 1, 1},
+  {&__pyx_n_s_fastsupercluster_wrapper, __pyx_k_fastsupercluster_wrapper, sizeof(__pyx_k_fastsupercluster_wrapper), 0, 0, 1, 1},
   {&__pyx_n_s_float64, __pyx_k_float64, sizeof(__pyx_k_float64), 0, 0, 1, 1},
   {&__pyx_n_s_import, __pyx_k_import, sizeof(__pyx_k_import), 0, 0, 1, 1},
-  {&__pyx_n_s_label_list, __pyx_k_label_list, sizeof(__pyx_k_label_list), 0, 0, 1, 1},
   {&__pyx_n_s_main, __pyx_k_main, sizeof(__pyx_k_main), 0, 0, 1, 1},
+  {&__pyx_n_s_mask, __pyx_k_mask, sizeof(__pyx_k_mask), 0, 0, 1, 1},
   {&__pyx_n_s_name, __pyx_k_name, sizeof(__pyx_k_name), 0, 0, 1, 1},
   {&__pyx_kp_u_ndarray_is_not_C_contiguous, __pyx_k_ndarray_is_not_C_contiguous, sizeof(__pyx_k_ndarray_is_not_C_contiguous), 0, 1, 0, 0},
   {&__pyx_kp_u_ndarray_is_not_Fortran_contiguou, __pyx_k_ndarray_is_not_Fortran_contiguou, sizeof(__pyx_k_ndarray_is_not_Fortran_contiguou), 0, 1, 0, 0},
   {&__pyx_n_s_np, __pyx_k_np, sizeof(__pyx_k_np), 0, 0, 1, 1},
-  {&__pyx_n_s_npixels, __pyx_k_npixels, sizeof(__pyx_k_npixels), 0, 0, 1, 1},
+  {&__pyx_n_s_ntriggers, __pyx_k_ntriggers, sizeof(__pyx_k_ntriggers), 0, 0, 1, 1},
   {&__pyx_n_s_numpy, __pyx_k_numpy, sizeof(__pyx_k_numpy), 0, 0, 1, 1},
   {&__pyx_kp_s_numpy_core_multiarray_failed_to, __pyx_k_numpy_core_multiarray_failed_to, sizeof(__pyx_k_numpy_core_multiarray_failed_to), 0, 0, 1, 0},
   {&__pyx_kp_s_numpy_core_umath_failed_to_impor, __pyx_k_numpy_core_umath_failed_to_impor, sizeof(__pyx_k_numpy_core_umath_failed_to_impor), 0, 0, 1, 0},
   {&__pyx_n_s_range, __pyx_k_range, sizeof(__pyx_k_range), 0, 0, 1, 1},
+  {&__pyx_n_s_rectangles, __pyx_k_rectangles, sizeof(__pyx_k_rectangles), 0, 0, 1, 1},
+  {&__pyx_n_s_rectangles_tmp, __pyx_k_rectangles_tmp, sizeof(__pyx_k_rectangles_tmp), 0, 0, 1, 1},
   {&__pyx_n_s_test, __pyx_k_test, sizeof(__pyx_k_test), 0, 0, 1, 1},
   {&__pyx_kp_u_unknown_dtype_code_in_numpy_pxd, __pyx_k_unknown_dtype_code_in_numpy_pxd, sizeof(__pyx_k_unknown_dtype_code_in_numpy_pxd), 0, 1, 0, 0},
-  {&__pyx_n_s_xpipeline_cluster_nearestneighbo, __pyx_k_xpipeline_cluster_nearestneighbo, sizeof(__pyx_k_xpipeline_cluster_nearestneighbo), 0, 0, 1, 1},
-  {&__pyx_kp_s_xpipeline_cluster_src_nearestnei, __pyx_k_xpipeline_cluster_src_nearestnei, sizeof(__pyx_k_xpipeline_cluster_src_nearestnei), 0, 0, 1, 0},
+  {&__pyx_n_s_xpipeline_cluster_fastsuperclust, __pyx_k_xpipeline_cluster_fastsuperclust, sizeof(__pyx_k_xpipeline_cluster_fastsuperclust), 0, 0, 1, 1},
+  {&__pyx_kp_s_xpipeline_cluster_src_superclust, __pyx_k_xpipeline_cluster_src_superclust, sizeof(__pyx_k_xpipeline_cluster_src_superclust), 0, 0, 1, 0},
   {&__pyx_n_s_zeros, __pyx_k_zeros, sizeof(__pyx_k_zeros), 0, 0, 1, 1},
   {0, 0, 0, 0, 0, 0, 0}
 };
@@ -4768,17 +4643,17 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GOTREF(__pyx_tuple__7);
   __Pyx_GIVEREF(__pyx_tuple__7);
 
-  /* "xpipeline/cluster/src/nearestneighbors.pyx":12
- *                     np.double_t * labelList)
+  /* "xpipeline/cluster/src/superclustertriggers.pyx":10
+ *      void fastsupercluster(const int N, np.double_t * rectangles, np.double_t * uncoveredMask)
  * 
- * def fastlabel_wrapper(object coord_array, object coord_dim_array,             # <<<<<<<<<<<<<<
- *                       connectivity, npixels):
+ * def fastsupercluster_wrapper(ntriggers, object rectangles,):             # <<<<<<<<<<<<<<
  *     cdef:
+ *         np.ndarray[np.double_t, ndim=2, mode='c'] rectangles_tmp
  */
-  __pyx_tuple__8 = PyTuple_Pack(7, __pyx_n_s_coord_array, __pyx_n_s_coord_dim_array, __pyx_n_s_connectivity, __pyx_n_s_npixels, __pyx_n_s_coord_array_tmp, __pyx_n_s_coord_dim_array_tmp, __pyx_n_s_label_list); if (unlikely(!__pyx_tuple__8)) __PYX_ERR(0, 12, __pyx_L1_error)
+  __pyx_tuple__8 = PyTuple_Pack(4, __pyx_n_s_ntriggers, __pyx_n_s_rectangles, __pyx_n_s_rectangles_tmp, __pyx_n_s_mask); if (unlikely(!__pyx_tuple__8)) __PYX_ERR(0, 10, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__8);
   __Pyx_GIVEREF(__pyx_tuple__8);
-  __pyx_codeobj__9 = (PyObject*)__Pyx_PyCode_New(4, 0, 7, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__8, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_xpipeline_cluster_src_nearestnei, __pyx_n_s_fastlabel_wrapper, 12, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__9)) __PYX_ERR(0, 12, __pyx_L1_error)
+  __pyx_codeobj__9 = (PyObject*)__Pyx_PyCode_New(2, 0, 4, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__8, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_xpipeline_cluster_src_superclust, __pyx_n_s_fastsupercluster_wrapper, 10, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__9)) __PYX_ERR(0, 10, __pyx_L1_error)
   __Pyx_RefNannyFinishContext();
   return 0;
   __pyx_L1_error:;
@@ -4903,11 +4778,11 @@ static int __Pyx_modinit_function_import_code(void) {
 
 
 #if PY_MAJOR_VERSION < 3
-__Pyx_PyMODINIT_FUNC initnearestneighbor(void) CYTHON_SMALL_CODE; /*proto*/
-__Pyx_PyMODINIT_FUNC initnearestneighbor(void)
+__Pyx_PyMODINIT_FUNC initfastsupercluster(void) CYTHON_SMALL_CODE; /*proto*/
+__Pyx_PyMODINIT_FUNC initfastsupercluster(void)
 #else
-__Pyx_PyMODINIT_FUNC PyInit_nearestneighbor(void) CYTHON_SMALL_CODE; /*proto*/
-__Pyx_PyMODINIT_FUNC PyInit_nearestneighbor(void)
+__Pyx_PyMODINIT_FUNC PyInit_fastsupercluster(void) CYTHON_SMALL_CODE; /*proto*/
+__Pyx_PyMODINIT_FUNC PyInit_fastsupercluster(void)
 #if CYTHON_PEP489_MULTI_PHASE_INIT
 {
   return PyModuleDef_Init(&__pyx_moduledef);
@@ -4974,7 +4849,7 @@ bad:
 }
 
 
-static CYTHON_SMALL_CODE int __pyx_pymod_exec_nearestneighbor(PyObject *__pyx_pyinit_module)
+static CYTHON_SMALL_CODE int __pyx_pymod_exec_fastsupercluster(PyObject *__pyx_pyinit_module)
 #endif
 #endif
 {
@@ -4983,7 +4858,7 @@ static CYTHON_SMALL_CODE int __pyx_pymod_exec_nearestneighbor(PyObject *__pyx_py
   #if CYTHON_PEP489_MULTI_PHASE_INIT
   if (__pyx_m) {
     if (__pyx_m == __pyx_pyinit_module) return 0;
-    PyErr_SetString(PyExc_RuntimeError, "Module 'nearestneighbor' has already been imported. Re-initialisation is not supported.");
+    PyErr_SetString(PyExc_RuntimeError, "Module 'fastsupercluster' has already been imported. Re-initialisation is not supported.");
     return -1;
   }
   #elif PY_MAJOR_VERSION >= 3
@@ -4998,7 +4873,7 @@ if (!__Pyx_RefNanny) {
       Py_FatalError("failed to import 'refnanny' module");
 }
 #endif
-  __Pyx_RefNannySetupContext("__Pyx_PyMODINIT_FUNC PyInit_nearestneighbor(void)", 0);
+  __Pyx_RefNannySetupContext("__Pyx_PyMODINIT_FUNC PyInit_fastsupercluster(void)", 0);
   if (__Pyx_check_binary_version() < 0) __PYX_ERR(0, 1, __pyx_L1_error)
   #ifdef __Pxy_PyFrame_Initialize_Offsets
   __Pxy_PyFrame_Initialize_Offsets();
@@ -5037,7 +4912,7 @@ if (!__Pyx_RefNanny) {
   Py_INCREF(__pyx_m);
   #else
   #if PY_MAJOR_VERSION < 3
-  __pyx_m = Py_InitModule4("nearestneighbor", __pyx_methods, 0, 0, PYTHON_API_VERSION); Py_XINCREF(__pyx_m);
+  __pyx_m = Py_InitModule4("fastsupercluster", __pyx_methods, 0, 0, PYTHON_API_VERSION); Py_XINCREF(__pyx_m);
   #else
   __pyx_m = PyModule_Create(&__pyx_moduledef);
   #endif
@@ -5056,14 +4931,14 @@ if (!__Pyx_RefNanny) {
   #if PY_MAJOR_VERSION < 3 && (__PYX_DEFAULT_STRING_ENCODING_IS_ASCII || __PYX_DEFAULT_STRING_ENCODING_IS_DEFAULT)
   if (__Pyx_init_sys_getdefaultencoding_params() < 0) __PYX_ERR(0, 1, __pyx_L1_error)
   #endif
-  if (__pyx_module_is_main_xpipeline__cluster__nearestneighbor) {
+  if (__pyx_module_is_main_xpipeline__cluster__fastsupercluster) {
     if (PyObject_SetAttr(__pyx_m, __pyx_n_s_name, __pyx_n_s_main) < 0) __PYX_ERR(0, 1, __pyx_L1_error)
   }
   #if PY_MAJOR_VERSION >= 3
   {
     PyObject *modules = PyImport_GetModuleDict(); if (unlikely(!modules)) __PYX_ERR(0, 1, __pyx_L1_error)
-    if (!PyDict_GetItemString(modules, "xpipeline.cluster.nearestneighbor")) {
-      if (unlikely(PyDict_SetItemString(modules, "xpipeline.cluster.nearestneighbor", __pyx_m) < 0)) __PYX_ERR(0, 1, __pyx_L1_error)
+    if (!PyDict_GetItemString(modules, "xpipeline.cluster.fastsupercluster")) {
+      if (unlikely(PyDict_SetItemString(modules, "xpipeline.cluster.fastsupercluster", __pyx_m) < 0)) __PYX_ERR(0, 1, __pyx_L1_error)
     }
   }
   #endif
@@ -5084,8 +4959,8 @@ if (!__Pyx_RefNanny) {
   if (__Pyx_patch_abc() < 0) __PYX_ERR(0, 1, __pyx_L1_error)
   #endif
 
-  /* "xpipeline/cluster/src/nearestneighbors.pyx":4
- * # distutils: sources = xpipeline/cluster/src/fastlabel.cpp
+  /* "xpipeline/cluster/src/superclustertriggers.pyx":4
+ * # distutils: sources = xpipeline/cluster/src/fastsupercluster.cpp
  * 
  * import numpy as np             # <<<<<<<<<<<<<<
  * cimport numpy as np
@@ -5096,21 +4971,21 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_np, __pyx_t_1) < 0) __PYX_ERR(0, 4, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "xpipeline/cluster/src/nearestneighbors.pyx":12
- *                     np.double_t * labelList)
+  /* "xpipeline/cluster/src/superclustertriggers.pyx":10
+ *      void fastsupercluster(const int N, np.double_t * rectangles, np.double_t * uncoveredMask)
  * 
- * def fastlabel_wrapper(object coord_array, object coord_dim_array,             # <<<<<<<<<<<<<<
- *                       connectivity, npixels):
+ * def fastsupercluster_wrapper(ntriggers, object rectangles,):             # <<<<<<<<<<<<<<
  *     cdef:
+ *         np.ndarray[np.double_t, ndim=2, mode='c'] rectangles_tmp
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_9xpipeline_7cluster_15nearestneighbor_1fastlabel_wrapper, NULL, __pyx_n_s_xpipeline_cluster_nearestneighbo); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 12, __pyx_L1_error)
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_9xpipeline_7cluster_16fastsupercluster_1fastsupercluster_wrapper, NULL, __pyx_n_s_xpipeline_cluster_fastsuperclust); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 10, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_fastlabel_wrapper, __pyx_t_1) < 0) __PYX_ERR(0, 12, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_fastsupercluster_wrapper, __pyx_t_1) < 0) __PYX_ERR(0, 10, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "xpipeline/cluster/src/nearestneighbors.pyx":1
+  /* "xpipeline/cluster/src/superclustertriggers.pyx":1
  * # distutils: language = c++             # <<<<<<<<<<<<<<
- * # distutils: sources = xpipeline/cluster/src/fastlabel.cpp
+ * # distutils: sources = xpipeline/cluster/src/fastsupercluster.cpp
  * 
  */
   __pyx_t_1 = __Pyx_PyDict_NewPresized(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 1, __pyx_L1_error)
@@ -5133,11 +5008,11 @@ if (!__Pyx_RefNanny) {
   __Pyx_XDECREF(__pyx_t_1);
   if (__pyx_m) {
     if (__pyx_d) {
-      __Pyx_AddTraceback("init xpipeline.cluster.nearestneighbor", __pyx_clineno, __pyx_lineno, __pyx_filename);
+      __Pyx_AddTraceback("init xpipeline.cluster.fastsupercluster", __pyx_clineno, __pyx_lineno, __pyx_filename);
     }
     Py_CLEAR(__pyx_m);
   } else if (!PyErr_Occurred()) {
-    PyErr_SetString(PyExc_ImportError, "init xpipeline.cluster.nearestneighbor");
+    PyErr_SetString(PyExc_ImportError, "init xpipeline.cluster.fastsupercluster");
   }
   __pyx_L0:;
   __Pyx_RefNannyFinishContext();

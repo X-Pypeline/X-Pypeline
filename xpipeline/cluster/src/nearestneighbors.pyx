@@ -6,7 +6,7 @@ cimport numpy as np
 
 cdef extern from "fastlabel.h" nogil:
      void fastlabel(const int nPixels, np.double_t * coords,
-                    np.double_t * coordDim, const int nNeighboors,
+                    np.double_t * coordDim, const int nNeighbors,
                     np.double_t * labelList)
 
 def fastlabel_wrapper(object coord_array, object coord_dim_array,

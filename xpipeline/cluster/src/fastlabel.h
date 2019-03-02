@@ -7,4 +7,4 @@
 
 using namespace std;
 
-void fastlabel(const int nPixels, const double *coords, const double *coordDim, const int nNeighboors, double *labelList);
+void fastlabel(const int nPixels, const double *coords, const double *coordDim, const int nNeighbors, double *labelList);

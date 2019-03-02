@@ -422,8 +422,8 @@ class csc_XSparseTimeFrequencyMap(csc_sparse_map):
             'x0' : tables.Float64Col(),
             'y0' : tables.Float64Col(),
             'shape' : tables.Int64Col(2),
-            'phi' : tables.Float32Col(),
-            'theta' : tables.Float32Col(),
+            'phi' : tables.Float64Col(),
+            'theta' : tables.Float64Col(),
             'map_type' : tables.StringCol(20),
             'ifo' : tables.StringCol(2),
             'x' : tables.Float64Col(shape=self.tindex.size),
@@ -496,11 +496,11 @@ class csc_XSparseTimeFrequencyMap(csc_sparse_map):
         energy = row['energy']
         tf_map = cls((energy, (x, y)), shape=shape, dx=dx, dy=dy,
                     x0=x0, y0=y0, map_type=map_type, name=ifo, phi=phi, theta=theta)
-        tf_map.tindex = x[:tf_map.size]
-        tf_map.findex = y[:tf_map.size]
-        tf_map.energy = energy[:tf_map.size]
-        tf_map.xindex = numpy.arange(x0, x0 + shape[0], dx)
-        tf_map.yindex = numpy.arange(y0, y0 + shape[1], dy)
+        tf_map.tindex = x[:tf_map.size-1].astype(int)
+        tf_map.findex = y[:tf_map.size-1].astype(int)
+        tf_map.energy = energy[:tf_map.size-1]
+        tf_map.xindex = numpy.arange(x0, x0 + dx*shape[0], dx)
+        tf_map.yindex = numpy.arange(y0, y0 + dy*shape[1], dy)
         return tf_map
 
     def label(self, connectivity=8):

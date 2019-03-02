@@ -49,4 +49,13 @@ class XCluster(pandas.DataFrame):
         columns = kwargs.pop('columns', _default_columns)
         dtype = kwargs.pop('dtype', _default_dtype)
         tab = cls(cluster_array, columns=columns, dtype=dtype)
+        tab.dt = tab.max_time_of_cluster - tab.min_time_of_cluster
+        tab.df = tb.max_frequency_of_cluster - tab.min_frequency_of_cluster
         return tab
+
+    def supercluster(self, statistic_column='energy_of_cluster'):
+        bounding_box_columns = ['min_time_of_cluster', 'min_frequency_of_cluster',
+                                 'dt', 'df']
+        bounding_box_columns.append(statistic_column)
+        mask = self[bounding_box_columns].values
+        return self[mask]
