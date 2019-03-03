@@ -19,11 +19,8 @@ inline double min(double a,double b)
   return b;
 }
 
-void fastsparseclusterprop(const double *dimArray, const double *labelledMap, const double *likelihoodMap, const double *pixTime, const double *pixFreq, double *clusterArray, const bool doTFprops)
+void fastsparseclusterprop(const double *labelledMap, const double *likelihoodMap, const double *pixTime, const double *pixFreq, double *clusterArray, const bool doTFprops, const double *dimArray)
 {
-  //Declaration
-  int nDims;
-
   // check input variable, if time/frequency scale information is
   // available do produce the cluster time/frequency information
   int nTFcols;
@@ -37,25 +34,9 @@ void fastsparseclusterprop(const double *dimArray, const double *labelledMap, co
       nTFcols = 0;
     }
 
-  // Number of dimesnion and size
-  nDims=dimArray[2];
-  if (3 != nDims && 2 != nDims)  {
-    printf("%s\n","Error the number of dimension for likelihoodMap is not 2 or 3");
-    return ;
-  }
-  int nLikelihoods;
   int colLen=dimArray[0];
   int rowLen=dimArray[1];
-
-  if( 3== nDims) {
-    nLikelihoods=dimArray[2]; }
-  else {
-    nLikelihoods=1;}
-    
-  if ( rowLen > 1 )
-    {
-      std::cout << "More than column, this function supports only the list of pixel format which should have a single column for the full TF map" << std::endl;
-    }
+  int nLikelihoods=dimArray[2];
 
   int nClusters=0;
   for(int j=0;j<colLen;j++)

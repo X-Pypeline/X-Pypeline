@@ -44,6 +44,12 @@ class csc_sparse_map(sparse.csc_matrix):
         self.theta = kwargs.pop('theta', None)
         self.map_type = kwargs.pop('map_type', 'excess_energy')
         super(csc_sparse_map, self).__init__(matrix, **kwargs)
+        if getattr(self, 'tindex') is None:
+            setattr(self, 'tindex', self.nonzero()[0])
+        if getattr(self, 'findex') is None:
+            setattr(self,'findex', self.nonzero()[1])
+        if getattr(self, 'energy') is None:
+            setattr(self, 'energy', self.A[self.tindex, self.findex])
 
     def _repr_helper(self, print_):
         if print_ is repr:

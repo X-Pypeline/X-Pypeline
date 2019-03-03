@@ -268,7 +268,7 @@ class XTimeSeries(TimeSeriesDict):
 
         return whitened_timeseries
 
-    def highpass(self, frequency):
+    def highpass(self, frequency, corruption=2):
         """Design a high-pass filter.
         
         Parameters
@@ -277,7 +277,8 @@ class XTimeSeries(TimeSeriesDict):
             high-pass corner frequency
         """
         for k, v in self.items():
-            self[k] = v.highpass(frequency)
+            ts_hp = v.highpass(frequency)
+            self[k] = ts_hp.crop(*ts_hp.span.contract(corruption))
 
         return self
 

@@ -23,7 +23,9 @@ from gwpy.frequencyseries import FrequencySeries
 import copy
 
 __author__ = 'Scott Coughlin <scott.coughlin@ligo.org>'
-__all__ = ['XFrequencySeriesDict', 'convert_to_dominant_polarization_frame']
+__all__ = ['XFrequencySeriesDict',
+           'XAntennaProjectedFrequencySeriesDict',
+           'convert_to_dominant_polarization_frame']
 
 class XFrequencySeriesDict(OrderedDict):
     def project_onto_antenna_patterns(self, antenna_responses,
@@ -49,12 +51,12 @@ class XFrequencySeriesDict(OrderedDict):
                 relevant angle parameter that would project the data into
                 the orthogonal cross plus polarization frame.
         """
-        antenna_response_asds = OrderedDict()
+        antenna_response_asds = XAntennaProjectedFrequencySeriesDict()
         for pattern, responses in antenna_responses.items():
             antenna_weighted_asds = XFrequencySeriesDict()
-            for det, asd in self.items():
-                abbr_det = det.split(':')[0]
-                antenna_weighted_asds[det] = responses[abbr_det] / asd
+            for ifo, asd in self.items():
+                abbr_ifo = ifo.split(':')[0]
+                antenna_weighted_asds[ifo] = responses[abbr_ifo] / asd
 
             antenna_response_asds[pattern] = antenna_weighted_asds
 
@@ -73,7 +75,7 @@ class XFrequencySeriesDict(OrderedDict):
                     -np.sin(2*psi[:,detidx]) * tmp['f_plus'][idet] +
                     np.cos(2*psi[:,detidx]) * tmp['f_cross'][idet]
                     )
-            
+
 
         return antenna_response_asds
 
@@ -102,7 +104,6 @@ class XFrequencySeriesDict(OrderedDict):
         """
         return sum([v**2 for v in self.values()])
 
-
     def slice_frequencies(self, indices):
         """select a subset of frequencies from XFrequencySeriesDict
 
@@ -120,6 +121,22 @@ class XFrequencySeriesDict(OrderedDict):
 
         return asd_subset
 
+class XAntennaProjectedFrequencySeriesDict(OrderedDict):
+    """Controls a dictionaries of projected asds
+    """
+    def to_unit(self):
+        """Find unit vector of a series of asds
+
+           Returns:
+               `XAntennaProjectedFrequencySeriesDict`
+        """
+        for k, v in self.items():
+            unit_dpf_asds = XFrequencySeriesDict()
+            for k1, v1 in v.items():
+                unit_dpf_asds[k1] = v1 / v.to_m_ab()
+            self[k] = unit_dpf_asds
+
+        return self
 
 def convert_to_dominant_polarization_frame(Fp, Fc):
     """Take in stream of fplus and ≈f_cross and convert to DPF

@@ -350,9 +350,7 @@ class XSparseTimeFrequencyMapDict(OrderedDict):
 
             labelled_map = nearestneighbor.fastlabel_wrapper(pixels + 1, coord_dim_array, connectivity, npixels).astype(int)
 
-            dim_array = numpy.array([total_energy.shape[0], 1, 2.0])
-
-            cluster_array = clusterproperties.clusterproperities_wrapper(dim_array, labelled_map, total_energy, pixels[0,:] + 1, pixels[1,:] + 1, True).T
+            cluster_array = clusterproperties.clusterproperities_wrapper(labelled_map, total_energy, True, pixels[0,:] + 1, pixels[1,:] + 1).T
 
             cluster_array[:, 0:3] = cluster_array[:, 0:3] * (v.xindex[2] - v.xindex[1])  + v.xindex[0]
 
@@ -514,6 +512,34 @@ class csc_XSparseTimeFrequencyMap(csc_sparse_map):
 
         self.pixel_labels = labelled_map
         return
+
+    def cluster(self, method='nearest_neighbors', **kwargs):
+        """Convert dict fo sparse matrix to `XTimeFrequencyMapDict`
+        """
+        if method=='nearest_neighbors':
+            connectivity = kwargs.pop('connectivity', 8)
+            total_energy = self.energy
+            pixels = numpy.vstack([self.tindex, self.findex])
+            coord_dim_array = self.shape
+
+            npixels = pixels.shape[1]
+
+            if getattr(self, 'pixel_labels') is None:
+                labelled_map = nearestneighbor.fastlabel_wrapper(pixels + 1, coord_dim_array, connectivity, npixels).astype(int)
+            else:
+                labelled_map = self.pixel_labels
+
+            cluster_array = clusterproperties.clusterproperities_wrapper(labelled_map, total_energy, True, pixels[0,:] + 1, pixels[1,:] + 1).T
+
+            if ((getattr(self, 'dx') is not None) and (getattr(self, 'dy') is not None) and
+                (getattr(self, 'x0') is not None) and (getattr(self, 'y0') is not None)):
+                cluster_array[:, 0:3] = cluster_array[:, 0:3] * v.dx  + v.x0
+
+                cluster_array[:, 3:6] = cluster_array[:, 3:6] * v.dy  + v.y0
+
+            return XCluster.nearest_neighbor(cluster_array, labelled_map)
+        else:
+            raise ValueError('Clustering method undefined')
 
     def plot(self, **kwargs):
         """Plot the data for this `XTimeFrequencyMapDict`.

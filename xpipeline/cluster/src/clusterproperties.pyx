@@ -6,14 +6,14 @@ cimport numpy as np
 from libcpp cimport bool
 
 cdef extern from "fastsparseclusterprop.h" nogil:
-    void fastsparseclusterprop(np.double_t *dimArray, np.double_t *labelledMap,
-                               np.double_t *likelihoodMap, np.double_t *pixTime,
-                               np.double_t *pixFreq, np.double_t *clusterArray,
-                               const bool tf_properties)
+    void fastsparseclusterprop(np.double_t *labelledMap, np.double_t *likelihoodMap,
+                               np.double_t *pixTime, np.double_t *pixFreq,
+                               np.double_t *clusterArray,
+                               const bool tf_properties, np.double_t *dimArray)
 
-def clusterproperities_wrapper(object dimension_array, object labelled_map,
-                               object likelihood_map, object pixel_time,
-                               object pixel_freq, tf_properties):
+def clusterproperities_wrapper(object labelled_map, object likelihood,
+                               tf_properties=False, pixel_time=None,
+                               pixel_freq=None):
     """This outputs properities of every cluster on the TF map
         Returns:
             cluster_array (array):
@@ -37,20 +37,46 @@ def clusterproperities_wrapper(object dimension_array, object labelled_map,
     cdef:
         np.ndarray[np.double_t, ndim=1, mode='c'] dimension_array_tmp
         np.ndarray[np.double_t, ndim=1, mode='c'] labelled_map_tmp
-        np.ndarray[np.double_t, ndim=1, mode='c'] likelihood_map_tmp
+        np.ndarray[np.double_t, ndim=3, mode='c'] likelihood_tmp
         np.ndarray[np.double_t, ndim=1, mode='c'] pixel_time_tmp
         np.ndarray[np.double_t, ndim=1, mode='c'] pixel_freq_tmp
-        np.ndarray[np.double_t, ndim=2, mode='c'] cluster_array = np.zeros((8, labelled_map.max()), dtype=np.double)
+        np.ndarray[np.double_t, ndim=2, mode='c'] cluster_array
 
-    dimension_array_tmp = np.ascontiguousarray(dimension_array, dtype=np.float64)
+    # FIXME: This crazy reshaping is from the original logic being in MATLAB
+    # I am sure with the numpy array format a cpp there is a way to not have to do this
+    likelihood = likelihood.reshape(labelled_map.size, 1, -1)
+
+    # FIXME the variable seems like it should not need to be passed!
+    dimension_array_tmp = np.ascontiguousarray(likelihood.shape, dtype=np.float64)
+
+    # If we do want tf_properities we need to have more columns in our array where
+    # those values will go. If we do not then we just want the sum of likelihoods over clusters
+    if tf_properties:
+        cluster_array = np.zeros((7 + likelihood.shape[-1], labelled_map.max()), dtype=np.double)
+    else:
+        cluster_array = np.zeros((likelihood.shape[-1], labelled_map.max()), dtype=np.double)
+
+    # Pass in the nearest neighbor labels of all clusters
     labelled_map_tmp = np.ascontiguousarray(labelled_map, dtype=np.float64)
-    likelihood_map_tmp = np.ascontiguousarray(likelihood_map, dtype=np.float64)
-    pixel_time_tmp = np.ascontiguousarray(pixel_time, dtype=np.float64)
-    pixel_freq_tmp = np.ascontiguousarray(pixel_freq, dtype=np.float64)
 
+    # Pass in a flattened array of likelihoods to calc statistics on
+    likelihood_tmp = np.ascontiguousarray(likelihood, dtype=np.float64)
 
-    fastsparseclusterprop(&dimension_array_tmp[0], &labelled_map_tmp[0],
-                          &likelihood_map_tmp[0],
+    # Pass in the start time of pixels
+    if tf_properties:
+        pixel_time_tmp = np.ascontiguousarray(pixel_time, dtype=np.float64)
+    else:
+        pixel_time_tmp = np.ascontiguousarray(np.zeros(labelled_map.size), dtype=np.float64)
+
+    # pass in the end time of pixels
+    if tf_properties:
+        pixel_freq_tmp = np.ascontiguousarray(pixel_freq, dtype=np.float64)
+    else:
+        pixel_freq_tmp = np.ascontiguousarray(np.zeros(labelled_map.size), dtype=np.float64)
+
+    fastsparseclusterprop(&labelled_map_tmp[0], &likelihood_tmp[0,0,0],
                           &pixel_time_tmp[0], &pixel_freq_tmp[0],
-                          &cluster_array[0,0], tf_properties)
+                          &cluster_array[0,0], tf_properties,
+                          &dimension_array_tmp[0])
+
     return cluster_array
