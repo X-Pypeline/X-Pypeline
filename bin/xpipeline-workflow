@@ -6,7 +6,7 @@
 
 # ---- Import standard modules to the python path.
 import sys, os, shutil, math, random, copy, getopt, re, string, time
-import glob, operator, argparse, socket, socket, uuid, pdb
+import glob, operator, argparse, socket, socket, uuid
 import numpy as np
 from glue import pipeline
 from numpy import loadtxt

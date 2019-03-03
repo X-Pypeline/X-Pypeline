@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 from xpipeline.core import XSparseTimeFrequencyMapDict, csc_XSparseTimeFrequencyMap
 from xpipeline.cluster.cluster import XCluster
-from csv import writer
+from xpipeline.setuputils import log
 
-import io
 import argparse
 import os
 import tables
@@ -24,7 +23,7 @@ def parse_commandline():
 
     args = parser.parse_args()
 
-    if os.path.isfile(args.event_file):
+    if not os.path.isfile(args.event_file):
         raise parser.error('You have supplied a non-existent event-file.')
 
     return args
@@ -35,13 +34,15 @@ logger = log.Logger('XPIPELINE: Post-Processing {0}'.format(args.event_file))
 
 # Read parameters
 f = tables.open_file(args.event_file)
-all_clusters = pandas.DataFrame()
-for table in f.walk_nodes('/background', "Table"):
+for table in f.walk_nodes('/injection', "Table"):
     channel_names = numpy.unique(table.cols.ifo).astype(str)
+    all_clusters = pandas.DataFrame()
     for fft_length in set(table.cols.dx):
         for phi, theta in set(zip(table.cols.phi, table.cols.theta)):
             sparse_maps = [csc_XSparseTimeFrequencyMap.read(row)
                             for row in table.where("""(dx == {0}) & (map_type == \'excess_energy\') & (phi == {1}) & (theta == {2})""".format(fft_length, phi, theta,))]
             sparse_maps = XSparseTimeFrequencyMapDict({imap.name: imap for imap in sparse_maps})
-            clusters = sparse_maps.abs().cluster()
-        all_clusters = all_clusters.append(clusters) 
+
+            clusters = sparse_maps.cluster()
+        all_clusters = all_clusters.append(clusters)
+    all_clusters.supercluster().to_hdf('clusters.h5', key=table._v_pathname, index=False,)

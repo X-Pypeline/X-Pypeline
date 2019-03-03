@@ -181,7 +181,7 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
     # likelihoods to analze
     time_slides = dict(zip(channel_names, time_slide))
     try:
-        analysis_data = XTimeSeries.read('examples/Oct_10_2015_data.hdf5')
+        analysis_data = XTimeSeries.read('examples/local_data.hdf5')
     except:
         analysis_data = XTimeSeries.retrieve_data(event_time, block_time,
                                                   channel_names, sample_frequency,
@@ -223,6 +223,8 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
 
             # Whiten the timeseries
             whitened_timeseries = data.whiten(asds)
+            for k, v in whitened_timeseries.items():
+                whitened_timeseries[k] = v.crop(*v.span.contract(2))
 
             # Obtain detector specific information
             detectors = {}
@@ -244,7 +246,7 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                 ####################
 
                 # Make a spectrogram that contains phase information
-                fft_grams_fixed = whitened_timeseries.fftgram(fft_length)
+                fft_grams_fixed = whitened_timeseries.fftgram(fft_length).crop_frequencies(minimum_frequency, maximum_frequency)
 
                 # determine how many indices every pixel needs to move
                 # with respect to the internal time slides
@@ -261,7 +263,9 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                     antenna_patterns = compute_antenna_patterns(['H1', 'L1'], phi, theta,
                                                                 antenna_patterns=['f_plus', 'f_cross'])
                     projected_asds = asds.project_onto_antenna_patterns(antenna_patterns,
-                                                                            to_dominant_polarization_frame=True)
+                                                                        to_dominant_polarization_frame=True)
+
+                    projected_asds = projected_asds.to_unit()
 
                     # NOTE we calculate everything from here to the loop over
                     # internal time slides for the non-slide maps

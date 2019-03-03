@@ -1,7 +1,7 @@
 #include "math.h"
 #include "stdio.h"
-#include<string>
-#include<iostream>
+#include <string>
+#include <iostream>
 
 using namespace std;
 

@@ -193,6 +193,27 @@ class XTimeFrequencyMapDict(OrderedDict):
                                      for k,v in self.items()}
                                     )
 
+    def crop_frequencies(self, low=None, high=None,):
+        """Crop this `Spectrogram` to the specified frequencies
+
+        Parameters
+        ----------
+        low : `float`
+            lower frequency bound for cropped `Spectrogram`
+        high : `float`
+            upper frequency bound for cropped `Spectrogram`
+
+        Returns
+        -------
+        spec : `Spectrogram`
+            A new `Spectrogram` with a subset of data from the frequency
+            axis
+        """
+        for k, v in self.items():
+            self[k] = v.crop_frequencies(low=low, high=high)
+
+        return self
+
 
 class XTimeFrequencyMap(Spectrogram):
     def blackout_pixels(self, blackpixel_percentile, **kwargs):
@@ -343,6 +364,8 @@ class XSparseTimeFrequencyMapDict(OrderedDict):
             total_energy = 0
             for k, v in self.items():
                 total_energy += v.energy
+
+            total_energy = numpy.abs(total_energy)
             pixels = numpy.vstack([v.tindex, v.findex])
             coord_dim_array = (v.xindex.size, v.yindex.size)
 
