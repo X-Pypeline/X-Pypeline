@@ -8,8 +8,9 @@ from libcpp cimport bool
 cdef extern from "fastsparseclusterprop.h" nogil:
     void fastsparseclusterprop(np.double_t *labelledMap, np.double_t *likelihoodMap,
                                np.double_t *pixTime, np.double_t *pixFreq,
-                               np.double_t *clusterArray,
-                               const bool tf_properties, np.double_t *dimArray)
+                               double clusterArray[],
+                               const bool tf_properties, np.double_t *dimArray,
+                               const int nClusters)
 
 def clusterproperities_wrapper(object labelled_map, object likelihood,
                                tf_properties=False, pixel_time=None,
@@ -77,6 +78,6 @@ def clusterproperities_wrapper(object labelled_map, object likelihood,
     fastsparseclusterprop(&labelled_map_tmp[0], &likelihood_tmp[0,0,0],
                           &pixel_time_tmp[0], &pixel_freq_tmp[0],
                           &cluster_array[0,0], tf_properties,
-                          &dimension_array_tmp[0])
+                          &dimension_array_tmp[0], labelled_map.max().astype(int))
 
     return cluster_array

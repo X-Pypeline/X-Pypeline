@@ -40,9 +40,10 @@ for table in f.walk_nodes('/injection', "Table"):
     for fft_length in set(table.cols.dx):
         for phi, theta in set(zip(table.cols.phi, table.cols.theta)):
             sparse_maps = [csc_XSparseTimeFrequencyMap.read(row)
-                            for row in table.where("""(dx == {0}) & (map_type == \'excess_energy\') & (phi == {1}) & (theta == {2})""".format(fft_length, phi, theta,))]
+                            for row in table.where("""(dx == {0}) & (map_type == \'f_plus\') & (phi == {1}) & (theta == {2})""".format(fft_length, phi, theta,))]
             sparse_maps = XSparseTimeFrequencyMapDict({imap.name: imap for imap in sparse_maps})
-
+            import pdb
+            pdb.set_trace()
             clusters = sparse_maps.cluster()
         all_clusters = all_clusters.append(clusters)
     all_clusters.supercluster().to_hdf('clusters.h5', key=table._v_pathname, index=False,)

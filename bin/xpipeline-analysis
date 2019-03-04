@@ -201,19 +201,24 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
         injection_scales = [None]
         injection_numbers = [None]
 
-    for injection_scale in injection_scales:
-        for injection_number in injection_numbers:
+    # Loop over injections
+    for injection_number in injection_numbers:
+        if args.job_type == 'injection':
+            logger.info('Creating injection number {0}'.format(injection_number))
+            [injection_data, gps_s, gps_ns, phi, theta, psi] = xinjectsignal.xinjectsignal_fromfile(start_time=start_time, block_time=block_time, channels=channel_names, injection_file_name=injection_file_name, injection_number=injection_number, sample_rate=sample_frequency, catalogdirectory=catalogdirectory)
+
+        # Loop over injection scales
+        for injection_scale in injection_scales:
             if args.job_type == 'injection':
-                logger.info('Creating injections')
-                [injection_data, gps_s, gps_ns, phi, theta, psi] = xinjectsignal.xinjectsignal_fromfile(start_time=start_time, block_time=block_time, channels=channel_names, injection_file_name=injection_file_name, injection_number=injection_number, sample_rate=sample_frequency, catalogdirectory=catalogdirectory)
                 logger.info('Scaling amplitude by injection scale: {0}'.format(injection_scale))
+                scaled_injection_data = XTimeSeries()
                 for k, v in injection_data.items():
-                    injection_data[k] = v * injection_scale
+                    scaled_injection_data[k] = v * injection_scale
 
                 logger.info('Injecting into data')
-                data = analysis_data.inject(injection_data)
+                data = analysis_data.inject(scaled_injection_data)
             else:
-                data = analysis_data.copy()
+                data = analysis_data
 
             # high pass filter the data
             data = data.highpass(minimum_frequency,)
@@ -321,6 +326,7 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                         # Now with pixels from both detectors
                         surviving_pixels = {k : v.to_sparse(tindex, findex, phi=phi, theta=theta, map_type=k) for k, v in projected_fftmaps.items()}
                         surviving_pixels['excess_energy'] = fft_grams.to_sparse(tindex, findex, phi=phi, theta=theta)
+
                         for k, v in surviving_pixels.items():
                             if args.job_type == 'injection':
                                 v.write(filename='grb.h5',

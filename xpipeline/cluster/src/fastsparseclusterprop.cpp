@@ -19,7 +19,7 @@ inline double min(double a,double b)
   return b;
 }
 
-void fastsparseclusterprop(const double *labelledMap, const double *likelihoodMap, const double *pixTime, const double *pixFreq, double *clusterArray, const bool doTFprops, const double *dimArray)
+void fastsparseclusterprop(const double *labelledMap, const double *likelihoodMap, const double *pixTime, const double *pixFreq, double clusterArray[], const bool doTFprops, const double *dimArray, const int nClusters)
 {
   // check input variable, if time/frequency scale information is
   // available do produce the cluster time/frequency information
@@ -38,10 +38,6 @@ void fastsparseclusterprop(const double *labelledMap, const double *likelihoodMa
   int rowLen=dimArray[1];
   int nLikelihoods=dimArray[2];
 
-  int nClusters=0;
-  for(int j=0;j<colLen;j++)
-    nClusters=(int)max(double(nClusters),labelledMap[j]);
-  
   for(int j=0;j<colLen;j++){
     int label=int(labelledMap[j])-1;
     if( -1 == label) {continue;}
@@ -85,8 +81,9 @@ void fastsparseclusterprop(const double *labelledMap, const double *likelihoodMa
 	clusterArray[((nTFcols+k)*nClusters)+label]+
 	likelihoodMap[k*colLen*rowLen + j];
     }
-    
   }
+
+  //sort(clusterArray, clusterArray + nClusters, [&v](size_t i1, size_t i2) {return v[i1] < v[i2];});;
 
   return;
 }

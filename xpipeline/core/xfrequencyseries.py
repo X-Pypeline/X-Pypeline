@@ -17,7 +17,7 @@
 # along with hveto.  If not, see <http://www.gnu.org/licenses/>.
 
 # ---- Import standard modules to the python path.
-import numpy as np
+import numpy
 from collections import OrderedDict
 from gwpy.frequencyseries import FrequencySeries
 import copy
@@ -68,12 +68,12 @@ class XFrequencySeriesDict(OrderedDict):
             tmp = copy.deepcopy(antenna_response_asds)
             for detidx, idet in enumerate(tmp['f_plus']):
                 antenna_response_asds['f_plus'][idet] = (
-                    np.cos(2*psi[:,detidx]) * tmp['f_plus'][idet] +
-                    np.sin(2*psi[:,detidx]) * tmp['f_cross'][idet]
+                    numpy.cos(2*psi[:,detidx]) * tmp['f_plus'][idet] +
+                    numpy.sin(2*psi[:,detidx]) * tmp['f_cross'][idet]
                     )
                 antenna_response_asds['f_cross'][idet] = (
-                    -np.sin(2*psi[:,detidx]) * tmp['f_plus'][idet] +
-                    np.cos(2*psi[:,detidx]) * tmp['f_cross'][idet]
+                    -numpy.sin(2*psi[:,detidx]) * tmp['f_plus'][idet] +
+                    numpy.cos(2*psi[:,detidx]) * tmp['f_cross'][idet]
                     )
 
 
@@ -85,14 +85,14 @@ class XFrequencySeriesDict(OrderedDict):
         """
         number_of_frequencies = list(self.values())[0].size
         number_of_detectors = len(self)
-        array = np.zeros([number_of_frequencies, number_of_detectors])
+        array = numpy.zeros([number_of_frequencies, number_of_detectors])
         for idx, asd in enumerate(self.values()):
             array[:, idx] = asd
 
         return array
 
 
-    def to_m_ab(self):
+    def calculate_magnitude(self):
         """Matrix M_AB components.
 
            This is the dot product of the projected_asds, with
@@ -102,7 +102,7 @@ class XFrequencySeriesDict(OrderedDict):
                `gwpy.frequencyseries.FrequencySeries`
                    Units Hz
         """
-        return sum([v**2 for v in self.values()])
+        return numpy.sqrt(sum([v**2 for v in self.values()]))
 
     def slice_frequencies(self, indices):
         """select a subset of frequencies from XFrequencySeriesDict
@@ -133,7 +133,7 @@ class XAntennaProjectedFrequencySeriesDict(OrderedDict):
         for k, v in self.items():
             unit_dpf_asds = XFrequencySeriesDict()
             for k1, v1 in v.items():
-                unit_dpf_asds[k1] = v1 / v.to_m_ab()
+                unit_dpf_asds[k1] = v1 / v.calculate_magnitude()
             self[k] = unit_dpf_asds
 
         return self
@@ -149,20 +149,20 @@ def convert_to_dominant_polarization_frame(Fp, Fc):
             Fc :  `float`
     """
     # ---- Compute rotation needed to reach DP frame.
-    psi = np.zeros([len(Fp), 1])
-    psi[:, 0] = 1/4*np.arctan(2*(np.sum(Fp*Fc, 1))/(
-                    np.sum(Fp*Fp, 1)-np.sum(Fc*Fc, 1))
+    psi = numpy.zeros([len(Fp), 1])
+    psi[:, 0] = 1/4*numpy.arctan(2*(numpy.sum(Fp*Fc, 1))/(
+                    numpy.sum(Fp*Fp, 1)-numpy.sum(Fc*Fc, 1))
                     )
     psi = psi.repeat(Fp.shape[1], 1)
 
     # ---- Rotate to DP frame.
-    FpDP = np.cos(2*psi)*Fp + np.sin(2*psi)*Fc
-    FcDP = -np.sin(2*psi)*Fp + np.cos(2*psi)*Fc
+    FpDP = numpy.cos(2*psi)*Fp + numpy.sin(2*psi)*Fc
+    FcDP = -numpy.sin(2*psi)*Fp + numpy.cos(2*psi)*Fc
 
     # ---- Further rotate polarization by pi/4 if |Fp|<|Fc|.
     swapindex = (FpDP**2).sum(1) < (FcDP**2).sum(1)
     FpDP[swapindex, :] = FcDP[swapindex, :]
     FcDP[swapindex, :] = -FpDP[swapindex, :]
-    psi[swapindex, :] = psi[swapindex, :] + np.pi/4
+    psi[swapindex, :] = psi[swapindex, :] + numpy.pi/4
 
     return FpDP, FcDP, psi
