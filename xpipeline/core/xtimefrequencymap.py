@@ -323,15 +323,7 @@ class XSparseTimeFrequencyMapDict(OrderedDict):
                `XTimeFrequencyMapDict`:
                    power_map of all Fourier Grams in Dict
         """
-        return XSparseTimeFrequencyMapDict({k: csc_XSparseTimeFrequencyMap(numpy.abs(v), yindex=v.yindex,
-                                           xindex=v.xindex, tindex=v.tindex,
-                                           findex=v.findex, energy=numpy.abs(v.energy),
-                                           dx=v.xindex[1] - v.xindex[0],
-                                           dy=v.yindex[1] - v.yindex[0],
-                                           x0=v.xindex[0],
-                                           y0=v.yindex[0],
-                                           name=v.name,
-                                           phi=v.phi, theta=v.theta,) for k,v in self.items()})
+        return XSparseTimeFrequencyMapDict({k: numpy.abs(v) for k, v in self.items()})
 
     def to_xtimefrequencymapdict(self):
         """Convert dict fo sparse matrix to `XTimeFrequencyMapDict`
@@ -556,9 +548,9 @@ class csc_XSparseTimeFrequencyMap(csc_sparse_map):
 
             if ((getattr(self, 'dx') is not None) and (getattr(self, 'dy') is not None) and
                 (getattr(self, 'x0') is not None) and (getattr(self, 'y0') is not None)):
-                cluster_array[:, 0:3] = cluster_array[:, 0:3] * v.dx  + v.x0
+                cluster_array[:, 0:3] = cluster_array[:, 0:3] * self.dx  + self.x0
 
-                cluster_array[:, 3:6] = cluster_array[:, 3:6] * v.dy  + v.y0
+                cluster_array[:, 3:6] = cluster_array[:, 3:6] * self.dy  + self.y0
 
             return XCluster.nearest_neighbor(cluster_array, labelled_map)
         else:

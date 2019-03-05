@@ -19,14 +19,12 @@
 # ---- Import standard modules to the python path.
 
 from scipy import sparse
+import numpy
 
 class csc_sparse_map(sparse.csc_matrix):
     _metadata_slots = ('energy', 'tindex', 'findex',
-                       'yindex', 'xindex',
-                       'dx', 'dy',
-                       'x0', 'y0',
-                       'pixel_labels',
-                       'name', 'map_type',
+                       'yindex', 'xindex', 'dx', 'dy', 'x0', 'y0',
+                       'pixel_labels', 'name', 'map_type',
                        'phi', 'theta',)
     def __init__(self, matrix, **kwargs):
         self.yindex = kwargs.pop('yindex', None)
@@ -44,12 +42,43 @@ class csc_sparse_map(sparse.csc_matrix):
         self.theta = kwargs.pop('theta', None)
         self.map_type = kwargs.pop('map_type', 'excess_energy')
         super(csc_sparse_map, self).__init__(matrix, **kwargs)
-        if getattr(self, 'tindex') is None:
-            setattr(self, 'tindex', self.nonzero()[0])
-        if getattr(self, 'findex') is None:
-            setattr(self,'findex', self.nonzero()[1])
-        if getattr(self, 'energy') is None:
-            setattr(self, 'energy', self.A[self.tindex, self.findex])
+
+    def __metadata_finalize__(self, obj, force=False):
+        # apply metadata from obj to self if creating a new object
+        for attr in self._metadata_slots:
+            _attr = '%s' % attr  # use private attribute (not property)
+            # if attribute is unset, default it to None, then update
+            # from obj if desired
+            try:
+                getattr(self, _attr)
+            except AttributeError:
+                update = True
+            else:
+                update = force
+
+            if update:
+                try:
+                    val = getattr(obj, _attr)
+                except AttributeError:
+                    continue
+                else:
+                    setattr(self, _attr, val)
+
+    def __add__(self, other):
+        obj = super(csc_sparse_map, self).__add__(other) 
+        obj.__metadata_finalize__(self, force=True)
+        if (obj.energy is not None) and (self.energy is not None):
+            obj.energy = numpy.add(self.energy, other.energy)
+        else:
+            obj.energy = None
+        return obj
+
+    def __abs__(self):
+        obj = super(csc_sparse_map, self).__abs__()
+        obj.__metadata_finalize__(self, force=True)
+        if obj.energy is not None:
+            obj.energy = numpy.abs(obj.energy)
+        return obj
 
     def _repr_helper(self, print_):
         if print_ is repr:
