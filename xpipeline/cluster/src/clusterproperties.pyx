@@ -1,16 +1,16 @@
 # distutils: language = c++
 # distutils: sources = xpipeline/cluster/src/fastsparseclusterprop.cpp
 
-import numpy as np
-cimport numpy as np
+import numpy
+cimport numpy
 from libcpp cimport bool
+from libcpp.vector cimport vector
 
 cdef extern from "fastsparseclusterprop.h" nogil:
-    void fastsparseclusterprop(np.double_t *labelledMap, np.double_t *likelihoodMap,
-                               np.double_t *pixTime, np.double_t *pixFreq,
-                               double clusterArray[],
-                               const bool tf_properties, np.double_t *dimArray,
-                               const int nClusters)
+    vector[double] fastsparseclusterprop(numpy.double_t *labelledMap, numpy.double_t *likelihoodMap,
+                          numpy.double_t *pixTime, numpy.double_t *pixFreq,
+                          const bool tf_properties, numpy.double_t *dimArray,
+                          const int nClusters)
 
 def clusterproperities_wrapper(object labelled_map, object likelihood,
                                tf_properties=False, pixel_time=None,
@@ -36,48 +36,37 @@ def clusterproperities_wrapper(object labelled_map, object likelihood,
                 Hz.
     """
     cdef:
-        np.ndarray[np.double_t, ndim=1, mode='c'] dimension_array_tmp
-        np.ndarray[np.double_t, ndim=1, mode='c'] labelled_map_tmp
-        np.ndarray[np.double_t, ndim=3, mode='c'] likelihood_tmp
-        np.ndarray[np.double_t, ndim=1, mode='c'] pixel_time_tmp
-        np.ndarray[np.double_t, ndim=1, mode='c'] pixel_freq_tmp
-        np.ndarray[np.double_t, ndim=2, mode='c'] cluster_array
+        numpy.ndarray[numpy.double_t, ndim=1, mode='c'] dimension_array_tmp
+        numpy.ndarray[numpy.double_t, ndim=1, mode='c'] labelled_map_tmp
+        numpy.ndarray[numpy.double_t, ndim=3, mode='c'] likelihood_tmp
+        numpy.ndarray[numpy.double_t, ndim=1, mode='c'] pixel_time_tmp
+        numpy.ndarray[numpy.double_t, ndim=1, mode='c'] pixel_freq_tmp
 
     # FIXME: This crazy reshaping is from the original logic being in MATLAB
     # I am sure with the numpy array format a cpp there is a way to not have to do this
     likelihood = likelihood.reshape(labelled_map.size, 1, -1)
 
     # FIXME the variable seems like it should not need to be passed!
-    dimension_array_tmp = np.ascontiguousarray(likelihood.shape, dtype=np.float64)
-
-    # If we do want tf_properities we need to have more columns in our array where
-    # those values will go. If we do not then we just want the sum of likelihoods over clusters
-    if tf_properties:
-        cluster_array = np.zeros((7 + likelihood.shape[-1], labelled_map.max()), dtype=np.double)
-    else:
-        cluster_array = np.zeros((likelihood.shape[-1], labelled_map.max()), dtype=np.double)
+    dimension_array_tmp = numpy.ascontiguousarray(likelihood.shape, dtype=numpy.float64)
 
     # Pass in the nearest neighbor labels of all clusters
-    labelled_map_tmp = np.ascontiguousarray(labelled_map, dtype=np.float64)
+    labelled_map_tmp = numpy.ascontiguousarray(labelled_map, dtype=numpy.float64)
 
     # Pass in a flattened array of likelihoods to calc statistics on
-    likelihood_tmp = np.ascontiguousarray(likelihood, dtype=np.float64)
+    likelihood_tmp = numpy.ascontiguousarray(likelihood, dtype=numpy.float64)
 
-    # Pass in the start time of pixels
+    # Pass in the start time and start frequency of pixels
     if tf_properties:
-        pixel_time_tmp = np.ascontiguousarray(pixel_time, dtype=np.float64)
+        pixel_time_tmp = numpy.ascontiguousarray(pixel_time, dtype=numpy.float64)
+        pixel_freq_tmp = numpy.ascontiguousarray(pixel_freq, dtype=numpy.float64)
+        number_of_columns = int(dimension_array_tmp[2] + 7)
     else:
-        pixel_time_tmp = np.ascontiguousarray(np.zeros(labelled_map.size), dtype=np.float64)
+        pixel_freq_tmp = numpy.ascontiguousarray(numpy.zeros(labelled_map.size), dtype=numpy.float64)
+        pixel_time_tmp = numpy.ascontiguousarray(numpy.zeros(labelled_map.size), dtype=numpy.float64)
+        number_of_columns = int(dimension_array_tmp[2])
 
-    # pass in the end time of pixels
-    if tf_properties:
-        pixel_freq_tmp = np.ascontiguousarray(pixel_freq, dtype=np.float64)
-    else:
-        pixel_freq_tmp = np.ascontiguousarray(np.zeros(labelled_map.size), dtype=np.float64)
-
-    fastsparseclusterprop(&labelled_map_tmp[0], &likelihood_tmp[0,0,0],
+    cluster_array = fastsparseclusterprop(&labelled_map_tmp[0], &likelihood_tmp[0,0,0],
                           &pixel_time_tmp[0], &pixel_freq_tmp[0],
-                          &cluster_array[0,0], tf_properties,
-                          &dimension_array_tmp[0], labelled_map.max().astype(int))
+                          tf_properties, &dimension_array_tmp[0], labelled_map.max().astype(int))
 
-    return cluster_array
+    return numpy.asarray(cluster_array).reshape(number_of_columns, -1).T 

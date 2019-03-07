@@ -2,9 +2,12 @@
 #include "stdio.h"
 #include <string>
 #include <iostream>
-#include <vector>
 #include <algorithm>
+#include <numeric>
+#include <unordered_set>
+#include <vector>
+#include <map>
 
 using namespace std;
 
-void fastsparseclusterprop(const double *labelledMap, const double * likelihoodMap, const double * pixTime, const double * pixFreq, double clusterArray[], const bool doTFprops, const double *dimArray, const int nClusters);
+vector<double> fastsparseclusterprop(const double *labelledMap, const double * likelihoodMap, const double * pixTime, const double * pixFreq, const bool doTFprops, const double *dimArray, const int nClusters);
