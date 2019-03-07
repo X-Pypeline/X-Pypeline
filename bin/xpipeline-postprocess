@@ -42,6 +42,6 @@ for table in f.walk_nodes('/injection', "Table"):
             sparse_maps = [csc_XSparseTimeFrequencyMap.read(row)
                             for row in table.where("""(dx == {0}) & (map_type == \'excess_energy\') & (phi == {1}) & (theta == {2})""".format(fft_length, phi, theta,))]
             sparse_maps = XSparseTimeFrequencyMapDict({imap.name: imap for imap in sparse_maps})
-            clusters = sparse_maps.abs().to_coherent().cluster()
+            clusters = sparse_maps.abs().cluster()
         all_clusters = all_clusters.append(clusters)
     all_clusters.supercluster().to_hdf('clusters.h5', key=table._v_pathname, index=False,)

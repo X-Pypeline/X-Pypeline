@@ -60,7 +60,5 @@ class XCluster(pandas.DataFrame):
                                  'dt', 'df']
         bounding_box_columns.append(statistic_column)
         bound_box = self[bounding_box_columns].values
-        import pdb
-        pdb.set_trace()
         mask = superclustertriggers.fastsupercluster_wrapper(len(bound_box), bound_box).astype(bool)
         return self.loc[mask]

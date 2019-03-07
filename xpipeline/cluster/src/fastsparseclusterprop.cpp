@@ -19,15 +19,6 @@ inline double min(double a,double b)
     return b;
 }
 
-inline map<int,int> create_map(vector<int> key)
-{
-    map<int,int> m;
-    for (int i = 0; i < key.size(); ++i) {
-        m[key[i]] = i+1;
-    }
-    return m;
-}
-
 vector<double> fastsparseclusterprop(const double *labelledMap, const double *likelihoodMap, const double *pixTime, const double *pixFreq, const bool doTFprops, const double *dimArray, const int nClusters)
 {
 
@@ -35,7 +26,7 @@ vector<double> fastsparseclusterprop(const double *labelledMap, const double *li
     int rowLen=dimArray[1];
     int nLikelihoods=dimArray[2];
     int k = 0; //FIXME this should be a specific likelihood that you want to sort on
-    double energy_of_cluster[nClusters];
+    vector<double> energy_of_cluster(nClusters, 0.0);
 
     for(int j=0;j<colLen;j++){
         int label=int(labelledMap[j])-1;
@@ -53,16 +44,28 @@ vector<double> fastsparseclusterprop(const double *labelledMap, const double *li
 
     // Find the indices of the top 10 percent of
     // clusters
-    int idx[nClusters];
-    iota(idx, idx + nClusters, 0);
-    sort(idx, idx + nClusters,
-          [&](int lhs, int rhs) { return energy_of_cluster[lhs] < energy_of_cluster[rhs]; });
-    int percentile_index = int(ceil(nClusters*0.1));
-    vector<int> idx_of_loudest_clusters(idx, idx + percentile_index);
-    sort(begin(idx_of_loudest_clusters), end(idx_of_loudest_clusters));
+    // initialize original index locations
+    vector<int> idx(energy_of_cluster.size());
+    iota(idx.begin(), idx.end(), 0);
 
-    // Map surviving clusters to "new" clusters starting at 1
-    map<int,int> m = create_map(idx_of_loudest_clusters);
+    // sort indexes based on comparing values in v
+    sort(idx.begin(), idx.end(),
+       [&energy_of_cluster](int i1, int i2) {return energy_of_cluster[i1] > energy_of_cluster[i2];});
+
+    int percentile_index = int(ceil(nClusters*0.1));
+    vector<int> idx_of_loudest_clusters(begin(idx), begin(idx) + percentile_index);
+
+    // Map survving clusters to new clusters 0:surviving clusters
+    map<int,int> m; 
+    int i = 1;
+    for (auto v : idx_of_loudest_clusters){
+        m[v] = i;
+        i++;
+    }
+
+    // sort the remaining cluster indicies this will make creating a mask
+    // to apply to the labelledMap varaible easier
+    sort(begin(idx_of_loudest_clusters), end(idx_of_loudest_clusters));
 
     // Prepare to reate a mask by looping over
     // These clusters and making a mask
@@ -73,8 +76,8 @@ vector<double> fastsparseclusterprop(const double *labelledMap, const double *li
     for (int i = 0; i < colLen; ++i) {
         if (binary_search(begin(idx_of_loudest_clusters),
                           end(idx_of_loudest_clusters),
-                          labelledMap[i])) {
-            mask[i] = m[labelledMap[i]];
+                          labelledMap[i]-1)) {
+            mask[i] = m[labelledMap[i]-1];
         }
     }
 
@@ -93,7 +96,6 @@ vector<double> fastsparseclusterprop(const double *labelledMap, const double *li
 
     vector<double> clusterArray((nTFcols + nLikelihoods)*percentile_index, 0);
 
-    int counter = 0;
     if (doTFprops)
         {for(int j=0;j<colLen;j++){
             int label=int(mask[j])-1;
@@ -157,30 +159,5 @@ vector<double> fastsparseclusterprop(const double *labelledMap, const double *li
             }
         }}
 
-  // We need to create a mask for labelledMap based on the
-  // loudest X percent of clusters
-
-  // Find the indices of the top 10 percent of
-  // clusters
-  //int idx[nClusters];
-  //iota(idx, idx + nClusters, 0);
-  //sort(idx, idx + nClusters,
-  //        [&](int lhs, int rhs) { return clusterArray[lhs] < clusterArray[rhs]; });
-  //int percentile_index = int(ceil(nClusters*0.1));
-  //unordered_set<int> idx_of_loudest_clusters(idx, idx + percentile_index);
-
-  // Prepare to reate a mask by looping over
-  // These clusters and making a mask
-  // of 0 if labelledMap[j] not in top 1 percent
-  // of cluster and 1 if it is
-  //int mask[colLen]
-
-  //for (int i = 0; i < colLen; ++i) {
-  //    if (idx_of_loudest_clusters.find(labelledMap[i]) != idx_of_loudest_clusters.end()) {
-  //        mask[i] = 1;
-  //    else
-  //        mask[i] = 0;
-  //    }
-  //}
   return clusterArray;
 }
