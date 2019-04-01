@@ -1,0 +1,90 @@
+#!/usr/bin/env python
+from xpipeline.core import XSparseTimeFrequencyMapDict, csc_XSparseTimeFrequencyMap
+from xpipeline.cluster.cluster import XCluster
+from xpipeline.setuputils import log
+
+import argparse
+import os
+import tables
+import numpy
+import pandas
+import itertools
+
+def parse_commandline():
+    parser = argparse.ArgumentParser(description="This executable processes "
+                                                 "a xpipeline-analysis "
+                                                 "generated file of tfmaps.")
+    # Define groups of flags to make the help output ore useful
+    required_args = parser.add_argument_group('required named arguments')
+    required_args.add_argument("-f", "--event-file", help=
+                               """
+                               trigger file
+                               """,
+                               required=True,)
+
+    args = parser.parse_args()
+
+    if not os.path.isfile(args.event_file):
+        raise parser.error('You have supplied a non-existent event-file.')
+
+    return args
+
+args = parse_commandline()
+numpy.random.seed(1986)
+
+logger = log.Logger('XPIPELINE: Post-Processing {0}'.format(args.event_file))
+
+# Read parameters
+f = tables.open_file(args.event_file)
+
+# We need to select have of background and half of injection events for training
+training_background_triggers, testing_background_triggers, training_injection_triggers, testing_injection_triggers = \
+    utils.choose_background_injection_training(f)
+
+background_trainingset = []
+for event in training_background_triggers:
+    for table in f.walk_nodes(event, "Table"): 
+        channel_names = numpy.unique(table.cols.ifo).astype(str)
+        # This has dimensions (ifos by (num_ffts * num_sky) by pixels)
+        array = numpy.asarray([[ x['energy'] for x in table.where("""(ifo == \'{0}\')""".format(channel_name))] for channel_name in channel_names],)
+        # we want (pixels by (num_ffts * num_sky) by ifos)
+        background_trainingset.append(array.T)
+
+background_trainingset = numpy.asarray(background_trainingset)
+
+background_validation = []
+for event in testing_background_triggers:
+    for table in f.walk_nodes(event, "Table"):
+        channel_names = numpy.unique(table.cols.ifo).astype(str)
+        # This has dimensions (ifos by (num_ffts * num_sky) by pixels)
+        array = numpy.asarray([[ x['energy'] for x in table.where("""(ifo == \'{0}\')""".format(channel_name))] for channel_name in channel_names],)
+        # we want (pixels by (num_ffts * num_sky) by ifos)
+        background_validation.append(array.T)
+
+background_validation = numpy.asarray(background_validation)
+numpy.save('background_trainingset', background_trainingset)
+numpy.save('background_validation', background_validation)
+
+injection_trainingset = []
+for event in training_injection_triggers:
+    for table in f.walk_nodes(event, "Table"):
+        channel_names = numpy.unique(table.cols.ifo).astype(str)
+        # This has dimensions (ifos by (num_ffts * num_sky) by pixels)
+        array = numpy.asarray([[ x['energy'] for x in table.where("""(ifo == \'{0}\')""".format(channel_name))] for channel_name in channel_names],)
+        # we want (pixels by (num_ffts * num_sky) by ifos)
+        injection_trainingset.append(array.T)
+
+injection_trainingset = numpy.asarray(injection_trainingset)
+
+injection_validation = []
+for event in testing_injection_triggers:
+    for table in f.walk_nodes(event, "Table"):
+        channel_names = numpy.unique(table.cols.ifo).astype(str)
+        # This has dimensions (ifos by (num_ffts * num_sky) by pixels)
+        array = numpy.asarray([[ x['energy'] for x in table.where("""(ifo == \'{0}\')""".format(channel_name))] for channel_name in channel_names],)
+        # we want (pixels by (num_ffts * num_sky) by ifos)
+        injection_validation.append(array.T)
+
+injection_validation = numpy.asarray(injection_validation)
+numpy.save('injection_trainingset', injection_trainingset)
+numpy.save('injection_validation', injection_validation)

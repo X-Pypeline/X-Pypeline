@@ -9,6 +9,7 @@ from xpipeline.core.xtimefrequencymap import csc_XSparseTimeFrequencyMap
 from xpipeline.waveform import xinjectsignal
 from xpipeline.setuputils import log
 from gwpy.table import EventTable
+from gwpy.timeseries import TimeSeries
 from gwpy.signal import filter_design
 from functools import reduce
 
@@ -17,6 +18,12 @@ import numpy
 import argparse
 import tables
 
+_injection_analysis_types = ['onsource_injection', 'zero_noise_injection']
+_other_event_types = ['background', 'onsource']
+_job_types = []
+_job_types.extend(_injection_analysis_types)
+_job_types.extend(_other_event_types)
+
 def parse_commandline():
     parser = argparse.ArgumentParser(description="This executable processes "
                                                  "injection, off source "
@@ -24,11 +31,11 @@ def parse_commandline():
                                                  "X-Pipeline triggered search jobs.")
     # Define groups of flags to make the help output ore useful
     required_args = parser.add_argument_group('required named arguments')
+    optional_args = parser.add_argument_group('optional arguments')
     required_args.add_argument("-j", "--job-type", help=
                                """
-                               Are you analyzing an injection
-                               or a background trial
-                               """,
+                               Job Type options are {0}
+                               """.format(_job_types),
                                required=True)
     required_args.add_argument("-p", "--parameter-file", help=
                                """
@@ -58,16 +65,15 @@ def parse_commandline():
                                and has the naming convention injection_"waveform_name".txt
                                Each row of the file has the form
                                gps_s, gps_ns, phi, theta, psi, gwb_type, gwb_params
-                               1135227846 42243481 2.034325e+00 1.014036e+00 6.620518e-01 chirplet 1.0e-22~0.01~100~0~0~1 
+                               1135227846 42243481 2.034325e+00 1.014036e+00 6.620518e-01 chirplet 1.0e-22~0.01~100~0~0~1
                                """,
                                type=int, nargs='+')
 
-
     args = parser.parse_args()
 
-    if args.job_type not in ['injection', 'background']:
-        raise parser.error('You can only perform an analysis on '
-                           'an injected signal or a background job.')
+    if args.job_type not in _job_types:
+        raise parser.error('You can only perform one of the following analyses '
+                           '{0}'.format(_job_types))
 
     if args.job_type == 'injection' and (args.injection_numbers is None):
         raise parser.error('You must specify what injections you want '
@@ -146,7 +152,7 @@ on_source_begin_offset = int(parameters['onsourcebeginoffset'])
 
 sky_positions = parameters['skyPositionList']
 sky_positions = EventTable.read(sky_positions, format='ascii',
-                                names=['phi', 'theta', 'probability', 'area'])
+                                names=['theta', 'phi', 'probability', 'area'])
 
 seed = int(parameters['seed'])
 fft_lengths = [float(fft) for fft in parameters['analysistimes'].split(',')]
@@ -180,56 +186,83 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
 
     # likelihoods to analze
     time_slides = dict(zip(channel_names, time_slide))
-    try:
-        analysis_data = XTimeSeries.read('examples/local_data.hdf5')
-    except:
-        analysis_data = XTimeSeries.retrieve_data(event_time, block_time,
-                                                  channel_names, sample_frequency,
-                                                  frame_types=frame_types, time_slides=time_slides)
+    analysis_data = XTimeSeries.retrieve_data(event_time, block_time,
+                                              channel_names, sample_frequency,
+                                              frame_types=frame_types, time_slides=time_slides)
 
     # Are we doing injections and if so how many injection scales are we doing?
-    if args.job_type == 'injection':
-        logger.info('Injecting a signal... Reading injections pecific parameters')
+    if args.job_type in _injection_analysis_types:
+        logger.info('Injecting a signal... Reading injection specific parameters')
         injection_file_name = parameters['injectionFileName']
         waveform_name = injection_file_name.split('_')[1].split('.')[0]
         injection_scales = [float(i) for i in parameters['injectionScales'].split(',')]
         injection_numbers = args.injection_numbers
         catalogdirectory = parameters['catalogdirectory']
     else:
-    # If not doing injections there are no injections scales (similarly there
-    # are no injection numbers to be done)
+        # If not doing injections there are no injections scales (similarly there
+        # are no injection numbers to be done)
         injection_scales = [None]
         injection_numbers = [None]
 
     # Loop over injections
     for injection_number in injection_numbers:
-        if args.job_type == 'injection':
+        if args.job_type in _injection_analysis_types:
             logger.info('Creating injection number {0}'.format(injection_number))
             [injection_data, gps_s, gps_ns, phi, theta, psi] = xinjectsignal.xinjectsignal_fromfile(start_time=start_time, block_time=block_time, channels=channel_names, injection_file_name=injection_file_name, injection_number=injection_number, sample_rate=sample_frequency, catalogdirectory=catalogdirectory)
 
         # Loop over injection scales
         for injection_scale in injection_scales:
-            if args.job_type == 'injection':
+            if args.job_type in _injection_analysis_types:
                 logger.info('Scaling amplitude by injection scale: {0}'.format(injection_scale))
                 scaled_injection_data = XTimeSeries()
                 for k, v in injection_data.items():
                     scaled_injection_data[k] = v * injection_scale
 
-                logger.info('Injecting into data')
-                data = analysis_data.inject(scaled_injection_data)
+                if args.job_type == 'zero_noise_injection':
+                    logger.info('Injecting into zero noise data')
+                    zero_noise_data = XTimeSeries()
+                    for channel in channel_names:
+                        zero_noise_data.append({channel : TimeSeries(numpy.zeros(int(sample_frequency * block_time)),
+                                                                   channel=channel,
+                                                                   name=channel,
+                                                                   dt=1./sample_frequency,
+                                                                   t0 = start_time)})
+                    zero_noise_injection = zero_noise_data.inject(scaled_injection_data)
+                    data = analysis_data.copy()
+                else:
+                    logger.info('Injecting into data')
+                    data = analysis_data.inject(scaled_injection_data)
             else:
                 data = analysis_data
 
             # high pass filter the data
             data = data.highpass(minimum_frequency,)
-
             # Get the ASDs that will be used to whiten the data
             asds = data.asd(whitening_length)
 
-            # Whiten the timeseries
-            whitened_timeseries = data.whiten(asds)
-            for k, v in whitened_timeseries.items():
-                whitened_timeseries[k] = v.crop(*v.span.contract(2))
+            if args.job_type == 'zero_noise_injection':
+                # use real asd to whiten data with no noise
+                whitened_timeseries = zero_noise_injection.whiten(asds)
+                #tmp = zero_noise_injection.plot()
+                #ax = tmp.gca()
+                #ax.set_xlim([gps_s + gps_ns * 10e-10-0.2, gps_s + gps_ns * 10e-10 +0.2])
+                #tmp.savefig('/home/scoughlin/public_html/PhD/Project/LIGO/BURST/xpipeline/grb-dev/zero-noise-injection.png')
+                #tmp = whitened_timeseries.plot()
+                #ax = tmp.gca()
+                #ax.set_xlim([gps_s + gps_ns * 10e-10-0.2, gps_s + gps_ns * 10e-10 +0.2])
+                #tmp.savefig('/home/scoughlin/public_html/PhD/Project/LIGO/BURST/xpipeline/grb-dev/zero-noise-injection-whitened.png')
+
+
+            else:
+                whitened_timeseries = data.whiten(asds)
+                #tmp = data.plot()
+                #ax = tmp.gca()
+                #ax.set_xlim([gps_s + gps_ns * 10e-10-0.2, gps_s + gps_ns * 10e-10 +0.2])
+                #tmp.savefig('/home/scoughlin/public_html/PhD/Project/LIGO/BURST/xpipeline/grb-dev/injection.png')
+                #tmp = whitened_timeseries.plot()
+                #ax = tmp.gca()
+                #ax.set_xlim([gps_s + gps_ns * 10e-10-0.2, gps_s + gps_ns * 10e-10 +0.2])
+                #tmp.savefig('/home/scoughlin/public_html/PhD/Project/LIGO/BURST/xpipeline/grb-dev/injection-whitened.png')
 
             # Obtain detector specific information
             detectors = {}
@@ -308,7 +341,7 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                     all_pixels = numpy.apply_along_axis(lambda x: reduce(lambda x, y: set(x).union(y), x.tolist()), 0, array_of_tf_pixels_per_slide_per_det)
 
                     for coherent_pixels, circular_time_slide in zip(all_pixels, internal_slides):
-                        
+
                         # make sure that the coherent time frequency pixels are sorted
                         coherent_pixels = sorted(coherent_pixels)
 
@@ -316,7 +349,7 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                         tindex, findex = zip(*coherent_pixels)
                         tindex = numpy.asarray(tindex)
                         findex = numpy.asarray(findex)
-                           
+
                         # extract the tindices and the findices
                         tindex = {k : tindex for k in channel_names}
                         findex = {k : findex for k in channel_names}
@@ -328,11 +361,11 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                         surviving_pixels['excess_energy'] = fft_grams.to_sparse(tindex, findex, phi=phi, theta=theta)
 
                         for k, v in surviving_pixels.items():
-                            if args.job_type == 'injection':
-                                v.write(filename='grb.h5',
+                            if args.job_type in _injection_analysis_types:
+                                v.write(filename='./output/grb-{0}-{1}-{2}.h5'.format(args.job_type, injection_numbers[0], injection_numbers[-1]),
                                       path='/{0}/event_{1}_slide_{2}/waveform_{3}/injection_scale_{4}/injection_number_{5}'.format(args.job_type, int(event_time), '_'.join(time_slide.astype(str).tolist()), waveform_name, str(injection_scale).replace('.', 'd'), injection_number,),
                                       table_description=table_description)
                             else:
-                                v.write(filename='grb.h5',
+                                v.write(filename='./output/grb-{0}-{1}.h5'.format(args.job_type, int(event_time)),
                                       path='/{0}/event_{1}_external_slide_{2}/internal_slide_{3}'.format(args.job_type, int(event_time), '_'.join(time_slide.astype(str).tolist()), circular_time_slide),
                                       table_description=table_description)

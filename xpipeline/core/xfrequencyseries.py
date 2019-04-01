@@ -27,9 +27,12 @@ __all__ = ['XFrequencySeriesDict',
            'XAntennaProjectedFrequencySeriesDict',
            'convert_to_dominant_polarization_frame']
 
+SQRT_OF_NEG_1 = numpy.sqrt(numpy.array([-1],dtype=complex))
+
 class XFrequencySeriesDict(OrderedDict):
     def project_onto_antenna_patterns(self, antenna_responses,
-                                      to_dominant_polarization_frame=False):
+                                      to_dominant_polarization_frame=False,
+                                      circular=True):
         """Shift timeseries by assosciated time delay
 
             Parameters
@@ -60,7 +63,6 @@ class XFrequencySeriesDict(OrderedDict):
 
             antenna_response_asds[pattern] = antenna_weighted_asds
 
-
         if to_dominant_polarization_frame:
             wfp = antenna_response_asds['f_plus'].to_array()
             wfc = antenna_response_asds['f_cross'].to_array()
@@ -76,6 +78,8 @@ class XFrequencySeriesDict(OrderedDict):
                     numpy.cos(2*psi[:,detidx]) * tmp['f_cross'][idet]
                     )
 
+        if circular:
+            antenna_response_asds.to_circular()
 
         return antenna_response_asds
 
@@ -135,6 +139,31 @@ class XAntennaProjectedFrequencySeriesDict(OrderedDict):
             for k1, v1 in v.items():
                 unit_dpf_asds[k1] = v1 / v.calculate_magnitude()
             self[k] = unit_dpf_asds
+
+        return self
+
+    def to_circular(self):
+        """
+        Find unit vector of a series of asds
+
+           Returns:
+               `XAntennaProjectedFrequencySeriesDict`
+        """
+        # Initialize projected circular keys
+        self['f_left'] = XFrequencySeriesDict()
+        self['f_right'] = XFrequencySeriesDict()
+        self['f_left_null'] = XFrequencySeriesDict()
+        self['f_right_null'] = XFrequencySeriesDict()
+
+        # calculate the magntiude squared of the plus and cross projected asds
+        f_plus_magnitude_squared = numpy.square(self['f_plus'].calculate_magnitude())
+        f_cross_magnitude_squared = numpy.square(self['f_cross'].calculate_magnitude())
+
+        for f_plus, f_cross in zip(self['f_plus'].values(), self['f_cross'].values()):
+            self['f_left'][f_plus.name] = f_plus + SQRT_OF_NEG_1 * f_cross
+            self['f_right'][f_plus.name] = f_plus - SQRT_OF_NEG_1 * f_cross
+            self['f_left_null'][f_plus.name] = f_plus / f_plus_magnitude_squared - SQRT_OF_NEG_1 * f_cross / f_cross_magnitude_squared
+            self['f_right_null'][f_plus.name] = f_plus / f_plus_magnitude_squared + SQRT_OF_NEG_1 * f_cross / f_cross_magnitude_squared
 
         return self
 

@@ -1,0 +1,46 @@
+#!/usr/bin/env python
+from xpipeline.core import XSparseTimeFrequencyMapDict, csc_XSparseTimeFrequencyMap
+from xpipeline.cluster.cluster import XCluster
+from xpipeline.setuputils import log
+from xpipeline.utils import utils
+
+import argparse
+import os
+import tables
+import numpy
+import pandas
+
+def parse_commandline():
+    parser = argparse.ArgumentParser(description="This executable processes "
+                                                 "a xpipeline-analysis "
+                                                 "generated file of tfmaps.")
+    # Define groups of flags to make the help output ore useful
+    required_args = parser.add_argument_group('required named arguments')
+    required_args.add_argument("-f", "--event-files", help=
+                               """
+                               trigger file
+                               """,
+                               required=True, nargs='+')
+    required_args.add_argument("-o", "--outfile", help=
+                               """
+                               Merged triggers file
+                               """,
+                               required=True,)
+
+    args = parser.parse_args()
+
+    for ifile in args.event_files:
+        if not os.path.isfile(ifile):
+            raise parser.error('You have supplied a non-existent event-file.')
+
+    return args
+
+args = parse_commandline()
+
+logger = log.Logger('XPIPELINE: Merger Files {0}'.format(args.event_files))
+
+# Read parameters
+for ifile in args.event_files:
+    f = tables.open_file(ifile)
+    import pdb
+    pdb.set_trace()
