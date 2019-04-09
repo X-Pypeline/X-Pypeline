@@ -22,6 +22,20 @@ def parse_commandline():
                                """,
                                required=True,)
 
+    required_args.add_argument("-t", "--injection-type", help=
+                               """
+                               onsource_injection or offsource_injection or
+                               zero_noise_injection?
+                               """,
+                               required=True,)
+
+    required_args.add_argument("-s", "--randomseed", help=
+                               """
+                               Randomseed that selects 50 percent of
+                               the background and injection jobs for training.
+                               """,
+                               type=int, default=1986,)
+
     args = parser.parse_args()
 
     if not os.path.isfile(args.event_file):
@@ -37,7 +51,7 @@ logger = log.Logger('XPIPELINE: Post-Processing {0}'.format(args.event_file))
 f = tables.open_file(args.event_file)
 
 training_background_triggers, testing_background_triggers, training_injection_triggers, testing_injection_triggers = \
-    utils.choose_background_injection_training(f)
+    utils.choose_background_injection_training(f, injection_type=args.injection_type, randomseed=args.randomseed,)
 
 for event in training_injection_triggers:
     for table in f.walk_nodes(event, "Table"):

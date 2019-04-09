@@ -43,7 +43,7 @@ for ifile in all_files:
     logger.info('Processing {0} ...'.format(ifile))
     f = tables.open_file(ifile)
     group = f.list_nodes('/')[0]._v_pathname
-    if group in ['/onsource_injection', '/zero_noise_injection']:
+    if group in ['/onsource_injection', '/zero_noise_injection', '/offsource_injection']:
         # First we figure out how many waveforms we injected
         injection_events = [i for i in f.list_nodes('/')[0]._v_children.keys()]
 

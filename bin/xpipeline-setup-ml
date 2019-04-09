@@ -23,6 +23,20 @@ def parse_commandline():
                                """,
                                required=True,)
 
+    required_args.add_argument("-t", "--injection-type", help=
+                               """
+                               onsource_injection or offsource_injection or
+                               zero_noise_injection?
+                               """,
+                               required=True,)
+
+    required_args.add_argument("-s", "--randomseed", help=
+                               """
+                               Randomseed that selects 50 percent of
+                               the background and injection jobs for training.
+                               """,
+                               type=int, default=1986,)
+
     args = parser.parse_args()
 
     if not os.path.isfile(args.event_file):
@@ -40,11 +54,11 @@ f = tables.open_file(args.event_file)
 
 # We need to select have of background and half of injection events for training
 training_background_triggers, testing_background_triggers, training_injection_triggers, testing_injection_triggers = \
-    utils.choose_background_injection_training(f, zero_noise=True)
+    utils.choose_background_injection_training(f, injection_type=args.injection_type, randomseed=args.randomseed,)
 
 background_trainingset = []
 for event in training_background_triggers:
-    for table in f.walk_nodes(event, "Table"): 
+    for table in f.walk_nodes(event._v_pathname, "Table"): 
         channel_names = numpy.unique(table.cols.ifo).astype(str)
         # This has dimensions (ifos by (num_ffts * num_sky) by pixels)
         array = numpy.asarray([[ x['energy'] for x in table.where("""(ifo == \'{0}\')""".format(channel_name))] for channel_name in channel_names],)
@@ -55,7 +69,7 @@ background_trainingset = numpy.asarray(background_trainingset)
 
 background_validation = []
 for event in testing_background_triggers:
-    for table in f.walk_nodes(event, "Table"):
+    for table in f.walk_nodes(event._v_pathname, "Table"):
         channel_names = numpy.unique(table.cols.ifo).astype(str)
         # This has dimensions (ifos by (num_ffts * num_sky) by pixels)
         array = numpy.asarray([[ x['energy'] for x in table.where("""(ifo == \'{0}\')""".format(channel_name))] for channel_name in channel_names],)
@@ -68,23 +82,29 @@ numpy.save('background_validation', background_validation)
 
 injection_trainingset = []
 for event in training_injection_triggers:
-    for table in f.walk_nodes(event, "Table"):
-        channel_names = numpy.unique(table.cols.ifo).astype(str)
-        # This has dimensions (ifos by (num_ffts * num_sky) by pixels)
-        array = numpy.asarray([[ x['energy'] for x in table.where("""(ifo == \'{0}\')""".format(channel_name))] for channel_name in channel_names],)
-        # we want (pixels by (num_ffts * num_sky) by ifos)
-        injection_trainingset.append(array.T)
+    try:
+        for table in f.walk_nodes(event, "Table"):
+            channel_names = numpy.unique(table.cols.ifo).astype(str)
+            # This has dimensions (ifos by (num_ffts * num_sky) by pixels)
+            array = numpy.asarray([[ x['energy'] for x in table.where("""(ifo == \'{0}\')""".format(channel_name))] for channel_name in channel_names],)
+            # we want (pixels by (num_ffts * num_sky) by ifos)
+            injection_trainingset.append(array.T)
+    except:
+        logger.warning("Skipping {0} not a performed injection".format(event))
 
 injection_trainingset = numpy.asarray(injection_trainingset)
 
 injection_validation = []
 for event in testing_injection_triggers:
-    for table in f.walk_nodes(event, "Table"):
-        channel_names = numpy.unique(table.cols.ifo).astype(str)
-        # This has dimensions (ifos by (num_ffts * num_sky) by pixels)
-        array = numpy.asarray([[ x['energy'] for x in table.where("""(ifo == \'{0}\')""".format(channel_name))] for channel_name in channel_names],)
-        # we want (pixels by (num_ffts * num_sky) by ifos)
-        injection_validation.append(array.T)
+    try:
+        for table in f.walk_nodes(event, "Table"):
+            channel_names = numpy.unique(table.cols.ifo).astype(str)
+            # This has dimensions (ifos by (num_ffts * num_sky) by pixels)
+            array = numpy.asarray([[ x['energy'] for x in table.where("""(ifo == \'{0}\')""".format(channel_name))] for channel_name in channel_names],)
+            # we want (pixels by (num_ffts * num_sky) by ifos)
+            injection_validation.append(array.T)
+    except:
+        logger.warning("Skipping {0} not a performed injection".format(event))
 
 injection_validation = numpy.asarray(injection_validation)
 numpy.save('injection_trainingset', injection_trainingset)
