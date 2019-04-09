@@ -1,14 +1,10 @@
 #!/usr/bin/env python
-from xpipeline.core import XSparseTimeFrequencyMapDict, csc_XSparseTimeFrequencyMap
-from xpipeline.cluster.cluster import XCluster
 from xpipeline.setuputils import log
-from xpipeline.utils import utils
 
 import argparse
 import os
 import tables
-import numpy
-import pandas
+import itertools
 
 def parse_commandline():
     parser = argparse.ArgumentParser(description="This executable processes "
@@ -16,11 +12,11 @@ def parse_commandline():
                                                  "generated file of tfmaps.")
     # Define groups of flags to make the help output ore useful
     required_args = parser.add_argument_group('required named arguments')
-    required_args.add_argument("-f", "--event-files", help=
+    required_args.add_argument("-d", "--trigger-directory", help=
                                """
-                               trigger file
+                               Directory contianing output from xpipeline-analysis
                                """,
-                               required=True, nargs='+')
+                               required=True,)
     required_args.add_argument("-o", "--outfile", help=
                                """
                                Merged triggers file
@@ -29,18 +25,43 @@ def parse_commandline():
 
     args = parser.parse_args()
 
-    for ifile in args.event_files:
-        if not os.path.isfile(ifile):
-            raise parser.error('You have supplied a non-existent event-file.')
+    if not os.path.isdir(args.trigger_directory):
+        raise parser.error('You have supplied a non-existent directory.')
 
     return args
 
 args = parse_commandline()
 
-logger = log.Logger('XPIPELINE: Merger Files {0}'.format(args.event_files))
+logger = log.Logger('XPIPELINE: Merging Files')
 
 # Read parameters
-for ifile in args.event_files:
+all_files = os.listdir(args.trigger_directory)
+all_files = [os.path.join(args.trigger_directory, ifile) for ifile in all_files]
+
+# Open outfile
+for ifile in all_files:
+    logger.info('Processing {0} ...'.format(ifile))
     f = tables.open_file(ifile)
-    import pdb
-    pdb.set_trace()
+    group = f.list_nodes('/')[0]._v_pathname
+    if group in ['/onsource_injection', '/zero_noise_injection']:
+        # First we figure out how many waveforms we injected
+        injection_events = [i for i in f.list_nodes('/')[0]._v_children.keys()]
+
+        waveforms = [waveform for waveform in f.get_node('{0}/{1}'.format(group, injection_events[0]))._v_children.keys()]
+
+        inj_scales = [inj_scale for inj_scale in f.get_node('/{0}/{1}/{2}'.format(group, injection_events[0], waveforms[0]))._v_children.keys()]
+
+        groups_to_transfer = [[group], injection_events, waveforms,
+                                            inj_scales,]
+
+        all_groups_for_copy = list(map(lambda x: '/'.join(x), itertools.product(*groups_to_transfer)))
+        f.close()
+        for grp in all_groups_for_copy:
+            command = 'ptrepack {0}:{1} {2}:{3} --verbose'.format(ifile, grp, args.outfile, grp)
+            os.system(command)
+
+    else:
+        # background easier to merge into the new file
+        f.close()
+        command = 'ptrepack {0}:{1} {2}:{3} --verbose'.format(ifile, group, args.outfile, group)
+        os.system(command)

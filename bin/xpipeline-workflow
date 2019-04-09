@@ -1706,10 +1706,10 @@ if outputType == 'seedless':
         job = xcondor.XsearchGPUJob(cp)
 
 # ---- Make instance of XmergeJob.
-mergejob = xcondor.XmergeJob(cp)
+#mergejob = xcondor.XmergeJob(cp)
 # ---- Put a single merge job node in mergejob.  This job will combine
 #      into a single file the output of all of the off-source analysis jobs.
-mergenode = xcondor.XmergeNode(mergejob)
+#mergenode = xcondor.XmergeNode(mergejob)
 if xtmvaFlag:
     xtmvanode.add_parent(mergenode)
 
@@ -1766,19 +1766,19 @@ for i in range(len(segmentList)):
     #      output/on_source directory - there are very few such jobs.
     node.set_output_dir( os.path.join( cwdstr + "/output/on_source" ) )
     node.set_x_injnum('0')
-    mergenode.add_parent(node)
+    #mergenode.add_parent(node)
     node.set_retry(retryNumber)
     # ---- Prepend human readable description to node name.
     node.set_name("xdetection_on_source_seg" + str(i) + "_" + node.get_name())
     dag.add_node(node)
 
 # ---- Supply remaining XmergeJob node parameters, add job to the dag.
-mergenode.set_dir_prefix("on_source/")
-mergenode.set_sn_flag("0 " + mergingCutsString)
-mergenode.set_retry(retryNumber)
+#mergenode.set_dir_prefix("on_source/")
+#mergenode.set_sn_flag("0 " + mergingCutsString)
+#mergenode.set_retry(retryNumber)
 # ---- Prepend human readable description to node name.
-mergenode.set_name("xmerge_on_source_" + mergenode.get_name())
-dag.add_node(mergenode)
+#mergenode.set_name("xmerge_on_source_" + mergenode.get_name())
+#dag.add_node(mergenode)
 
 # ---- do the same if clustering.
 if smartCluster == True:
@@ -1796,7 +1796,7 @@ dag.write_dag()
 # ---- Delete used dag job
 del dag
 del job
-del mergejob
+#del mergejob
 # --- if we cluster
 if smartCluster == True:
   dag_clustered.write_sub_files()
@@ -1825,10 +1825,10 @@ if outputType == 'seedless':
         job = xcondor.XsearchGPUJob(cp)
 
 # ---- Make instance of XmergeJob.
-mergejob = xcondor.XmergeJob(cp)
+#mergejob = xcondor.XmergeJob(cp)
 # ---- Put a single merge job node in mergejob.  This job will combine
 #      into a single file the output of all of the off-source analysis jobs.
-mergenode = xcondor.XmergeNode(mergejob)
+#mergenode = xcondor.XmergeNode(mergejob)
 if xtmvaFlag:
     xtmvanode.add_parent(mergenode)
 
@@ -1854,19 +1854,19 @@ for i in range(len(segmentList)):
     #      output/ul_source directory - there are very few such jobs.
     node.set_output_dir( os.path.join( cwdstr + "/output/ul_source" ) )
     node.set_x_injnum('0')
-    mergenode.add_parent(node)
+    #mergenode.add_parent(node)
     node.set_retry(retryNumber)
     # ---- Prepend human readable description to node name.
     node.set_name("xdetection_ul_source_seg" + str(i) + "_" + node.get_name())
     dag.add_node(node)
 
 # ---- Supply remaining XmergeJob node parameters, add job to the dag.
-mergenode.set_dir_prefix("ul_source/")
-mergenode.set_sn_flag("0 " + mergingCutsString)
-mergenode.set_retry(retryNumber)
+#mergenode.set_dir_prefix("ul_source/")
+#mergenode.set_sn_flag("0 " + mergingCutsString)
+#mergenode.set_retry(retryNumber)
 # ---- Prepend human readable description to node name.
-mergenode.set_name("xmerge_ul_source_" + mergenode.get_name())
-dag.add_node(mergenode)
+#mergenode.set_name("xmerge_ul_source_" + mergenode.get_name())
+#dag.add_node(mergenode)
 
 
 # ---- Write out the submit files needed by condor.
@@ -1876,7 +1876,7 @@ dag.write_dag()
 # ---- Delete used dag job
 del dag
 del job
-del mergejob
+#del mergejob
 
 # -------------------------------------------------------------------------
 #      Write off-source dag.
@@ -1896,10 +1896,10 @@ if outputType == 'seedless':
         job = xcondor.XsearchGPUJob(cp)
 
 # ---- Make instance of XmergeJob.
-mergejob = xcondor.XmergeJob(cp)
+#mergejob = xcondor.XmergeJob(cp)
 # ---- Put a single merge job node in mergejob.  This job will combine
 #      into a single file the output of all of the off-source analysis jobs.
-mergenode = xcondor.XmergeNode(mergejob)
+#mergenode = xcondor.XmergeNode(mergejob)
 
 if xtmvaFlag:
     xtmvanode.add_parent(mergenode)
@@ -1996,12 +1996,12 @@ else:
         dag.add_node(node)
 
 # ---- Supply remaining XmergeJob node parameters, add job to the dag.
-mergenode.set_dir_prefix("off_source/")
-mergenode.set_sn_flag("0 " + mergingCutsString)
-mergenode.set_retry(retryNumber)
+#mergenode.set_dir_prefix("off_source/")
+#mergenode.set_sn_flag("0 " + mergingCutsString)
+#mergenode.set_retry(retryNumber)
 # ---- Prepend human readable description to node name.
-mergenode.set_name("xmerge_off_source_" + mergenode.get_name())
-dag.add_node(mergenode)
+#mergenode.set_name("xmerge_off_source_" + mergenode.get_name())
+#dag.add_node(mergenode)
 # ---- do the same if clustering.
 if smartCluster == True:
   logger.info("Writing off-source clustered dag ... ")
@@ -2023,7 +2023,7 @@ dag.write_dag()
 # ---- Delete used dag and jobs
 del dag
 del job
-del mergejob
+#del mergejob
 # --- Close file recording distribution of off-source results.
 if smartCluster == True:
   dag_clustered.write_sub_files()
@@ -2202,13 +2202,14 @@ if cp.has_section('waveforms') :
                   mergenode[scale_counter].set_dir_prefix(mergingCutsPath + '/../output/simulations_' \
                       + set + '_' + str(scale_counter) + '/')
               else :
-                 mergenode[scale_counter].set_dir_prefix('simulations_' + set + '_' + str(scale_counter) + '/')
-              mergenode[scale_counter].set_sn_flag("1 " + mergingCutsString)
-              mergenode[scale_counter].set_retry(retryNumber)
+                 #mergenode[scale_counter].set_dir_prefix('simulations_' + set + '_' + str(scale_counter) + '/')
+                 pass
+              #mergenode[scale_counter].set_sn_flag("1 " + mergingCutsString)
+              #mergenode[scale_counter].set_retry(retryNumber)
               # ---- Prepend human readable description to node name.
-              mergenode[scale_counter].set_name("xmerge_simulation_" + set + "_injScale" \
-                  + str(scale_counter) + "_" + mergenode[scale_counter].get_name())
-              dag.add_node(mergenode[scale_counter])
+              #mergenode[scale_counter].set_name("xmerge_simulation_" + set + "_injScale" \
+              #    + str(scale_counter) + "_" + mergenode[scale_counter].get_name())
+              #dag.add_node(mergenode[scale_counter])
               if smartCluster == True:
                 # ---- Point to already produced injection results if provided.
                 if reUseInj:
@@ -2224,7 +2225,7 @@ if cp.has_section('waveforms') :
                     + str(scale_counter) + "_" + mergeclusterednode[scale_counter].get_name())
                 dag_clustered.add_node(mergeclusterednode[scale_counter])
         else:
-            mergenode = xcondor.XmergeNode(mergejob)
+            #mergenode = xcondor.XmergeNode(mergejob)
             if xtmvaFlag:
               xtmvanode.add_parent(mergenode)
             if smartCluster == True:
@@ -2301,13 +2302,14 @@ if cp.has_section('waveforms') :
             if reUseInj:
                     mergenode.set_dir_prefix(mergingCutsPath + '/../output/simulations_' + set + '_' + str(scale_counter) + '/')
             else:
-                    mergenode.set_dir_prefix('simulations_' + set + '_' + str(scale_counter) + '/')
-            mergenode.set_sn_flag("0 " + mergingCutsString)
-            mergenode.set_retry(retryNumber)
+                    #mergenode.set_dir_prefix('simulations_' + set + '_' + str(scale_counter) + '/')
+                    pass
+            #mergenode.set_sn_flag("0 " + mergingCutsString)
+            #mergenode.set_retry(retryNumber)
             # ---- Prepend human readable description to node name.
-            mergenode.set_name("xmerge_simulation_" + set + "_injScale" \
-                                + str(scale_counter) + "_" + mergenode.get_name())
-            dag.add_node(mergenode)
+            #mergenode.set_name("xmerge_simulation_" + set + "_injScale" \
+            #                    + str(scale_counter) + "_" + mergenode.get_name())
+            #dag.add_node(mergenode)
             if smartCluster == True:
                   # ---- Point to already produced injection results if provided.
                   if reUseInj:
@@ -2331,7 +2333,7 @@ if cp.has_section('waveforms') :
         # ---- Delete used dag job
         del dag
         del job
-        del mergejob
+        #del mergejob
         if smartCluster == True:
           dag_clustered.write_sub_files()
           dag_clustered.write_dag()
@@ -2409,7 +2411,7 @@ if cp.has_option('mdc','mdc_sets') :
         scale_counter = 0
         for injectionScale in injectionScales :
             # ---- Merge all results for a single waveform+injection scale.
-            mergenode = xcondor.XmergeNode(mergejob)
+            #mergenode = xcondor.XmergeNode(mergejob)
             if xtmvaFlag:
                 xtmvanode.add_parent(mergenode)
 
@@ -2482,7 +2484,7 @@ if cp.has_option('mdc','mdc_sets') :
                 #      one segment; injection number iterates only over
                 #      injections that fall within analysis interval.
                 node.set_x_injnum("1-%d"%(numberOfInjections))
-                mergenode.add_parent(node)
+                #mergenode.add_parent(node)
                 node.set_retry(retryNumber)
                 # ---- Prepend human readable description to node name.
                 node.set_name("xdetection_simulation_" + set + "_injScale" \
@@ -2517,7 +2519,7 @@ if cp.has_option('mdc','mdc_sets') :
                         node.set_x_injnum("%d"%(iInjRange*maxInjNum+1) + "-" \
                             + "%d"%(min((iInjRange+1)*maxInjNum,numberOfInjections)))
 
-                        mergenode.add_parent(node)
+                        #mergenode.add_parent(node)
                         node.set_retry(retryNumber)
                         # ---- Prepend human readable description to node name.
                         node.set_name("xdetection_simulation_" + set + "_seg" \
@@ -2527,13 +2529,13 @@ if cp.has_option('mdc','mdc_sets') :
 
             # ---- Add job node to the dag.
             # ---- Continue on to the next injection scale.
-            mergenode.set_dir_prefix('simulations_' + set + '_' + str(scale_counter) + '/')
-            mergenode.set_sn_flag("0 " + mergingCutsString)
-            mergenode.set_retry(retryNumber)
+            #mergenode.set_dir_prefix('simulations_' + set + '_' + str(scale_counter) + '/')
+            #mergenode.set_sn_flag("0 " + mergingCutsString)
+            #mergenode.set_retry(retryNumber)
             # ---- Prepend human readable description to node name.
-            mergenode.set_name("xmerge_simulation_" + set + "_seg" + \
-                "_injScale" + str(scale_counter) + "_" + mergenode.get_name())
-            dag.add_node(mergenode)
+            #mergenode.set_name("xmerge_simulation_" + set + "_seg" + \
+            #    "_injScale" + str(scale_counter) + "_" + mergenode.get_name())
+            #dag.add_node(mergenode)
             scale_counter = scale_counter + 1
 
         # ---- end loop over injections scales
@@ -2546,7 +2548,7 @@ if cp.has_option('mdc','mdc_sets') :
         # ---- Delete used dag job
         del dag
         del job
-        del mergejob
+        #del mergejob
     # ---- end loop overmdc sets
 
 # -------------------------------------------------------------------------

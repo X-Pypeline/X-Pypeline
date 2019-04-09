@@ -18,7 +18,7 @@ import numpy
 import argparse
 import tables
 
-_injection_analysis_types = ['onsource_injection', 'zero_noise_injection']
+_injection_analysis_types = ['onsource_injection', 'zero_noise_injection', 'offsource_injection']
 _other_event_types = ['background', 'onsource']
 _job_types = []
 _job_types.extend(_injection_analysis_types)
@@ -361,11 +361,12 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                         surviving_pixels['excess_energy'] = fft_grams.to_sparse(tindex, findex, phi=phi, theta=theta)
 
                         for k, v in surviving_pixels.items():
+                            processed_map_info = '{0}-{1}'.format(int(event_time), '_'.join(time_slide.astype(str).tolist()))
                             if args.job_type in _injection_analysis_types:
-                                v.write(filename='./output/grb-{0}-{1}-{2}.h5'.format(args.job_type, injection_numbers[0], injection_numbers[-1]),
+                                v.write(filename='./output/grb-{0}-{1}-{2}-{3}.h5'.format(args.job_type, int(event_time), injection_numbers[0], injection_numbers[-1]),
                                       path='/{0}/event_{1}_slide_{2}/waveform_{3}/injection_scale_{4}/injection_number_{5}'.format(args.job_type, int(event_time), '_'.join(time_slide.astype(str).tolist()), waveform_name, str(injection_scale).replace('.', 'd'), injection_number,),
                                       table_description=table_description)
                             else:
-                                v.write(filename='./output/grb-{0}-{1}.h5'.format(args.job_type, int(event_time)),
+                                v.write(filename='./output/grb-{0}-{1}.h5'.format(args.job_type, processed_map_info),
                                       path='/{0}/event_{1}_external_slide_{2}/internal_slide_{3}'.format(args.job_type, int(event_time), '_'.join(time_slide.astype(str).tolist()), circular_time_slide),
                                       table_description=table_description)

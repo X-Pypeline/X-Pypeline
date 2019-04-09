@@ -131,29 +131,29 @@ class XsearchNode(pipeline.CondorDAGNode, pipeline.AnalysisNode):
         self.__x_injnum = None
 
     # ---- Set parameters file.
-    def set_param_file(self,path):
-        self.add_var_arg(path)
+    def set_param_file(self, path):
+        self.add_var_arg('--parameter-file ' + path)
         self.__param_file = path
 
     def get_param_file(self):
         return self.__param_file
 
-    def set_x_jobnum(self,n):
-        self.add_var_arg(str(n))
+    def set_x_jobnum(self, n):
+        self.add_var_arg('--event-numbers ' + str(n))
         self.__x_jobnum = n
 
     def get_x_jobnum(self):
         return self.__x_jobnum
 
-    def set_output_dir(self,path):
-        self.add_var_arg(path)
+    def set_output_dir(self, path):
+        self.add_var_arg('--job-type ' + path)
         self.__output_dir = path
 
     def get_output_dir(self,path):
         return self.__output_dir
 
-    def set_x_injnum(self,n):
-        self.add_var_arg(n)
+    def set_x_injnum(self, n):
+        self.add_var_arg('--injection-numbers ' + n)
         self.__x_injnum = n
 
     def get_x_injnum(self):
