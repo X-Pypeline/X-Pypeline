@@ -18,18 +18,23 @@ def choose_background_injection_training(f, injection_type='onsource_injection',
 
     inj_scales = [inj_scale for inj_scale in f.get_node('/{0}/{1}/{2}'.format(injection_type, injection_events[0], waveforms[0]))._v_children.keys()]
 
-    injections = numpy.asarray([injection for injection in f.get_node('/{0}/{1}/{2}/{3}'.format(injection_type, injection_events[0], waveforms[0], inj_scales[0]))._v_children.keys()])
+    all_training_injection_events = []
+    all_validation_injection_events = []
+    for injection_event in injection_events:
+        injections = numpy.asarray([injection for injection in f.get_node('/{0}/{1}/{2}/{3}'.format(injection_type, injection_event, waveforms[0], inj_scales[0]))._v_children.keys()])
 
-    training_injection_events_idx = numpy.random.randint(0, injections.size, size=int(0.5*injections.size))
+        training_injection_events_idx = numpy.random.randint(0, injections.size, size=int(0.5*injections.size))
 
-    list_of_training_injection_paths = [['/' + injection_type], injection_events, waveforms,
-                                        inj_scales, injections[training_injection_events_idx].tolist()]
+        list_of_training_injection_paths = [['/' + injection_type], [injection_event], waveforms,
+                                            inj_scales, injections[training_injection_events_idx].tolist()]
 
-    training_injection_events = list(map(lambda x: '/'.join(x), itertools.product(*list_of_training_injection_paths)))
+        training_injection_events = list(map(lambda x: '/'.join(x), itertools.product(*list_of_training_injection_paths)))
+        all_training_injection_events.extend(training_injection_events)
 
-    list_of_validation_injection_paths = [['/' + injection_type], injection_events, waveforms, inj_scales, injections[~training_injection_events_idx].tolist()]
+        list_of_validation_injection_paths = [['/' + injection_type], [injection_event], waveforms, inj_scales, injections[~training_injection_events_idx].tolist()]
 
-    validation_injection_events = list(map(lambda x: '/'.join(x), itertools.product(*list_of_validation_injection_paths)))
+        validation_injection_events = list(map(lambda x: '/'.join(x), itertools.product(*list_of_validation_injection_paths)))
+        all_validation_injection_events.extend(validation_injection_events)
 
     # We need to select have of background and half of injection events for training
     background_events = numpy.asarray([group for group in f.walk_groups('/background') if 'internal_slide' in group._v_name])
@@ -37,4 +42,4 @@ def choose_background_injection_training(f, injection_type='onsource_injection',
     training_background_events = background_events[training_events]
     validation_background_events = background_events[~training_events]
 
-    return training_background_events, validation_background_events, training_injection_events, validation_injection_events
+    return training_background_events, validation_background_events, all_training_injection_events, all_validation_injection_events

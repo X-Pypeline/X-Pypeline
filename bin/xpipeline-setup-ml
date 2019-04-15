@@ -82,29 +82,23 @@ numpy.save('background_validation', background_validation)
 
 injection_trainingset = []
 for event in training_injection_triggers:
-    try:
-        for table in f.walk_nodes(event, "Table"):
-            channel_names = numpy.unique(table.cols.ifo).astype(str)
-            # This has dimensions (ifos by (num_ffts * num_sky) by pixels)
-            array = numpy.asarray([[ x['energy'] for x in table.where("""(ifo == \'{0}\')""".format(channel_name))] for channel_name in channel_names],)
-            # we want (pixels by (num_ffts * num_sky) by ifos)
-            injection_trainingset.append(array.T)
-    except:
-        logger.warning("Skipping {0} not a performed injection".format(event))
+    for table in f.walk_nodes(event, "Table"):
+        channel_names = numpy.unique(table.cols.ifo).astype(str)
+        # This has dimensions (ifos by (num_ffts * num_sky) by pixels)
+        array = numpy.asarray([[ x['energy'] for x in table.where("""(ifo == \'{0}\')""".format(channel_name))] for channel_name in channel_names],)
+        # we want (pixels by (num_ffts * num_sky) by ifos)
+        injection_trainingset.append(array.T)
 
 injection_trainingset = numpy.asarray(injection_trainingset)
 
 injection_validation = []
 for event in testing_injection_triggers:
-    try:
-        for table in f.walk_nodes(event, "Table"):
-            channel_names = numpy.unique(table.cols.ifo).astype(str)
-            # This has dimensions (ifos by (num_ffts * num_sky) by pixels)
-            array = numpy.asarray([[ x['energy'] for x in table.where("""(ifo == \'{0}\')""".format(channel_name))] for channel_name in channel_names],)
-            # we want (pixels by (num_ffts * num_sky) by ifos)
-            injection_validation.append(array.T)
-    except:
-        logger.warning("Skipping {0} not a performed injection".format(event))
+    for table in f.walk_nodes(event, "Table"):
+        channel_names = numpy.unique(table.cols.ifo).astype(str)
+        # This has dimensions (ifos by (num_ffts * num_sky) by pixels)
+        array = numpy.asarray([[ x['energy'] for x in table.where("""(ifo == \'{0}\')""".format(channel_name))] for channel_name in channel_names],)
+        # we want (pixels by (num_ffts * num_sky) by ifos)
+        injection_validation.append(array.T)
 
 injection_validation = numpy.asarray(injection_validation)
 numpy.save('injection_trainingset', injection_trainingset)
