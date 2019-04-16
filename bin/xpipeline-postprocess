@@ -10,6 +10,13 @@ import tables
 import numpy
 import pandas
 
+_default_columns = ['min_time_of_cluster',
+                    'weighted_center_time', 'max_time_of_cluster',
+                    'min_frequency_of_cluster',
+                    'weighted_center_frequency',
+                    'max_frequency_of_cluster',
+                    'number_of_pixels',]
+
 def parse_commandline():
     parser = argparse.ArgumentParser(description="This executable processes "
                                                  "a xpipeline-analysis "
@@ -59,9 +66,62 @@ for event in training_injection_triggers:
         all_clusters = pandas.DataFrame()
         for fft_length in set(table.cols.dx):
             for phi, theta in set(zip(table.cols.phi, table.cols.theta)):
+                # Obtain all sparse time frequency maps for this fftlength and sky position
                 sparse_maps = [csc_XSparseTimeFrequencyMap.read(row)
-                                for row in table.where("""(dx == {0}) & (map_type == \'excess_energy\') & (phi == {1}) & (theta == {2})""".format(fft_length, phi, theta,))]
-                sparse_maps = XSparseTimeFrequencyMapDict({imap.name: imap for imap in sparse_maps})
-                clusters = sparse_maps.abs().cluster()
+                                for row in table.where("""(dx == {0}) & (phi == {1}) & (theta == {2})""".format(fft_length, phi, theta,))]
+
+                # Reformat the above list of projected sparse time frequency maps into
+                # a nested dictionary of key : {key1 :value}} where
+                # key=projection (i.e. 'f_plus') key1 is detectors
+                projected_sparse_maps = XSparseTimeFrequencyMapDict({imap.map_type : XSparseTimeFrequencyMapDict() for imap in sparse_maps})
+                for imap in sparse_maps:
+                    projected_sparse_maps[imap.map_type][imap.name] = imap
+
+                all_energies = []
+                all_columns = _default_columns.copy()
+                for k,v in projected_sparse_maps.items():
+                    all_energies.append(v.to_coherent().power2(2).energy)
+                    all_columns.append('coherent_' + k.decode("utf-8"))
+                    all_energies.append(v.power2().to_coherent().energy)
+                    all_columns.append('incoherent_' + k.decode("utf-8"))
+
+                # Just assign the energy attribute of the last sparse maps to be
+                # all the coherent and incoherent energies and get all clsuter properities
+                tmp_sparse_map = list(v.values())[0]
+                tmp_sparse_map.energy = numpy.asarray(all_energies)
+                clusters = tmp_sparse_map.cluster(columns=all_columns)
             all_clusters = all_clusters.append(clusters)
-        all_clusters.supercluster().to_hdf('clusters.h5', key=table._v_pathname, index=False,)
+        all_clusters.supercluster(statistic_column='coherent_f_plus').to_hdf('clusters.h5', key=table._v_pathname, index=False,)
+
+for event in training_background_triggers:
+    for table in f.walk_nodes(event, "Table"):
+        channel_names = numpy.unique(table.cols.ifo).astype(str)
+        all_clusters = pandas.DataFrame()
+        for fft_length in set(table.cols.dx):
+            for phi, theta in set(zip(table.cols.phi, table.cols.theta)):
+                # Obtain all sparse time frequency maps for this fftlength and sky position
+                sparse_maps = [csc_XSparseTimeFrequencyMap.read(row)
+                                for row in table.where("""(dx == {0}) & (phi == {1}) & (theta == {2})""".format(fft_length, phi, theta,))]
+
+                # Reformat the above list of projected sparse time frequency maps into
+                # a nested dictionary of key : {key1 :value}} where
+                # key=projection (i.e. 'f_plus') key1 is detectors
+                projected_sparse_maps = XSparseTimeFrequencyMapDict({imap.map_type : XSparseTimeFrequencyMapDict() for imap in sparse_maps})
+                for imap in sparse_maps:
+                    projected_sparse_maps[imap.map_type][imap.name] = imap
+
+                all_energies = []
+                all_columns = _default_columns.copy()
+                for k,v in projected_sparse_maps.items():
+                    all_energies.append(v.to_coherent().power2(2).energy)
+                    all_columns.append('coherent_' + k.decode("utf-8"))
+                    all_energies.append(v.power2().to_coherent().energy)
+                    all_columns.append('incoherent_' + k.decode("utf-8"))
+
+                # Just assign the energy attribute of the last sparse maps to be
+                # all the coherent and incoherent energies and get all clsuter properities
+                tmp_sparse_map = list(v.values())[0]
+                tmp_sparse_map.energy = numpy.asarray(all_energies)
+                clusters = tmp_sparse_map.cluster(columns=all_columns)
+            all_clusters = all_clusters.append(clusters)
+        all_clusters.supercluster(statistic_column='coherent_f_plus').to_hdf('clusters.h5', key=table._v_pathname, index=False,)

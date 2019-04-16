@@ -80,6 +80,13 @@ class csc_sparse_map(sparse.csc_matrix):
             obj.energy = numpy.abs(obj.energy)
         return obj
 
+    def power2(self, *args, **kwargs):
+        obj = self.imag.power(*args, **kwargs) + self.real.power(*args, **kwargs)
+        obj.__metadata_finalize__(self, force=True)
+        if obj.energy is not None:
+            obj.energy = obj.energy.imag**2 + obj.energy.real**2
+        return obj
+
     def _repr_helper(self, print_):
         if print_ is repr:
             opstr = '='

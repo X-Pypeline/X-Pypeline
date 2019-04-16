@@ -324,6 +324,15 @@ class XSparseTimeFrequencyMapDict(OrderedDict):
         """
         return XSparseTimeFrequencyMapDict({k: numpy.abs(v) for k, v in self.items()})
 
+    def power2(self, n=2, dtype=None):
+        """Take the absolute value of all maps in dict
+
+           Returns:
+               `XTimeFrequencyMapDict`:
+                   power_map of all Fourier Grams in Dict
+        """
+        return XSparseTimeFrequencyMapDict({k: v.power2(n, dtype=dtype) for k, v in self.items()})
+
     def to_xtimefrequencymapdict(self):
         """Convert dict fo sparse matrix to `XTimeFrequencyMapDict`
         """
@@ -418,7 +427,7 @@ class XSparseTimeFrequencyMapDict(OrderedDict):
         return
 
 class csc_XSparseTimeFrequencyMap(csc_sparse_map):
-    def write(self, filename, path, table_description=None,**kwargs):
+    def write(self, filename, path, table_description=None, **kwargs):
         """Plot the data for this `XTimeFrequencyMapDict`.
 
         Parameters
@@ -549,7 +558,7 @@ class csc_XSparseTimeFrequencyMap(csc_sparse_map):
 
                 cluster_array[:, 3:6] = cluster_array[:, 3:6] * self.dy  + self.y0
 
-            return XCluster.nearest_neighbor(cluster_array, labelled_map)
+            return XCluster.nearest_neighbor(cluster_array, labelled_map, **kwargs)
         else:
             raise ValueError('Clustering method undefined')
 
