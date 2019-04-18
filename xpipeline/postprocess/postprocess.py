@@ -19,6 +19,69 @@
 # ---- Import standard modules to the python path.
 import numpy
 import pandas
+from xpipeline.core import XSparseTimeFrequencyMapDict, csc_XSparseTimeFrequencyMap
+
+_default_columns = ['min_time_of_cluster',
+                    'weighted_center_time', 'max_time_of_cluster',
+                    'min_frequency_of_cluster',
+                    'weighted_center_frequency',
+                    'max_frequency_of_cluster',
+                    'number_of_pixels',]
+
+def extract_clusters_from_table(table, event_type):
+    channel_names = numpy.unique(table.cols.ifo).astype(str)
+    all_clusters = pandas.DataFrame()
+    for fft_length in set(table.cols.dx):
+        for phi, theta in set(zip(table.cols.phi, table.cols.theta)):
+            # Obtain all sparse time frequency maps for this fftlength and sky position
+            sparse_maps = [csc_XSparseTimeFrequencyMap.read(row)
+                            for row in table.where("""(dx == {0}) & (phi == {1}) & (theta == {2})""".format(fft_length, phi, theta,))]
+
+            # Reformat the above list of projected sparse time frequency maps into
+            # a nested dictionary of key : {key1 :value}} where
+            # key=projection (i.e. 'f_plus') key1 is detectors
+            projected_sparse_maps = XSparseTimeFrequencyMapDict({imap.map_type : XSparseTimeFrequencyMapDict() for imap in sparse_maps})
+            for imap in sparse_maps:
+                projected_sparse_maps[imap.map_type][imap.name] = imap
+
+            all_energies = []
+            all_columns = _default_columns.copy()
+            for k,v in projected_sparse_maps.items():
+                all_energies.append(v.to_coherent().power2(2).energy)
+                all_columns.append('coherent_' + k.decode("utf-8"))
+                all_energies.append(v.power2().to_coherent().energy)
+                all_columns.append('incoherent_' + k.decode("utf-8"))
+
+            # Just assign the energy attribute of the last sparse maps to be
+            # all the coherent and incoherent energies and get all clsuter properities
+            tmp_sparse_map = list(v.values())[0]
+            tmp_sparse_map.energy = numpy.asarray(all_energies)
+            clusters = tmp_sparse_map.cluster(columns=all_columns)
+
+        # append the cluster to other clusters from same sky locations
+        all_clusters = all_clusters.append(clusters)
+
+    # super cluster over sky locations and ffitlengths for this event
+    all_clusters = all_clusters.supercluster(statistic_column='coherent_f_plus')
+
+    # extract event info
+    trigger_info = table._v_pathname.split('/')
+    if event_type in ['background', 'onsource']:
+        event_info = list(filter(lambda x: 'event' in x, trigger_info))[0]
+        internal_time_slide = int(list(filter(lambda x: 'internal_slide' in x, trigger_info))[0].split('_')[-1])
+        all_clusters['event'] = event_info
+        all_clusters['internal_time_slide'] = internal_time_slide
+    else:
+        event_info = list(filter(lambda x: 'event' in x, trigger_info))[0]
+        waveform_info = list(filter(lambda x: 'waveform' in x, trigger_info))[0]
+        injection_scale = float(list(filter(lambda x: 'injection_scale' in x, trigger_info))[0].split('_')[-1].replace('d','.'))
+        injection_number = int(list(filter(lambda x: 'injection_number' in x, trigger_info))[0].split('_')[-1])
+        all_clusters['event'] = event_info
+        all_clusters['waveform'] = waveform_info
+        all_clusters['injection_scale'] = injection_scale
+        all_clusters['injection_number'] = injection_number
+
+    return all_clusters
 
 def xapplyratiocuts(triggers, ePlusIndex,eCrossIndex,eNullIndex,
                     iPlusIndex,iCrossIndex,iNullIndex,
