@@ -1,21 +1,14 @@
 #!/usr/bin/env python
 from xpipeline.core import XSparseTimeFrequencyMapDict, csc_XSparseTimeFrequencyMap
-from xpipeline.cluster.cluster import XCluster
 from xpipeline.setuputils import log
 from xpipeline.utils import utils
+from xpipeline.postprocess import postprocess
 
 import argparse
 import os
 import tables
 import numpy
 import pandas
-
-_default_columns = ['min_time_of_cluster',
-                    'weighted_center_time', 'max_time_of_cluster',
-                    'min_frequency_of_cluster',
-                    'weighted_center_frequency',
-                    'max_frequency_of_cluster',
-                    'number_of_pixels',]
 
 def parse_commandline():
     parser = argparse.ArgumentParser(description="This executable processes "
@@ -28,7 +21,11 @@ def parse_commandline():
                                trigger file
                                """,
                                required=True,)
-
+    required_args.add_argument("-o", "--output-file", help=
+                               """
+                               Filename
+                               """,
+                               required=True,)
     required_args.add_argument("-t", "--injection-type", help=
                                """
                                onsource_injection or offsource_injection or
@@ -60,68 +57,62 @@ f = tables.open_file(args.event_file)
 training_background_triggers, testing_background_triggers, training_injection_triggers, testing_injection_triggers = \
     utils.choose_background_injection_training(f, injection_type=args.injection_type, randomseed=args.randomseed,)
 
-for event in training_injection_triggers:
-    for table in f.walk_nodes(event, "Table"):
-        channel_names = numpy.unique(table.cols.ifo).astype(str)
-        all_clusters = pandas.DataFrame()
-        for fft_length in set(table.cols.dx):
-            for phi, theta in set(zip(table.cols.phi, table.cols.theta)):
-                # Obtain all sparse time frequency maps for this fftlength and sky position
-                sparse_maps = [csc_XSparseTimeFrequencyMap.read(row)
-                                for row in table.where("""(dx == {0}) & (phi == {1}) & (theta == {2})""".format(fft_length, phi, theta,))]
-
-                # Reformat the above list of projected sparse time frequency maps into
-                # a nested dictionary of key : {key1 :value}} where
-                # key=projection (i.e. 'f_plus') key1 is detectors
-                projected_sparse_maps = XSparseTimeFrequencyMapDict({imap.map_type : XSparseTimeFrequencyMapDict() for imap in sparse_maps})
-                for imap in sparse_maps:
-                    projected_sparse_maps[imap.map_type][imap.name] = imap
-
-                all_energies = []
-                all_columns = _default_columns.copy()
-                for k,v in projected_sparse_maps.items():
-                    all_energies.append(v.to_coherent().power2(2).energy)
-                    all_columns.append('coherent_' + k.decode("utf-8"))
-                    all_energies.append(v.power2().to_coherent().energy)
-                    all_columns.append('incoherent_' + k.decode("utf-8"))
-
-                # Just assign the energy attribute of the last sparse maps to be
-                # all the coherent and incoherent energies and get all clsuter properities
-                tmp_sparse_map = list(v.values())[0]
-                tmp_sparse_map.energy = numpy.asarray(all_energies)
-                clusters = tmp_sparse_map.cluster(columns=all_columns)
-            all_clusters = all_clusters.append(clusters)
-        all_clusters.supercluster(statistic_column='coherent_f_plus').to_hdf('clusters.h5', key=table._v_pathname, index=False,)
-
+# Now get background triggers for the training and testing injections
+all_background_triggers = []
 for event in training_background_triggers:
     for table in f.walk_nodes(event, "Table"):
-        channel_names = numpy.unique(table.cols.ifo).astype(str)
-        all_clusters = pandas.DataFrame()
-        for fft_length in set(table.cols.dx):
-            for phi, theta in set(zip(table.cols.phi, table.cols.theta)):
-                # Obtain all sparse time frequency maps for this fftlength and sky position
-                sparse_maps = [csc_XSparseTimeFrequencyMap.read(row)
-                                for row in table.where("""(dx == {0}) & (phi == {1}) & (theta == {2})""".format(fft_length, phi, theta,))]
+        all_clusters = postprocess.extract_clusters_from_table(table, event_type='background')
+        all_background_triggers.append(all_clusters.values)
 
-                # Reformat the above list of projected sparse time frequency maps into
-                # a nested dictionary of key : {key1 :value}} where
-                # key=projection (i.e. 'f_plus') key1 is detectors
-                projected_sparse_maps = XSparseTimeFrequencyMapDict({imap.map_type : XSparseTimeFrequencyMapDict() for imap in sparse_maps})
-                for imap in sparse_maps:
-                    projected_sparse_maps[imap.map_type][imap.name] = imap
+# Now stack all the background triggers from the various trials and
+# save them as one big DataFrame
+all_background_triggers = numpy.vstack(all_background_triggers)
+non_string_cols = all_clusters.columns[~all_clusters.dtypes.eq('object')]
+all_background_triggers = pandas.DataFrame(all_background_triggers, columns=all_clusters.columns,)
+all_background_triggers[non_string_cols] = all_background_triggers[non_string_cols].apply(pandas.to_numeric)
+all_background_triggers.to_hdf(args.output_file, key='/background/trainingset', append=True, index=False,)
 
-                all_energies = []
-                all_columns = _default_columns.copy()
-                for k,v in projected_sparse_maps.items():
-                    all_energies.append(v.to_coherent().power2(2).energy)
-                    all_columns.append('coherent_' + k.decode("utf-8"))
-                    all_energies.append(v.power2().to_coherent().energy)
-                    all_columns.append('incoherent_' + k.decode("utf-8"))
+all_background_triggers = []
+for event in testing_background_triggers:
+    for table in f.walk_nodes(event, "Table"):
+        all_clusters = postprocess.extract_clusters_from_table(table, event_type='background')
+        all_background_triggers.append(all_clusters.values)
 
-                # Just assign the energy attribute of the last sparse maps to be
-                # all the coherent and incoherent energies and get all clsuter properities
-                tmp_sparse_map = list(v.values())[0]
-                tmp_sparse_map.energy = numpy.asarray(all_energies)
-                clusters = tmp_sparse_map.cluster(columns=all_columns)
-            all_clusters = all_clusters.append(clusters)
-        all_clusters.supercluster(statistic_column='coherent_f_plus').to_hdf('clusters.h5', key=table._v_pathname, index=False,)
+# Now stack all the background triggers from the various trials and
+# save them as one big DataFrame
+all_background_triggers = numpy.vstack(all_background_triggers)
+non_string_cols = all_clusters.columns[~all_clusters.dtypes.eq('object')]
+all_background_triggers = pandas.DataFrame(all_background_triggers, columns=all_clusters.columns,)
+all_background_triggers[non_string_cols] = all_background_triggers[non_string_cols].apply(pandas.to_numeric)
+all_background_triggers.to_hdf(args.output_file, key='/background/testingset', append=True, index=False,)
+
+del all_background_triggers
+
+# Now get injection triggers for the training and testing injections
+all_injection_triggers = []
+
+for event in training_injection_triggers:
+    for table in f.walk_nodes(event, "Table"):
+        all_clusters = postprocess.extract_clusters_from_table(table, event_type='injection')
+        all_injection_triggers.append(all_clusters.values)
+
+non_string_cols = all_clusters.columns[~all_clusters.dtypes.eq('object')]
+
+all_injection_triggers = numpy.vstack(all_injection_triggers)
+all_injection_triggers = pandas.DataFrame(all_injection_triggers, columns=all_clusters.columns)
+all_injection_triggers[non_string_cols] = all_injection_triggers[non_string_cols].apply(pandas.to_numeric)
+all_injection_triggers.to_hdf(args.output_file, key='/injections/trainingset', append=True, index=False,)
+
+all_injection_triggers = []
+
+for event in testing_injection_triggers:
+    for table in f.walk_nodes(event, "Table"):
+        all_clusters = postprocess.extract_clusters_from_table(table, event_type='injection')
+        all_injection_triggers.append(all_clusters.values)
+
+non_string_cols = all_clusters.columns[~all_clusters.dtypes.eq('object')]
+
+all_injection_triggers = numpy.vstack(all_injection_triggers)
+all_injection_triggers = pandas.DataFrame(all_injection_triggers, columns=all_clusters.columns)
+all_injection_triggers[non_string_cols] = all_injection_triggers[non_string_cols].apply(pandas.to_numeric)
+all_injection_triggers.to_hdf(args.output_file, key='/injections/testingset', append=True, index=False,)
