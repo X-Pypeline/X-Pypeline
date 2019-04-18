@@ -1,11 +1,13 @@
 import numpy
 import itertools
+import random
 
 def choose_background_injection_training(f, injection_type='onsource_injection', randomseed=1986,):
     """We need to select half of background and half of injection events for training
     """
     # set set for reproducibility
     numpy.random.seed(randomseed)
+    random.seed(randomseed)
 
     for idx, node in enumerate(f.list_nodes('/')):
         if '/' + injection_type == node._v_pathname:
@@ -23,8 +25,9 @@ def choose_background_injection_training(f, injection_type='onsource_injection',
     for injection_event in injection_events:
         injections = numpy.asarray([injection for injection in f.get_node('/{0}/{1}/{2}/{3}'.format(injection_type, injection_event, waveforms[0], inj_scales[0]))._v_children.keys()])
 
-        training_injection_events_idx = numpy.random.randint(0, injections.size, size=int(0.5*injections.size))
-
+        number_of_injections = injections.size
+        training_injection_events_idx = numpy.array(random.sample(range(number_of_injections), int(0.5*number_of_injections)))
+        
         list_of_training_injection_paths = [['/' + injection_type], [injection_event], waveforms,
                                             inj_scales, injections[training_injection_events_idx].tolist()]
 
@@ -38,7 +41,8 @@ def choose_background_injection_training(f, injection_type='onsource_injection',
 
     # We need to select have of background and half of injection events for training
     background_events = numpy.asarray([group for group in f.walk_groups('/background') if 'internal_slide' in group._v_name])
-    training_events = numpy.random.randint(0, background_events.size, size=int(0.5*background_events.size))
+    number_of_background_events = background_events.size
+    training_events = numpy.array(random.sample(range(number_of_background_events), int(0.5*number_of_background_events)))
     training_background_events = background_events[training_events]
     validation_background_events = background_events[~training_events]
 
