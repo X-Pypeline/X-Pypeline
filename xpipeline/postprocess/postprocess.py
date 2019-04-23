@@ -400,7 +400,7 @@ def xapplyalphacuts(triggers,
     background_trials = triggers.groupby(['event','internal_time_slide'])
     number_of_trials = len(background_trials)
     indexFARBackground = int(numpy.ceil(number_of_trials* FAR))
-    loduest_background_that_survives_cut = []
+    loudest_background_that_survives_cut = []
     trial_name = []
     
 
@@ -497,13 +497,14 @@ def xapplyalphacuts(triggers,
         # Find loudest surviving trigger for this trial for the grid of applied cuts
         # to do this we find the max over the columns
         #(remember each row represented an applied a cut)
-        loduest_background_that_survives_cut.append(numpy.max(backGroundArray,1))
+        loudest_background_that_survives_cut.append(numpy.max(backGroundArray,1))
         trial_name.append(key)
 
-    loduest_background_that_survives_cut = numpy.vstack(loduest_background_that_survives_cut)
-    loduest_background_that_survives_cut.sort(axis=0)
+    loudest_background_that_survives_cut = numpy.vstack(loudest_background_that_survives_cut)
+    sorted_indices = loudest_background_that_survives_cut.argsort(axis=0)[:,0]
+    loudest_background_that_survives_cut.sort(axis=0)
 
-    return loduest_background_that_survives_cut[indexFARBackground,:]
+    return loudest_background_that_survives_cut[indexFARBackground,:], numpy.array(trial_name)[sorted_indices], loudest_background_that_survives_cut
 
 def xapplyalphacutsinjection(triggers,
                     ePlusIndex,eCrossIndex,eNullIndex,
