@@ -210,6 +210,8 @@ def xmakewaveform(family, parameters, T, T0, fs, **kwargs):
     #----- Time in column vector.
     t = numpy.arange(0, T, 1./fs)
 
+    hb = None
+
     #----- If parameters are supplied as tilde-delimited string, then convert
     #      to cell or double array.
     if type(parameters) in [str, numpy.str_, numpy.str, numpy.string_]:
@@ -1849,6 +1851,11 @@ def xmakewaveform(family, parameters, T, T0, fs, **kwargs):
     else:
        raise ValueError("Waveform family not recognized")
 
+    # this waveform very well may not ave the scalar polarization defined.
+    # therefore make it a time series of zeros
+    if hb is None:
+         hb = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
+                name=hp.name)
     ###########################################################################
     #   Process pre-generated waveforms.
     ###########################################################################
