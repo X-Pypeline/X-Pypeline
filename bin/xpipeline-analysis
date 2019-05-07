@@ -247,7 +247,7 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                 data = analysis_data
 
             # high pass filter the data
-            data = data.highpass(minimum_frequency,)
+            data = data.highpass(minimum_frequency/2,)
             # Get the ASDs that will be used to whiten the data
             asds = data.asd(whitening_length)
 
@@ -281,10 +281,6 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                 # determine how many indices every pixel needs to move
                 # with respect to the internal time slides
                 final_time_bin_idx = fft_grams_fixed[channel_names[0]].shape[0]
-                if circ_time_slides is not None:
-                    slide_pixels = {k: v * 1./fft_length * 1./offset_fraction for k,v in slides.items()}
-                else:
-                    slide_pixels = {k: numpy.zeros(1) for k in channel_names}
 
                 fft_grams = fft_grams_fixed.copy()
                 for (sky_position, time_delay) in zip(sky_positions, time_delays):
@@ -353,10 +349,6 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                         # Now with pixels from both detectors
                         surviving_pixels = {k : v.to_sparse(tindex, findex, phi=phi, theta=theta, map_type=k) for k, v in projected_fftmaps.items()}
                         surviving_pixels['excess_energy'] = fft_grams.to_sparse(tindex, findex, phi=phi, theta=theta)
-
-                        all_sparse_maps[circular_time_slide] = surviving_pixels
-                        import pdb
-                        pdb.set_trace()
 
                         if args.development:
                             for k, v in surviving_pixels.items():
