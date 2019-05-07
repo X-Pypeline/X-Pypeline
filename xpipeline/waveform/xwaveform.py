@@ -1058,6 +1058,29 @@ def xmakewaveform(family, parameters, T, T0, fs, **kwargs):
         hp = 100./dist * hp * (1+ciota**2) / 2
         hc = 100./dist * hc * ciota
 
+    elif family.lower() in ['oconnorcouch2018']:
+
+        # ----  Burrows 2018 2D SN waveform (pregenerated).
+        distance = parameters[0]
+        name = parameters[1]
+        pregen = 1
+
+        # Read hplus
+        hp = TimeSeries.read(os.path.join(filedir, family + '.hdf5'),
+                             path='/{0}/{1}/hp'.format(family, name))
+        hc = TimeSeries.read(os.path.join(filedir, family + '.hdf5'),
+                             path='/{0}/{1}/hc'.format(family, name))
+
+
+        pregen_fs = hp.sample_rate.value
+        pregen_T = hp.duration.value
+
+        # ---- Read waveform, which is defined at a range of 1 kiloparsec.
+        # and scale by distance (distance should be in kiloparsecs)
+        hp = 1. / distance * hp
+        hc = 1. / distance * hc
+        hb = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
+                        name=hp.name)
 
     elif family.lower() in ['onecyclesine']:
 
@@ -1214,6 +1237,54 @@ def xmakewaveform(family, parameters, T, T0, fs, **kwargs):
 
         hp = hp / (distance/20.)
         hc = hc / (distance/20.)
+
+    elif family.lower() in ['powell2018']:
+
+        # ----  Burrows 2018 2D SN waveform (pregenerated).
+        distance = parameters[0]
+        name = parameters[1]
+        pregen = 1
+
+        # Read hplus
+        hp = TimeSeries.read(os.path.join(filedir, family + '.hdf5'),
+                             path='/{0}/{1}/hp'.format(family, name))
+        hc = TimeSeries.read(os.path.join(filedir, family + '.hdf5'),
+                             path='/{0}/{1}/hc'.format(family, name))
+
+
+        pregen_fs = hp.sample_rate.value
+        pregen_T = hp.duration.value
+
+        # ---- Read waveform, which is defined at a range of 1 kiloparsec.
+        # and scale by distance (distance should be in kiloparsecs)
+        hp = 1. / distance * hp
+        hc = 1. / distance * hc
+        hb = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
+                        name=hp.name)
+
+    elif family.lower() in ['yakunin2017']:
+
+        # ----  Burrows 2018 2D SN waveform (pregenerated).
+        distance = parameters[0]
+        name = parameters[1]
+        pregen = 1
+
+        # Read hplus
+        hp = TimeSeries.read(os.path.join(filedir, family + '.hdf5'),
+                             path='/{0}/{1}/hp'.format(family, name))
+        hc = TimeSeries.read(os.path.join(filedir, family + '.hdf5'),
+                             path='/{0}/{1}/hc'.format(family, name))
+
+
+        pregen_fs = hp.sample_rate.value
+        pregen_T = hp.duration.value
+
+        # ---- Read waveform, which is defined at a range of 1 kiloparsec.
+        # and scale by distance (distance should be in kiloparsecs)
+        hp = 1. / distance * hp
+        hc = 1. / distance * hc
+        hb = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
+                        name=hp.name)
 
     elif family.lower() in ['scalarchirplet']:
 
