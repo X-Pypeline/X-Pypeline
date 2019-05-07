@@ -27,7 +27,7 @@ def choose_background_injection_training(f, injection_type='onsource_injection',
             injections = numpy.asarray([injection for injection in f.get_node('/{0}/{1}/{2}/{3}'.format(injection_type, injection_event, waveforms[0], inj_scales[0]))._v_children.keys()])
 
             number_of_injections = injections.size
-            training_injection_events_idx = numpy.array(random.sample(range(number_of_injections), int(0.5*number_of_injections)))
+            training_injection_events_idx = numpy.array(random.sample(range(number_of_injections), max(int(0.5*number_of_injections),1)))
             validation_injection_events_idx = numpy.setxor1d(numpy.indices(numpy.arange(len(injections)).shape), training_injection_events_idx)
             
             list_of_training_injection_paths = [['/' + injection_type], [injection_event], waveforms,
