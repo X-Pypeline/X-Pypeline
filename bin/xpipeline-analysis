@@ -8,6 +8,9 @@ from xpipeline.core.xtimefrequencymap import XTimeFrequencyMapDict
 from xpipeline.core.xtimefrequencymap import csc_XSparseTimeFrequencyMap
 from xpipeline.waveform import xinjectsignal
 from xpipeline.setuputils import log
+from xpipeline.utils import utils
+from xpipeline.postprocess import postprocess
+
 from gwpy.table import EventTable
 from gwpy.timeseries import TimeSeries
 from gwpy.signal import filter_design
@@ -68,6 +71,14 @@ def parse_commandline():
                                1135227846 42243481 2.034325e+00 1.014036e+00 6.620518e-01 chirplet 1.0e-22~0.01~100~0~0~1
                                """,
                                type=int, nargs='+')
+
+    required_args.add_argument("--cluster", action="store_true", default=False,
+                                help="After storing the raw sparse time frequency maps"
+                                     "read in and create the clusters in thsoe maps")
+
+    required_args.add_argument("--development", action="store_true", default=False,
+                                help="Store the raw unclustered sparse time frequency maps"
+                                     "of every trial")
 
     args = parser.parse_args()
 
@@ -243,26 +254,8 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
             if args.job_type == 'zero_noise_injection':
                 # use real asd to whiten data with no noise
                 whitened_timeseries = zero_noise_injection.whiten(asds)
-                #tmp = zero_noise_injection.plot()
-                #ax = tmp.gca()
-                #ax.set_xlim([gps_s + gps_ns * 10e-10-0.2, gps_s + gps_ns * 10e-10 +0.2])
-                #tmp.savefig('/home/scoughlin/public_html/PhD/Project/LIGO/BURST/xpipeline/grb-dev/zero-noise-injection.png')
-                #tmp = whitened_timeseries.plot()
-                #ax = tmp.gca()
-                #ax.set_xlim([gps_s + gps_ns * 10e-10-0.2, gps_s + gps_ns * 10e-10 +0.2])
-                #tmp.savefig('/home/scoughlin/public_html/PhD/Project/LIGO/BURST/xpipeline/grb-dev/zero-noise-injection-whitened.png')
-
-
             else:
                 whitened_timeseries = data.whiten(asds)
-                #tmp = data.plot()
-                #ax = tmp.gca()
-                #ax.set_xlim([gps_s + gps_ns * 10e-10-0.2, gps_s + gps_ns * 10e-10 +0.2])
-                #tmp.savefig('/home/scoughlin/public_html/PhD/Project/LIGO/BURST/xpipeline/grb-dev/injection.png')
-                #tmp = whitened_timeseries.plot()
-                #ax = tmp.gca()
-                #ax.set_xlim([gps_s + gps_ns * 10e-10-0.2, gps_s + gps_ns * 10e-10 +0.2])
-                #tmp.savefig('/home/scoughlin/public_html/PhD/Project/LIGO/BURST/xpipeline/grb-dev/injection-whitened.png')
 
             # Obtain detector specific information
             detectors = {}
@@ -274,7 +267,6 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
             phi = numpy.array(sky_positions['phi'])
             theta = numpy.array(sky_positions['theta'])
 
-
             for idx, idetector in enumerate(ifos[1::]):
                 time_delays[:, idx] = detectors[ifos[0]].time_delay_from_earth_center_phi_theta(phi, theta) - detectors[idetector].time_delay_from_earth_center_phi_theta(phi, theta)
 
@@ -284,7 +276,7 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                 ####################
 
                 # Make a spectrogram that contains phase information
-                fft_grams_fixed = whitened_timeseries.fftgram(fft_length).crop_frequencies(minimum_frequency, maximum_frequency)
+                fft_grams_fixed = whitened_timeseries.fftgram(fft_length).crop_frequencies(minimum_frequency, maximum_frequency + 1/fft_length)
 
                 # determine how many indices every pixel needs to move
                 # with respect to the internal time slides
@@ -303,6 +295,7 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                     projected_asds = asds.project_onto_antenna_patterns(antenna_patterns,
                                                                         to_dominant_polarization_frame=True)
 
+                    asd_magnitudes = projected_asds.calculate_magnitude()
                     projected_asds = projected_asds.to_unit()
 
                     # NOTE we calculate everything from here to the loop over
@@ -340,6 +333,7 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                     # all coherent tf pixels accross all maps
                     all_pixels = numpy.apply_along_axis(lambda x: reduce(lambda x, y: set(x).union(y), x.tolist()), 0, array_of_tf_pixels_per_slide_per_det)
 
+                    all_sparse_maps = {}
                     for coherent_pixels, circular_time_slide in zip(all_pixels, internal_slides):
 
                         # make sure that the coherent time frequency pixels are sorted
@@ -360,13 +354,62 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                         surviving_pixels = {k : v.to_sparse(tindex, findex, phi=phi, theta=theta, map_type=k) for k, v in projected_fftmaps.items()}
                         surviving_pixels['excess_energy'] = fft_grams.to_sparse(tindex, findex, phi=phi, theta=theta)
 
-                        for k, v in surviving_pixels.items():
-                            processed_map_info = '{0}-{1}'.format(int(event_time), '_'.join(time_slide.astype(str).tolist()))
-                            if args.job_type in _injection_analysis_types:
-                                v.write(filename='./output/grb-{0}-{1}-{2}-{3}.h5'.format(args.job_type, int(event_time), injection_numbers[0], injection_numbers[-1]),
-                                      path='/{0}/event_{1}_slide_{2}/waveform_{3}/injection_scale_{4}/injection_number_{5}'.format(args.job_type, int(event_time), '_'.join(time_slide.astype(str).tolist()), waveform_name, str(injection_scale).replace('.', 'd'), injection_number,),
-                                      table_description=table_description)
-                            else:
-                                v.write(filename='./output/grb-{0}-{1}.h5'.format(args.job_type, processed_map_info),
-                                      path='/{0}/event_{1}_external_slide_{2}/internal_slide_{3}'.format(args.job_type, int(event_time), '_'.join(time_slide.astype(str).tolist()), circular_time_slide),
-                                      table_description=table_description)
+                        all_sparse_maps[circular_time_slide] = surviving_pixels
+                        import pdb
+                        pdb.set_trace()
+
+                        if args.development:
+                            for k, v in surviving_pixels.items():
+                                processed_map_info = '{0}-{1}'.format(int(event_time), '_'.join(time_slide.astype(str).tolist()))
+                                if args.job_type in _injection_analysis_types:
+                                    v.write(filename='./output/grb-{0}-{1}-{2}-{3}-{4}.h5'.format(args.job_type, int(event_time), waveform_name, injection_numbers[0], injection_numbers[-1]),
+                                          path='/{0}/event_{1}_slide_{2}/waveform_{3}/injection_scale_{4}/injection_number_{5}'.format(args.job_type, int(event_time), '_'.join(time_slide.astype(str).tolist()), waveform_name, str(injection_scale).replace('.', 'd'), injection_number,),
+                                          table_description=table_description)
+                                else:
+                                    v.write(filename='./output/grb-{0}-{1}.h5'.format(args.job_type, processed_map_info),
+                                          path='/{0}/event_{1}_external_slide_{2}/internal_slide_{3}'.format(args.job_type, int(event_time), '_'.join(time_slide.astype(str).tolist()), circular_time_slide),
+                                          table_description=table_description)
+
+    if args.cluster:
+        if args.job_type in _injection_analysis_types:
+            f = tables.open_file('./output/grb-{0}-{1}-{2}-{3}-{4}.h5'.format(args.job_type, int(event_time), waveform_name, injection_numbers[0], injection_numbers[-1]))
+            training_background_triggers, testing_background_triggers, training_injection_triggers, testing_injection_triggers = utils.choose_background_injection_training(f, injection_type=args.job_type, randomseed=seed,)
+
+            training_injection_triggers.extend(testing_injection_triggers)
+
+            # Now get injection triggers for the training and testing injections
+            all_injection_triggers = []
+
+            for event in training_injection_triggers:
+                for table in f.walk_nodes(event, "Table"):
+                    all_clusters = postprocess.extract_clusters_from_table(table, event_type='injection')
+                    all_injection_triggers.append(all_clusters.values)
+
+            non_string_cols = all_clusters.columns[~all_clusters.dtypes.eq('object')]
+
+            all_injection_triggers = numpy.vstack(all_injection_triggers)
+            all_injection_triggers = pandas.DataFrame(all_injection_triggers, columns=all_clusters.columns)
+            all_injection_triggers[non_string_cols] = all_injection_triggers[non_string_cols].apply(pandas.to_numeric)
+            all_injection_triggers.to_hdf('./output/grb-{0}-{1}-{2}-{3}-{4}-triggers.h5'.format(args.job_type, int(event_time), waveform_name, injection_numbers[0], injection_numbers[-1]), key='/injections', append=True, index=False,)
+
+        else:
+
+            f = tables.open_file('./output/grb-{0}-{1}.h5'.format(args.job_type, processed_map_info))
+            training_background_triggers, testing_background_triggers, training_injection_triggers, testing_injection_triggers = utils.choose_background_injection_training(f, injection_type='', randomseed=seed,)
+
+            training_background_triggers = numpy.append(training_background_triggers, testing_background_triggers)
+
+            # Now get background triggers for the training and testing injections
+            all_background_triggers = []
+            for event in training_background_triggers:
+                for table in f.walk_nodes(event, "Table"):
+                    all_clusters = postprocess.extract_clusters_from_table(table, event_type='background')
+                    all_background_triggers.append(all_clusters.values)
+
+            # Now stack all the background triggers from the various trials and
+            # save them as one big DataFrame
+            all_background_triggers = numpy.vstack(all_background_triggers)
+            non_string_cols = all_clusters.columns[~all_clusters.dtypes.eq('object')]
+            all_background_triggers = pandas.DataFrame(all_background_triggers, columns=all_clusters.columns,)
+            all_background_triggers[non_string_cols] = all_background_triggers[non_string_cols].apply(pandas.to_numeric)
+            all_background_triggers.to_hdf('./output/grb-{0}-{1}-triggers.h5'.format(args.job_type, processed_map_info), key='/background', append=True, index=False,)
