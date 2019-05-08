@@ -21,12 +21,17 @@ import numpy
 import argparse
 import tables
 import os
+import string
+import random
 
 _injection_analysis_types = ['onsource_injection', 'zero_noise_injection', 'offsource_injection']
 _other_event_types = ['background', 'onsource']
 _job_types = []
 _job_types.extend(_injection_analysis_types)
 _job_types.extend(_other_event_types)
+
+def id_generator(x,size=10, chars=string.ascii_uppercase + string.digits +string.ascii_lowercase):
+    return ''.join(random.SystemRandom().choice(chars) for _ in range(size))
 
 def parse_commandline():
     parser = argparse.ArgumentParser(description="This executable processes "
@@ -118,6 +123,18 @@ ifos = [chan.split(':')[0] for chan in channel_names]
 # Minimum and Maximum search frequency range
 minimum_frequency = int(parameters['minimumfrequency'])
 maximum_frequency = int(parameters['maximumfrequency'])
+
+# output directory
+if args.development:
+    # in run directory
+    output_directory = os.path.join('.','output')
+else:
+    # fast i/o location
+    output_directory = os.path.join(os.getenv('TMPDIR', None), id_generator(1), 'output')
+
+if not os.path.isdir(output_directory):
+    os.makedirs(output_directory)
+
 
 # Sample frequency
 sample_frequency = float(parameters['samplefrequency'])
@@ -351,21 +368,24 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                         surviving_pixels = {k : v.to_sparse(tindex, findex, phi=phi, theta=theta, map_type=k) for k, v in projected_fftmaps.items()}
                         surviving_pixels['excess_energy'] = fft_grams.to_sparse(tindex, findex, phi=phi, theta=theta)
 
-                        if args.development:
-                            for k, v in surviving_pixels.items():
+                        for k, v in surviving_pixels.items():
+                            if args.job_type in _injection_analysis_types:
+                                # convoluted name of file
+                                filename = os.path.join(output_directory, 'grb-{0}-{1}-{2}-{3}-{4}.h5'.format(args.job_type, int(event_time), waveform_name, injection_numbers[0], injection_numbers[-1]))
+                                # convoluted path in hdf5 file
+                                path = '/{0}/event_{1}_slide_{2}/waveform_{3}/injection_scale_{4}/injection_number_{5}'.format(args.job_type, int(event_time), '_'.join(time_slide.astype(str).tolist()), waveform_name, str(injection_scale).replace('.', 'd'), injection_number,)
+                            else:
+                                # convoluted name of file
                                 processed_map_info = '{0}-{1}'.format(int(event_time), '_'.join(time_slide.astype(str).tolist()))
-                                if args.job_type in _injection_analysis_types:
-                                    v.write(filename='./output/grb-{0}-{1}-{2}-{3}-{4}.h5'.format(args.job_type, int(event_time), waveform_name, injection_numbers[0], injection_numbers[-1]),
-                                          path='/{0}/event_{1}_slide_{2}/waveform_{3}/injection_scale_{4}/injection_number_{5}'.format(args.job_type, int(event_time), '_'.join(time_slide.astype(str).tolist()), waveform_name, str(injection_scale).replace('.', 'd'), injection_number,),
-                                          table_description=table_description)
-                                else:
-                                    v.write(filename='./output/grb-{0}-{1}.h5'.format(args.job_type, processed_map_info),
-                                          path='/{0}/event_{1}_external_slide_{2}/internal_slide_{3}'.format(args.job_type, int(event_time), '_'.join(time_slide.astype(str).tolist()), circular_time_slide),
-                                          table_description=table_description)
+                                filename = os.path.join(output_directory, 'grb-{0}-{1}.h5'.format(args.job_type, processed_map_info))
+                                # convoluted path in hdf5 file
+                                path = '/{0}/event_{1}_external_slide_{2}/internal_slide_{3}'.format(args.job_type, int(event_time), '_'.join(time_slide.astype(str).tolist()), circular_time_slide)
+                            # write to file
+                            v.write(filename=filename, path=path, table_description=table_description)
 
     if args.cluster:
         if args.job_type in _injection_analysis_types:
-            filename = './output/grb-{0}-{1}-{2}-{3}-{4}.h5'.format(args.job_type, int(event_time), waveform_name, injection_numbers[0], injection_numbers[-1])
+            filename = os.path.join(output_directory, 'grb-{0}-{1}-{2}-{3}-{4}.h5'.format(args.job_type, int(event_time), waveform_name, injection_numbers[0], injection_numbers[-1]))
             f = tables.open_file(filename)
 
             training_background_triggers, testing_background_triggers, training_injection_triggers, testing_injection_triggers = utils.choose_background_injection_training(f, injection_type=args.job_type, randomseed=seed,)
@@ -393,7 +413,7 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
             os.remove(filename)
 
         else:
-            filename = './output/grb-{0}-{1}.h5'.format(args.job_type, processed_map_info)
+            filename = os.path.join(output_directory, 'grb-{0}-{1}.h5'.format(args.job_type, processed_map_info))
             f = tables.open_file(filename)
 
             training_background_triggers, testing_background_triggers, training_injection_triggers, testing_injection_triggers = utils.choose_background_injection_training(f, injection_type='', randomseed=seed,)
