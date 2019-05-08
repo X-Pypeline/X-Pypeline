@@ -20,6 +20,7 @@
 import numpy
 import pandas
 from xpipeline.core import XSparseTimeFrequencyMapDict, csc_XSparseTimeFrequencyMap
+from ..cluster.cluster import XCluster
 
 _default_columns = ['min_time_of_cluster',
                     'weighted_center_time', 'max_time_of_cluster',
@@ -27,6 +28,34 @@ _default_columns = ['min_time_of_cluster',
                     'weighted_center_frequency',
                     'max_frequency_of_cluster',
                     'number_of_pixels',]
+
+def extract_clusters_from_dict(maps, statistic_column='coherent_f_plus', connectivity_list=[8,24,48,80]):
+    all_clusters = XCluster()
+    for fft_length in maps.keys():
+        for skypostion, imap in maps[fft_length].items():
+            # Obtain all sparse time frequency maps for this fftlength and sky position
+            all_energies = []
+            all_columns = _default_columns.copy()
+            for k,v in imap.items():
+                all_energies.append(v.to_coherent().power2(2).energy)
+                all_columns.append('coherent_' + k)
+                all_energies.append(v.power2().to_coherent().energy)
+                all_columns.append('incoherent_' + k)
+
+            # Just assign the energy attribute of the last sparse maps to be
+            # all the coherent and incoherent energies and get all clsuter properities
+            tmp_sparse_map = list(v.values())[0]
+            tmp_sparse_map.energy = numpy.asarray(all_energies)
+            for connectivity in connectivity_list:
+                clusters = tmp_sparse_map.cluster(columns=all_columns, connectivity=connectivity)
+                clusters['connectivity'] = connectivity
+
+                # append the cluster to other clusters from same sky locations
+                all_clusters = all_clusters.append(clusters)
+
+    all_clusters = all_clusters.groupby(['connectivity']).apply(lambda x, statistic_column: XCluster(x).supercluster(statistic_column=statistic_column), statistic_column=statistic_column).reset_index(drop=True)
+
+    return all_clusters
 
 def extract_clusters_from_table(table, event_type, **kwargs):
     all_clusters = pandas.DataFrame()
