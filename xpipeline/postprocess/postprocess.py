@@ -28,8 +28,7 @@ _default_columns = ['min_time_of_cluster',
                     'max_frequency_of_cluster',
                     'number_of_pixels',]
 
-def extract_clusters_from_table(table, event_type):
-    channel_names = numpy.unique(table.cols.ifo).astype(str)
+def extract_clusters_from_table(table, event_type, **kwargs):
     all_clusters = pandas.DataFrame()
     for fft_length in set(table.cols.dx):
         for phi, theta in set(zip(table.cols.phi, table.cols.theta)):
@@ -56,7 +55,7 @@ def extract_clusters_from_table(table, event_type):
             # all the coherent and incoherent energies and get all clsuter properities
             tmp_sparse_map = list(v.values())[0]
             tmp_sparse_map.energy = numpy.asarray(all_energies)
-            clusters = tmp_sparse_map.cluster(columns=all_columns)
+            clusters = tmp_sparse_map.cluster(columns=all_columns, **kwargs)
 
         # append the cluster to other clusters from same sky locations
         all_clusters = all_clusters.append(clusters)
@@ -83,12 +82,84 @@ def extract_clusters_from_table(table, event_type):
 
     return all_clusters
 
+def extract_cnn_maps_from_table(table,):
+    for fft_length in set(table.cols.dx):
+        if fft_length == 0.25:
+            continue
+        for phi, theta in set(zip(table.cols.phi, table.cols.theta)):
+            # Obtain all sparse time frequency maps for this fftlength and sky position
+            sparse_maps = [csc_XSparseTimeFrequencyMap.read(row)
+                            for row in table.where("""(dx == {0}) & (phi == {1}) & (theta == {2})""".format(fft_length, phi, theta,))]
+
+            # Reformat the above list of projected sparse time frequency maps into
+            # a nested dictionary of key : {key1 :value}} where
+            # key=projection (i.e. 'f_plus') key1 is detectors
+            projected_sparse_maps = XSparseTimeFrequencyMapDict({imap.map_type : XSparseTimeFrequencyMapDict() for imap in sparse_maps})
+            for imap in sparse_maps:
+                projected_sparse_maps[imap.map_type][imap.name] = imap
+
+            # Determine the size of the input to the CNN
+            input_size = list(sparse_maps[0].shape)
+            input_size.append( len(list(projected_sparse_maps.keys()))*2)
+
+            # initialize input to all zeros
+            data = numpy.zeros(input_size)
+
+            i = 0
+            for k,v in projected_sparse_maps.items():
+                data[:,:,i] = v.to_coherent().power2(2).todense()
+                data[:,:,i+1] = v.power2().to_coherent().todense()
+                i +=2
+    return data
+
+def extract_energy_maps_from_table(table, **kwargs):
+
+    injection_time = kwargs.pop('injection_time', None)
+    window = kwargs.pop('window', None)
+    for fft_length in set(table.cols.dx):
+        if fft_length == 0.25:
+            continue
+        for phi, theta in set(zip(table.cols.phi, table.cols.theta)):
+            # Obtain all sparse time frequency maps for this fftlength and sky position
+            sparse_maps = [csc_XSparseTimeFrequencyMap.read(row)
+                            for row in table.where("""(dx == {0}) & (phi == {1}) & (theta == {2})""".format(fft_length, phi, theta,))]
+
+            # assume you will use all pixels as samples unless this is in an injection in whcih casse
+            # we only want to provide weight to pixels within some window of the injection
+            mask = numpy.ones(sparse_maps[0].tindex.size)
+            if injection_time is not None:
+                injection_time_indices = numpy.searchsorted(sparse_maps[0].xindex, [injection_time-window, injection_time+window])
+                mask[numpy.searchsorted(injection_time_indices,sparse_maps[0].tindex) != 1] = 0
+            # Reformat the above list of projected sparse time frequency maps into
+            # a nested dictionary of key : {key1 :value}} where
+            # key=projection (i.e. 'f_plus') key1 is detectors
+            projected_sparse_maps = XSparseTimeFrequencyMapDict({imap.map_type : XSparseTimeFrequencyMapDict() for imap in sparse_maps})
+            for imap in sparse_maps:
+                projected_sparse_maps[imap.map_type][imap.name] = imap
+
+            # number of rows
+            num_rows = len(list(projected_sparse_maps.keys()))*2 + 1
+            # Determine the size of the input to the CNN
+            input_size = [num_rows]
+            input_size.extend(list(sparse_maps[0].energy.shape))
+
+            # initialize input to all zeros
+            data = numpy.zeros(input_size)
+            data[num_rows-1, :] = mask
+
+            i = 0
+            for k,v in projected_sparse_maps.items():
+                data[i, :] = v.to_coherent().power2(2).energy
+                data[i+1, :] = v.power2().to_coherent().energy
+                i +=2
+    return data
+
 def xapplyratiocuts(triggers, ePlusIndex,eCrossIndex,eNullIndex,
                     iPlusIndex,iCrossIndex,iNullIndex,
                     vetoPlusRange,vetoCrossRange,vetoNullRange,
                     FAR_Tuning,typeOfCutPlus,typeOfCutCross,
                     detection_statistic_column_name):
-    
+
     if float(FAR_Tuning).is_integer():
         FAR_Tuning = (FAR_Tuning/100)
 
@@ -99,8 +170,8 @@ def xapplyratiocuts(triggers, ePlusIndex,eCrossIndex,eNullIndex,
     crossRatioIoverE = numpy.log(triggers[iCrossIndex] / triggers[eCrossIndex])
 
     if iNullIndex == 0:
-        triggers['nullenergy'] = numpy.ones(plusRatioEoverI.size) 
-        nullRatioIoverE = triggers['nullenergy']  
+        triggers['nullenergy'] = numpy.ones(plusRatioEoverI.size)
+        nullRatioIoverE = triggers['nullenergy']
     else:
         nullRatioIoverE = numpy.log(triggers[iNullIndex] / triggers[eNullIndex])
 
@@ -140,13 +211,13 @@ def xapplyratiocuts(triggers, ePlusIndex,eCrossIndex,eNullIndex,
     indexFARBackground = int(numpy.ceil(number_of_trials* FAR_Tuning))
     loudestBackgroundRatioJob = []
     trial_name = []
-    
+
 
     for key, item in background_trials:
         triggers_from_this_trial = background_trials.get_group(key).index
-        
+
         detection_statistic = triggers[detection_statistic_column_name].loc[triggers_from_this_trial].to_numpy()
-        
+
         ratioArrayPlusJobNumber = ratioArrayPlus.loc[triggers_from_this_trial].to_numpy()
         ratioArrayCrossJobNumber = ratioArrayCross.loc[triggers_from_this_trial].to_numpy()
         ratioArrayNullJobNumber = ratioArrayNull.loc[triggers_from_this_trial].to_numpy()
@@ -177,14 +248,14 @@ def xapplyratiocuts(triggers, ePlusIndex,eCrossIndex,eNullIndex,
 
         # Determine what clusters passed all the Ratio cuts
         ratioPassCut = ((ratioArrayTempPlus  > vetoPlusRep) &
-                        (ratioArrayTempCross  > vetoCrossRep) & 
+                        (ratioArrayTempCross  > vetoCrossRep) &
                         (ratioArrayTempNull > vetoNullRep))
 
         # Find Surviving Offsource
         backGroundArray = ratioPassCut*numpy.repeat(numpy.atleast_2d(detection_statistic),
                                                    len(ratioCutsPlus),
                                                    axis=0)
-        
+
         # Find loudest surviving trigger for this trial for the grid of applied cuts
         # to do this we find the max over the columns
         #(remember each row represented an applied a cut)
@@ -209,8 +280,8 @@ def xapplyratiocutsinjections(triggers, ePlusIndex,eCrossIndex,eNullIndex,
     crossRatioIoverE = numpy.log(triggers[iCrossIndex] / triggers[eCrossIndex])
 
     if iNullIndex == 0:
-        triggers['nullenergy'] = numpy.ones(plusRatioEoverI.size) 
-        nullRatioIoverE = triggers['nullenergy']  
+        triggers['nullenergy'] = numpy.ones(plusRatioEoverI.size)
+        nullRatioIoverE = triggers['nullenergy']
     else:
         nullRatioIoverE = numpy.log(triggers[iNullIndex] / triggers[eNullIndex])
 
@@ -243,14 +314,14 @@ def xapplyratiocutsinjections(triggers, ePlusIndex,eCrossIndex,eNullIndex,
 
         ratioArrayNull = nullRatioIoverE
         sidedCut = 1
-    
+
     injection_trials = triggers.groupby(['injection_scale','injection_number'])
     all_ratio_boolean = []
     all_indices = []
 
     for key, item in injection_trials:
         triggers_from_this_trial = injection_trials.get_group(key).index
-        
+
         detection_statistic = triggers[detection_statistic_column_name].loc[triggers_from_this_trial].to_numpy()
         ratioArrayPlusJobNumber = ratioArrayPlus.loc[triggers_from_this_trial].to_numpy()
         ratioArrayCrossJobNumber = ratioArrayCross.loc[triggers_from_this_trial].to_numpy()
@@ -278,24 +349,24 @@ def xapplyratiocutsinjections(triggers, ePlusIndex,eCrossIndex,eNullIndex,
 
         vetoPlusRep = numpy.kron(numpy.atleast_2d(ratioCutsPlus).T,
                                       numpy.ones((sidedCut, len(ratioArrayPlusJobNumber))))
-        
+
         vetoCrossRep = numpy.kron(numpy.atleast_2d(ratioCutsCross).T,
                                       numpy.ones((sidedCut, len(ratioArrayCrossJobNumber),)))
-        
+
         vetoNullRep = numpy.kron(numpy.atleast_2d(ratioCutsNull).T,
                                      numpy.ones((1, len(ratioArrayNullJobNumber),)))
-        
+
         loudest_background_job = numpy.kron(numpy.atleast_2d(loudestBackgroundRatioJob).T,
                                             numpy.ones((1, len(detection_statistic),)))
 
         # Determine what clusters passed all the Ratio cuts and are louder that the loudest
         # surviving background trigger fwhen using that same ratio cut
         ratioPassCut = ((ratioArrayTempPlus  > vetoPlusRep) &
-                        (ratioArrayTempCross  > vetoCrossRep) & 
+                        (ratioArrayTempCross  > vetoCrossRep) &
                         (ratioArrayTempNull > vetoNullRep) &
                         (detection_statistic_tmp > loudest_background_job)
                        )
-        
+
         all_ratio_boolean.append(ratioPassCut)
         all_indices.extend(triggers_from_this_trial)
 
@@ -318,13 +389,13 @@ def xapplyalphacuts(triggers,
     # Calculate all ratio values
     denominator_plus = (triggers[ePlusIndex] + triggers[iPlusIndex])**0.8
     denominator_cross = (triggers[eCrossIndex] + triggers[iCrossIndex])**0.8
-    
+
     # Calculate the so called alpha values
     plusAlphaEoverI  = 2*(triggers[ePlusIndex] - triggers[iPlusIndex])/denominator_plus
     crossAlphaEoverI = 2*(triggers[eCrossIndex] - triggers[iCrossIndex])/denominator_cross
     plusAlphaIoverE  = 2*(triggers[iPlusIndex] - triggers[ePlusIndex])/denominator_plus
     crossAlphaIoverE = 2*(triggers[iCrossIndex] - triggers[eCrossIndex])/denominator_cross
-    
+
     # Calculate all Ratio value
     plusRatioEoverI = numpy.log(triggers[ePlusIndex] / triggers[iPlusIndex])
     crossRatioEoverI = numpy.log(triggers[eCrossIndex] / triggers[iCrossIndex])
@@ -351,7 +422,7 @@ def xapplyalphacuts(triggers,
         alphaArrayCross = abs(crossAlphaEoverI)+1
         alphaArrayNull = nullAlphaIoverE+1
         sidedCut = 2
-        
+
         ratioCutsPlus = numpy.log(vetoPlusRange)
         ratioCutsCross = numpy.log(vetoCrossRange)
         ratioCutsNull = numpy.log(vetoNullRange)
@@ -375,10 +446,10 @@ def xapplyalphacuts(triggers,
             alphaArrayCross = crossAlphaEoverI + 1
         else:
             alphaArrayCross = crossAlphaIoverE + 1
-   
+
         alphaArrayNull = nullAlphaIoverE + 1
         sidedCut = 1
-        
+
         ratioCutsPlus = numpy.log(abs(vetoPlusRange))
         ratioCutsCross = numpy.log(abs(vetoCrossRange))
         ratioCutsNull = numpy.log(abs(vetoNullRange))
@@ -402,14 +473,14 @@ def xapplyalphacuts(triggers,
     indexFARBackground = int(numpy.ceil(number_of_trials* FAR))
     loudest_background_that_survives_cut = []
     trial_name = []
-    
+
 
     for key, item in background_trials:
         triggers_from_this_trial = background_trials.get_group(key).index
-        
+
         # Extract detction statisc for triggers associated with this event
         detection_statistic = triggers[detection_statistic_column_name].loc[triggers_from_this_trial].to_numpy()
-        
+
         # Get all the ratio values for triggers associated with this event
         ratioArrayPlusJobNumber = ratioArrayPlus.loc[triggers_from_this_trial].to_numpy()
         ratioArrayCrossJobNumber = ratioArrayCross.loc[triggers_from_this_trial].to_numpy()
@@ -439,7 +510,7 @@ def xapplyalphacuts(triggers,
         vetoNullRep = numpy.kron(numpy.atleast_2d(ratioCutsNull).T,
                                       numpy.ones((len(alphaCutsNull), len(ratioArrayNullJobNumber),)))
 
-        
+
         # Get all the relevant alpha ratios for triggers associated with this event
         alphaArrayPlusJobNumber = alphaArrayPlus.loc[triggers_from_this_trial].to_numpy()
         alphaArrayCrossJobNumber = alphaArrayCross.loc[triggers_from_this_trial].to_numpy()
@@ -469,12 +540,12 @@ def xapplyalphacuts(triggers,
         vetoNullRange2Rep = numpy.kron(numpy.atleast_2d(alphaCutsNull).T,
                                      numpy.ones((1, len(alphaArrayNullJobNumber),)))
 
-        
+
         # Take absolute value of vetoRange2Rep.
         vetoPlusRange2Rep = abs(vetoPlusRange2Rep)
         vetoCrossRange2Rep = abs(vetoCrossRange2Rep)
         vetoNullRange2Rep = abs(vetoNullRange2Rep)
-        
+
         vetoPlusRange2Rep[vetoPlusRange2Rep==0] = -numpy.inf
         vetoCrossRange2Rep[vetoCrossRange2Rep==0] = -numpy.inf
         vetoNullRange2Rep[vetoNullRange2Rep==0] = -numpy.inf
@@ -485,7 +556,7 @@ def xapplyalphacuts(triggers,
                         (alphaArrayTempCross >= vetoCrossRange2Rep) &
                         (alphaArrayTempNull  >= vetoNullRange2Rep) &
                         (ratioArrayTempPlus  > vetoPlusRep) &
-                        (ratioArrayTempCross  > vetoCrossRep) & 
+                        (ratioArrayTempCross  > vetoCrossRep) &
                         (ratioArrayTempNull > vetoNullRep)
                        )
 
@@ -516,13 +587,13 @@ def xapplyalphacutsinjection(triggers,
     # Calculate all ratio values
     denominator_plus = (triggers[ePlusIndex] + triggers[iPlusIndex])**0.8
     denominator_cross = (triggers[eCrossIndex] + triggers[iCrossIndex])**0.8
-    
+
     # Calculate the so called alpha values
     plusAlphaEoverI  = 2*(triggers[ePlusIndex] - triggers[iPlusIndex])/denominator_plus
     crossAlphaEoverI = 2*(triggers[eCrossIndex] - triggers[iCrossIndex])/denominator_cross
     plusAlphaIoverE  = 2*(triggers[iPlusIndex] - triggers[ePlusIndex])/denominator_plus
     crossAlphaIoverE = 2*(triggers[iCrossIndex] - triggers[eCrossIndex])/denominator_cross
-    
+
     # Calculate all Ratio value
     plusRatioEoverI = numpy.log(triggers[ePlusIndex] / triggers[iPlusIndex])
     crossRatioEoverI = numpy.log(triggers[eCrossIndex] / triggers[iCrossIndex])
@@ -549,7 +620,7 @@ def xapplyalphacutsinjection(triggers,
         alphaArrayCross = abs(crossAlphaEoverI)+1
         alphaArrayNull = nullAlphaIoverE+1
         sidedCut = 2
-        
+
         ratioCutsPlus = numpy.log(vetoPlusRange)
         ratioCutsCross = numpy.log(vetoCrossRange)
         ratioCutsNull = numpy.log(vetoNullRange)
@@ -573,10 +644,10 @@ def xapplyalphacutsinjection(triggers,
             alphaArrayCross = crossAlphaEoverI + 1
         else:
             alphaArrayCross = crossAlphaIoverE + 1
-   
+
         alphaArrayNull = nullAlphaIoverE + 1
         sidedCut = 1
-        
+
         ratioCutsPlus = numpy.log(abs(vetoPlusRange))
         ratioCutsCross = numpy.log(abs(vetoCrossRange))
         ratioCutsNull = numpy.log(abs(vetoNullRange))
@@ -601,10 +672,10 @@ def xapplyalphacutsinjection(triggers,
 
     for key, item in injection_trials:
         triggers_from_this_trial = injection_trials.get_group(key).index
-        
+
         # Extract detction statisc for triggers associated with this event
         detection_statistic = triggers[detection_statistic_column_name].loc[triggers_from_this_trial].to_numpy()
-        
+
         # Get all the ratio values for triggers associated with this event
         ratioArrayPlusJobNumber = ratioArrayPlus.loc[triggers_from_this_trial].to_numpy()
         ratioArrayCrossJobNumber = ratioArrayCross.loc[triggers_from_this_trial].to_numpy()
@@ -634,7 +705,7 @@ def xapplyalphacutsinjection(triggers,
         vetoNullRep = numpy.kron(numpy.atleast_2d(ratioCutsNull).T,
                                       numpy.ones((len(alphaCutsNull), len(ratioArrayNullJobNumber),)))
 
-        
+
         # Get all the relevant alpha ratios for triggers associated with this event
         alphaArrayPlusJobNumber = alphaArrayPlus.loc[triggers_from_this_trial].to_numpy()
         alphaArrayCrossJobNumber = alphaArrayCross.loc[triggers_from_this_trial].to_numpy()
@@ -664,21 +735,21 @@ def xapplyalphacutsinjection(triggers,
         vetoNullRange2Rep = numpy.kron(numpy.atleast_2d(alphaCutsNull).T,
                                      numpy.ones((1, len(alphaArrayNullJobNumber),)))
 
-        
+
         # Take absolute value of vetoRange2Rep.
         vetoPlusRange2Rep = abs(vetoPlusRange2Rep)
         vetoCrossRange2Rep = abs(vetoCrossRange2Rep)
         vetoNullRange2Rep = abs(vetoNullRange2Rep)
-        
+
         vetoPlusRange2Rep[vetoPlusRange2Rep==0] = -numpy.inf
         vetoCrossRange2Rep[vetoCrossRange2Rep==0] = -numpy.inf
         vetoNullRange2Rep[vetoNullRange2Rep==0] = -numpy.inf
-        
+
         # Now repeat the background
         detection_statistic_tmp = numpy.repeat(numpy.atleast_2d(detection_statistic),
                                               len(alphaCutsNull),
                                               axis=0)
-        
+
         loudest_background_job = numpy.kron(numpy.atleast_2d(loudestBackgroundAlpha).T,
                                             numpy.ones((1, len(detection_statistic),)))
 
@@ -688,7 +759,7 @@ def xapplyalphacutsinjection(triggers,
                         (alphaArrayTempCross >= vetoCrossRange2Rep) &
                         (alphaArrayTempNull >= vetoNullRange2Rep) &
                         (ratioArrayTempPlus > vetoPlusRep) &
-                        (ratioArrayTempCross > vetoCrossRep) & 
+                        (ratioArrayTempCross > vetoCrossRep) &
                         (ratioArrayTempNull > vetoNullRep) &
                         (detection_statistic_tmp > loudest_background_job)
                        )

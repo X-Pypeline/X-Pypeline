@@ -9,7 +9,7 @@ from xpipeline.core.xtimefrequencymap import csc_XSparseTimeFrequencyMap
 from xpipeline.waveform import xinjectsignal
 from xpipeline.setuputils import log
 from xpipeline.utils import utils
-from xpipeline.postprocess import postprocess
+from xpipeline.postprocess import postprocess, prep_data
 
 from gwpy.table import EventTable
 from gwpy.timeseries import TimeSeries
@@ -20,6 +20,7 @@ import pandas
 import numpy
 import argparse
 import tables
+import os
 
 _injection_analysis_types = ['onsource_injection', 'zero_noise_injection', 'offsource_injection']
 _other_event_types = ['background', 'onsource']
@@ -247,7 +248,7 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                 data = analysis_data
 
             # high pass filter the data
-            data = data.highpass(minimum_frequency,)
+            data = data.highpass(minimum_frequency/2,)
             # Get the ASDs that will be used to whiten the data
             asds = data.asd(whitening_length)
 
@@ -281,10 +282,6 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                 # determine how many indices every pixel needs to move
                 # with respect to the internal time slides
                 final_time_bin_idx = fft_grams_fixed[channel_names[0]].shape[0]
-                if circ_time_slides is not None:
-                    slide_pixels = {k: v * 1./fft_length * 1./offset_fraction for k,v in slides.items()}
-                else:
-                    slide_pixels = {k: numpy.zeros(1) for k in channel_names}
 
                 fft_grams = fft_grams_fixed.copy()
                 for (sky_position, time_delay) in zip(sky_positions, time_delays):
@@ -354,10 +351,6 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                         surviving_pixels = {k : v.to_sparse(tindex, findex, phi=phi, theta=theta, map_type=k) for k, v in projected_fftmaps.items()}
                         surviving_pixels['excess_energy'] = fft_grams.to_sparse(tindex, findex, phi=phi, theta=theta)
 
-                        all_sparse_maps[circular_time_slide] = surviving_pixels
-                        import pdb
-                        pdb.set_trace()
-
                         if args.development:
                             for k, v in surviving_pixels.items():
                                 processed_map_info = '{0}-{1}'.format(int(event_time), '_'.join(time_slide.astype(str).tolist()))
@@ -372,7 +365,9 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
 
     if args.cluster:
         if args.job_type in _injection_analysis_types:
-            f = tables.open_file('./output/grb-{0}-{1}-{2}-{3}-{4}.h5'.format(args.job_type, int(event_time), waveform_name, injection_numbers[0], injection_numbers[-1]))
+            filename = './output/grb-{0}-{1}-{2}-{3}-{4}.h5'.format(args.job_type, int(event_time), waveform_name, injection_numbers[0], injection_numbers[-1])
+            f = tables.open_file(filename)
+
             training_background_triggers, testing_background_triggers, training_injection_triggers, testing_injection_triggers = utils.choose_background_injection_training(f, injection_type=args.job_type, randomseed=seed,)
 
             training_injection_triggers.extend(testing_injection_triggers)
@@ -380,31 +375,40 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
             # Now get injection triggers for the training and testing injections
             all_injection_triggers = []
 
-            for event in training_injection_triggers:
-                for table in f.walk_nodes(event, "Table"):
-                    all_clusters = postprocess.extract_clusters_from_table(table, event_type='injection')
-                    all_injection_triggers.append(all_clusters.values)
+            for connectivity in [8,24,48,80]:
+                for event in training_injection_triggers:
+                    for table in f.walk_nodes(event, "Table"):
+                        all_clusters = postprocess.extract_clusters_from_table(table, event_type='injection')
+                        all_clusters['connectivity'] = connectivity
+                        all_injection_triggers.append(all_clusters.values)
 
             non_string_cols = all_clusters.columns[~all_clusters.dtypes.eq('object')]
 
             all_injection_triggers = numpy.vstack(all_injection_triggers)
             all_injection_triggers = pandas.DataFrame(all_injection_triggers, columns=all_clusters.columns)
             all_injection_triggers[non_string_cols] = all_injection_triggers[non_string_cols].apply(pandas.to_numeric)
+            all_injection_triggers = prep_data.window_cut(all_injection_triggers, duration=1.0)
             all_injection_triggers.to_hdf('./output/grb-{0}-{1}-{2}-{3}-{4}-triggers.h5'.format(args.job_type, int(event_time), waveform_name, injection_numbers[0], injection_numbers[-1]), key='/injections', append=True, index=False,)
+            f.close()
+            os.remove(filename)
 
         else:
+            filename = './output/grb-{0}-{1}.h5'.format(args.job_type, processed_map_info)
+            f = tables.open_file(filename)
 
-            f = tables.open_file('./output/grb-{0}-{1}.h5'.format(args.job_type, processed_map_info))
             training_background_triggers, testing_background_triggers, training_injection_triggers, testing_injection_triggers = utils.choose_background_injection_training(f, injection_type='', randomseed=seed,)
 
             training_background_triggers = numpy.append(training_background_triggers, testing_background_triggers)
 
             # Now get background triggers for the training and testing injections
             all_background_triggers = []
-            for event in training_background_triggers:
-                for table in f.walk_nodes(event, "Table"):
-                    all_clusters = postprocess.extract_clusters_from_table(table, event_type='background')
-                    all_background_triggers.append(all_clusters.values)
+
+            for connectivity in [8,24,48,80]:
+                for event in training_background_triggers:
+                    for table in f.walk_nodes(event, "Table"):
+                        all_clusters = postprocess.extract_clusters_from_table(table, event_type='background')
+                        all_clusters['connectivity'] = connectivity
+                        all_background_triggers.append(all_clusters.values)
 
             # Now stack all the background triggers from the various trials and
             # save them as one big DataFrame
@@ -413,3 +417,6 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
             all_background_triggers = pandas.DataFrame(all_background_triggers, columns=all_clusters.columns,)
             all_background_triggers[non_string_cols] = all_background_triggers[non_string_cols].apply(pandas.to_numeric)
             all_background_triggers.to_hdf('./output/grb-{0}-{1}-triggers.h5'.format(args.job_type, processed_map_info), key='/background', append=True, index=False,)
+
+            f.close()
+            os.remove(filename)
