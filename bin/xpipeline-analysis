@@ -386,7 +386,7 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
             all_triggers = []
             for circular_time_slide in internal_slides:
                 all_clusters = postprocess.extract_clusters_from_dict(all_sparse_maps[circular_time_slide],)
-                all_clusters['internal_slide'] = circular_time_slide
+                all_clusters['internal_time_slide'] = circular_time_slide
                 all_triggers.append(all_clusters.values)
 
             # Now stack all the background triggers from the various trials and
@@ -401,11 +401,10 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
             processed_map_info = '{0}-{1}'.format(int(event_time), '_'.join(time_slide.astype(str).tolist()))
             all_triggers['event'] = event_info
             if args.job_type in _injection_analysis_types:
-                all_triggers = prep_data.window_cut(all_triggers, duration=1.0)
-                all_triggers['event'] = event_info
                 all_triggers['waveform'] = waveform_name
                 all_triggers['injection_scale'] = injection_scale
                 all_triggers['injection_number'] = injection_number
+                all_triggers = prep_data.window_cut(all_triggers, duration=1.0)
                 all_triggers.to_hdf('./output/grb-{0}-{1}-{2}-{3}-{4}-triggers.h5'.format(args.job_type, int(event_time), waveform_name, injection_numbers[0], injection_numbers[-1]), key='/injections', append=True, index=False,)
             else:
                 all_triggers.to_hdf('./output/grb-{0}-{1}-triggers.h5'.format(args.job_type, processed_map_info), key='/background', append=True, index=False,)       
