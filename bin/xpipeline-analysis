@@ -366,7 +366,7 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                         total_energy_threshold = energy_maps.to_coherent().blackout_pixels(99).energy.min()
 
                     # Calculate all time slides
-                    tindex_findex_slided = {k : zip(numpy.mod(numpy.repeat(numpy.atleast_2d(energy_maps_zeroed[k].nonzero()[0]), len(v),0) + numpy.atleast_2d(v).T, final_time_bin_idx).astype(int), numpy.repeat(numpy.atleast_2d(energy_maps_zeroed[k].nonzero()[1]), len(v), 0))  for k,v in slides.items()}
+                    tindex_findex_slided = {k : zip(numpy.mod(numpy.repeat(numpy.atleast_2d(energy_maps_zeroed[k].nonzero()[0]), len(v),0) + numpy.atleast_2d(v*(1/fft_length)).T, final_time_bin_idx).astype(int), numpy.repeat(numpy.atleast_2d(energy_maps_zeroed[k].nonzero()[1]), len(v), 0))  for k,v in slides.items()}
 
                     # Make every TF pixels pair in all maps
                     all_maps_pixel_pairs = [zip(i[0], i[1]) for k,v in tindex_findex_slided.items() for i in v]
@@ -388,6 +388,9 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                         # extract the tindices and the findices
                         tindex = {k : tindex for k in channel_names}
                         findex = {k : findex for k in channel_names}
+
+                        # undo internal_time_slide
+                        tindex['L1:GDS-CALIB_STRAIN'] = numpy.mod(tindex['L1:GDS-CALIB_STRAIN']-circular_time_slide*fft_length, final_time_bin_idx).astype(int)
 
                         # Now that we have the pixels that are in each map
                         # let's reconstruct the sparse tf map
