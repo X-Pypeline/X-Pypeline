@@ -185,6 +185,7 @@ sky_positions = EventTable.read(sky_positions, format='ascii',
 
 seed = int(parameters['seed'])
 fft_lengths = [float(fft) for fft in parameters['analysistimes'].split(',')]
+normalization_factor = numpy.sqrt(fft_lengths[0]/numpy.asarray(fft_lengths))
 min_fftlength = min(fft_lengths)
 likelihoods = parameters['likelihoodtype'].split(',')
 
@@ -218,7 +219,7 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
     # likelihoods to analze
     time_slides = dict(zip(channel_names, time_slide))
     analysis_data = XTimeSeries.retrieve_data(event_time, block_time,
-                                              channel_names, sample_frequency,
+                                              channel_names, sample_frequency*2,
                                               frame_types=frame_types, time_slides=time_slides)
 
     # Are we doing injections and if so how many injection scales are we doing?
@@ -239,7 +240,7 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
     for injection_number in injection_numbers:
         if args.job_type in _injection_analysis_types:
             logger.info('Creating injection number {0}'.format(injection_number))
-            [injection_data, gps_s, gps_ns, phi, theta, psi] = xinjectsignal.xinjectsignal_fromfile(start_time=start_time, block_time=block_time, channels=channel_names, injection_file_name=injection_file_name, injection_number=injection_number, sample_rate=sample_frequency, catalogdirectory=catalogdirectory)
+            [injection_data, gps_s, gps_ns, phi_inj, theta_inj, psi_inj] = xinjectsignal.xinjectsignal_fromfile(start_time=start_time, block_time=block_time, channels=channel_names, injection_file_name=injection_file_name, injection_number=injection_number, sample_rate=sample_frequency*2, catalogdirectory=catalogdirectory)
 
         # Loop over injection scales
         for injection_scale in injection_scales:
@@ -266,8 +267,10 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
             else:
                 data = analysis_data
 
+            data = data.resample(sample_frequency)
+
             # high pass filter the data
-            data = data.highpass(minimum_frequency/2,)
+            #data = data.highpass(minimum_frequency/2,)
             # Get the ASDs that will be used to whiten the data
             asds = data.asd(whitening_length)
 
@@ -284,11 +287,13 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
 
             # Pre calculate time delays number of instruments-1 by number of sky positons
             time_delays = numpy.zeros((sky_positions['phi'].size, len(detectors)-1))
+            residual_time_delays = numpy.zeros((sky_positions['phi'].size, len(detectors)-1))
             phi = numpy.array(sky_positions['phi'])
             theta = numpy.array(sky_positions['theta'])
 
             for idx, idetector in enumerate(ifos[1::]):
-                time_delays[:, idx] = detectors[ifos[0]].time_delay_from_earth_center_phi_theta(phi, theta) - detectors[idetector].time_delay_from_earth_center_phi_theta(phi, theta)
+                time_delays[:, idx] = numpy.round((detectors[idetector].time_delay_from_earth_center_phi_theta(phi, theta) - detectors[ifos[0]].time_delay_from_earth_center_phi_theta(phi, theta))*sample_frequency)
+                residual_time_delays[:, idx] = (time_delays[:, idx] - (detectors[idetector].time_delay_from_earth_center_phi_theta(phi, theta) - detectors[ifos[0]].time_delay_from_earth_center_phi_theta(phi, theta))*sample_frequency)/sample_frequency
 
             # Initialize empty dictionary of sparse time-frequency maps
             all_sparse_maps = {}
@@ -301,21 +306,27 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                         theta = sky_position['theta']
                         all_sparse_maps[circular_time_slide][fft_length][(phi, theta)] = {}
 
+            whitened_timeseries['L1:GDS-CALIB_STRAIN'] = numpy.roll(whitened_timeseries['L1:GDS-CALIB_STRAIN'], -3)
+
             # Now let's loop
-            for fft_length in fft_lengths:
+            for idx_fft_length, fft_length in enumerate(fft_lengths):
                 ####################
                 # Create FFT grams #
                 ####################
 
-                # Make a spectrogram that contains phase information
-                fft_grams_fixed = whitened_timeseries.fftgram(fft_length).crop_frequencies(minimum_frequency, maximum_frequency + 1/fft_length)
+                # ---- Rescale conditioned data to normalize it appropriately for this fftlength
+                if idx>0:
+                    whitened_timeseries.update((x, y*(normalization_factor[idx] / normalization_factor[idx-1])) for x, y in whitened_timeseries.items())
+                for idx_sky_postion, (sky_position, time_delay, residual_time_delay) in enumerate(zip(sky_positions, time_delays, residual_time_delays)):
 
-                # determine how many indices every pixel needs to move
-                # with respect to the internal time slides
-                final_time_bin_idx = fft_grams_fixed[channel_names[0]].shape[0]
+                    # shift data and make fftgram
+                    # Make a spectrogram that contains phase information
+                    fft_grams = whitened_timeseries.fftgram(fft_length).crop_frequencies(minimum_frequency, maximum_frequency + 1/fft_length)
 
-                fft_grams = fft_grams_fixed.copy()
-                for (sky_position, time_delay) in zip(sky_positions, time_delays):
+                    # determine how many indices every pixel needs to move
+                    # with respect to the internal time slides
+                    final_time_bin_idx = fft_grams[channel_names[0]].shape[0]
+
                     phi = sky_position['phi']
                     theta = sky_position['theta']
                     antenna_patterns = compute_antenna_patterns(['H1', 'L1'], phi, theta,
@@ -323,7 +334,6 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                     projected_asds = asds.project_onto_antenna_patterns(antenna_patterns,
                                                                         to_dominant_polarization_frame=True)
 
-                    asd_magnitudes = projected_asds.calculate_magnitude()
                     projected_asds = projected_asds.to_unit()
 
                     # NOTE we calculate everything from here to the loop over
@@ -338,7 +348,7 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                     ####################################################
 
                     # Make a spectrogram that contains phase information
-                    fft_grams['L1:GDS-CALIB_STRAIN'] = fft_grams_fixed['L1:GDS-CALIB_STRAIN'].phaseshift(time_delay)
+                    fft_grams['L1:GDS-CALIB_STRAIN'] = fft_grams['L1:GDS-CALIB_STRAIN'].phaseshift(residual_time_delay)
                     # Create Dominant Polariztion Frame projected TF map
                     projected_fftmaps = fft_grams.to_dominant_polarization_frame(projected_asds)
 
@@ -346,10 +356,14 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                     # Find loud pixels and down select maps            #
                     ####################################################
                     # Create spectrogram that contains info of the energy in each pixel
-                    energy_maps = fft_grams.abs()
+                    energy_maps = fft_grams.power2()
 
                     # Turn off the bottom 99 percent of pixels (i.e. set to 0)
                     energy_maps_zeroed = energy_maps.blackout_pixels(99)
+
+                    # add incoherent maps together to find the 99 percentile coherent pixels
+                    if idx_sky_postion == 0:
+                        total_energy_threshold = energy_maps.to_coherent().blackout_pixels(99).energy.min()
 
                     # Calculate all time slides
                     tindex_findex_slided = {k : zip(numpy.mod(numpy.repeat(numpy.atleast_2d(energy_maps_zeroed[k].nonzero()[0]), len(v),0) + numpy.atleast_2d(v).T, final_time_bin_idx).astype(int), numpy.repeat(numpy.atleast_2d(energy_maps_zeroed[k].nonzero()[1]), len(v), 0))  for k,v in slides.items()}
@@ -378,6 +392,10 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                         # Now that we have the pixels that are in each map
                         # let's reconstruct the sparse tf map
                         # Now with pixels from both detectors
+                        tmp_map_to_find_total_energy_threshold = fft_grams.to_sparse(tindex, findex, phi=phi, theta=theta).power2().to_coherent()
+                        tfpixel_to_keep = numpy.where(tmp_map_to_find_total_energy_threshold.energy>total_energy_threshold)[0]
+                        tindex = {k : v[tfpixel_to_keep] for k,v in tindex.items()}
+                        findex = {k : v[tfpixel_to_keep] for k,v in findex.items()}
                         surviving_pixels = {k : v.to_sparse(tindex, findex, phi=phi, theta=theta, map_type=k) for k, v in projected_fftmaps.items()}
                         surviving_pixels['excess_energy'] = fft_grams.to_sparse(tindex, findex, phi=phi, theta=theta)
                         all_sparse_maps[circular_time_slide][fft_length][(phi, theta)] = surviving_pixels
@@ -404,7 +422,7 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                 all_triggers['waveform'] = waveform_name
                 all_triggers['injection_scale'] = injection_scale
                 all_triggers['injection_number'] = injection_number
-                all_triggers = prep_data.window_cut(all_triggers, duration=1.0)
+                all_triggers = prep_data.window_cut(all_triggers,duration=2.0)
                 all_triggers.to_hdf('./output/grb-{0}-{1}-{2}-{3}-{4}-triggers.h5'.format(args.job_type, int(event_time), waveform_name, injection_numbers[0], injection_numbers[-1]), key='/injections', append=True, index=False,)
             else:
                 all_triggers.to_hdf('./output/grb-{0}-{1}-triggers.h5'.format(args.job_type, processed_map_info), key='/background', append=True, index=False,)       

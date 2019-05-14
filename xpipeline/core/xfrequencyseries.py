@@ -128,6 +128,18 @@ class XFrequencySeriesDict(OrderedDict):
 class XAntennaProjectedFrequencySeriesDict(OrderedDict):
     """Controls a dictionaries of projected asds
     """
+    def calculate_magnitude(self):
+        """Find unit vector of a series of asds
+
+           Returns:
+               `XAntennaProjectedFrequencySeriesDict`
+        """
+        asds_magnitude = XFrequencySeriesDict()
+        for k, v in self.items():
+            asds_magnitude[k] = v.calculate_magnitude()
+
+        return asds_magnitude
+
     def to_unit(self):
         """Find unit vector of a series of asds
 

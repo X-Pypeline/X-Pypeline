@@ -50,6 +50,15 @@ class XTimeFrequencyMapDict(OrderedDict):
         """
         return XTimeFrequencyMapDict({k: v.abs() for k,v in self.items()})
 
+    def power2(self):
+        """Take the absolute value of all maps in dict
+
+           Returns:
+               `XTimeFrequencyMapDict`:
+                   power_map of all Fourier Grams in Dict
+        """
+        return XTimeFrequencyMapDict({k: v.abs()**2 for k,v in self.items()})
+
     def to_coherent(self):
         """Sum all maps in the dict
 
