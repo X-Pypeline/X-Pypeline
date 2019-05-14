@@ -47,8 +47,8 @@ def prep_triggers_for_ratio(triggers, ePlusIndex,eCrossIndex,eNullIndex,
         ratioCutsCross = numpy.log10(vetoCrossRange)
         ratioCutsNull = numpy.log10(vetoNullRange)
 
-        ratioCutsPlus_repeated = numpy.atleast_2d(numpy.repeat(ratioCutsPlus,2)).T
-        ratioCutsCross_repeated = numpy.atleast_2d(numpy.repeat(ratioCutsCross,2)).T
+        ratioCutsPlus_repeated = numpy.atleast_2d(numpy.append(ratioCutsPlus,ratioCutsPlus)).T
+        ratioCutsCross_repeated = numpy.atleast_2d(numpy.append(ratioCutsCross,ratioCutsCross)).T
         ratioCutsNull_repeated = numpy.atleast_2d(ratioCutsNull).T
 
         ratioArrayPlus = pandas.concat((plusRatioEoverI, plusRatioIoverE), join='outer', axis=1)
@@ -121,10 +121,7 @@ def apply_ratio_cuts_this_trial(triggers,triggers_from_this_trial,typeOfCutPlus,
     # Determine what clusters passed all the Ratio cuts
     if applying_to_injections:
         if typeOfCutPlus == 'twosided':
-            ratioPassCut = (((ratioArrayTempPlus  >= vetoPlusRep)[0:len(ratioCutsPlus)] | (ratioArrayTempPlus  >= vetoPlusRep)[len(ratioCutsPlus)::]) &
-            ((ratioArrayTempCross  >= vetoCrossRep)[0:len(ratioCutsCross)] | (ratioArrayTempCross  >= vetoCrossRep)[len(ratioCutsCross)::]) &
-            (ratioArrayTempNull >= vetoNullRep) &
-             (detection_statistic_tmp > loudest_background_job))
+            ratioPassCut = (((ratioArrayTempPlus  >= vetoPlusRep)[0:len(ratioCutsPlus)] | (ratioArrayTempPlus  >= vetoPlusRep)[len(ratioCutsPlus)::]) & ((ratioArrayTempCross  >= vetoCrossRep)[0:len(ratioCutsCross)] | (ratioArrayTempCross  >= vetoCrossRep)[len(ratioCutsCross)::]) & (ratioArrayTempNull >= vetoNullRep) & (detection_statistic_tmp > loudest_background_job))
         else:
             ratioPassCut = ((ratioArrayTempPlus  >= vetoPlusRep) &
                             (ratioArrayTempCross  >= vetoCrossRep) &
