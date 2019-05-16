@@ -29,7 +29,7 @@ _default_columns = ['min_time_of_cluster',
                     'max_frequency_of_cluster',
                     'number_of_pixels',]
 
-def extract_clusters_from_dict(maps, statistic_column='standard_energy', connectivity_list=[8],):
+def extract_clusters_from_dict(maps, statistic_column='standard_energy', connectivity_list=[8,24,48,80],):
     all_clusters = XCluster()
     for fft_length in maps.keys():
         for skypostion, imap in maps[fft_length].items():

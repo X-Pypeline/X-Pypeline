@@ -306,7 +306,7 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                         theta = sky_position['theta']
                         all_sparse_maps[circular_time_slide][fft_length][(phi, theta)] = {}
 
-            whitened_timeseries['L1:GDS-CALIB_STRAIN'] = numpy.roll(whitened_timeseries['L1:GDS-CALIB_STRAIN'], -3)
+            whitened_timeseries[channel_names[1]] = numpy.roll(whitened_timeseries[channel_names[1]], -3)
 
             # Now let's loop
             for idx_fft_length, fft_length in enumerate(fft_lengths):
@@ -348,7 +348,7 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                     ####################################################
 
                     # Make a spectrogram that contains phase information
-                    fft_grams['L1:GDS-CALIB_STRAIN'] = fft_grams['L1:GDS-CALIB_STRAIN'].phaseshift(residual_time_delay)
+                    fft_grams[channel_names[1]] = fft_grams[channel_names[1]].phaseshift(residual_time_delay)
                     # Create Dominant Polariztion Frame projected TF map
                     projected_fftmaps = fft_grams.to_dominant_polarization_frame(projected_asds)
 
@@ -390,7 +390,7 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                         findex = {k : findex for k in channel_names}
 
                         # undo internal_time_slide
-                        tindex['L1:GDS-CALIB_STRAIN'] = numpy.mod(tindex['L1:GDS-CALIB_STRAIN']-circular_time_slide*fft_length, final_time_bin_idx).astype(int)
+                        tindex[channel_names[1]] = numpy.mod(tindex[channel_names[1]]-circular_time_slide*fft_length, final_time_bin_idx).astype(int)
 
                         # Now that we have the pixels that are in each map
                         # let's reconstruct the sparse tf map
@@ -425,7 +425,7 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                 all_triggers['waveform'] = waveform_name
                 all_triggers['injection_scale'] = injection_scale
                 all_triggers['injection_number'] = injection_number
-                all_triggers = prep_data.window_cut(all_triggers,duration=2.0)
+                all_triggers = prep_data.window_cut(all_triggers,duration=1.0)
                 all_triggers.to_hdf('./output/grb-{0}-{1}-{2}-{3}-{4}-triggers.h5'.format(args.job_type, int(event_time), waveform_name, injection_numbers[0], injection_numbers[-1]), key='/injections', append=True, index=False,)
             else:
                 all_triggers.to_hdf('./output/grb-{0}-{1}-triggers.h5'.format(args.job_type, processed_map_info), key='/background', append=True, index=False,)       
