@@ -74,7 +74,7 @@ class XTimeSeries(TimeSeriesDict):
         # If frametype is None then make dictionary
         # of key channel and value None
         frame_types = kwargs.pop('frame_types', {det : None for det in channel_names})
-        if not isinstance(time_slides, dict):
+        if not isinstance(frame_types, dict):
             raise ValueError("frame_types must be supplied "
                               "in the form of a dict "
                               "with key channel and value frametype "
