@@ -1,0 +1,4 @@
+[submodule "waveforms/xpipeline-waveforms"]
+	path = waveforms/xpipeline-waveforms
+	url = https://git.ligo.org/scott.coughlin/xpipeline-waveforms.git
+	branch = master

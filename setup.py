@@ -75,12 +75,10 @@ setup_requires = [
 ]
 
 install_requires = [
-    'six',
-    'numpy>=1.10',
-    'scipy>=1.0',
-    'astropy',
-    'lalsuite',
-    'cython',
+    'lalsuite>6.52',
+    'cython>=0.29.5',
+    'filelock>=3.0.10',
+    'tables>=3.4.4',
     'gwpy>=0.12',
     'lscsoft-glue>=2.0.0',
     'pandas >= 0.22 ; python_version >= \'3.5\'',
@@ -122,6 +120,12 @@ extensions = [
               extra_compile_args=['-std=c++11'],
               language='c++'
               ),
+    Extension('xpipeline.cluster.superclustertriggers',
+              ['xpipeline/cluster/src/superclustertriggers.pyx'],
+              include_dirs=[numpy.get_include()],
+              extra_compile_args=['-std=c++11'],
+              language='c++'
+              ),
 ]
 
 # -- run setup ----------------------------------------------------------------
@@ -146,14 +150,19 @@ setup(name=DISTNAME,
       install_requires=install_requires,
       tests_require=tests_require,
       extras_require=extras_require,
+      python_requires='>=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, <4',
       test_suite='xpipeline.tests',
       use_2to3=True,
       classifiers=[
+          'Development Status :: 4 - Beta',
           'Programming Language :: Python',
-          'Development Status :: 3 - Alpha',
+          'Programming Language :: Python :: 2.7',
+          'Programming Language :: Python :: 3.5',
+          'Programming Language :: Python :: 3.6',
+          'Programming Language :: Python :: 3.7',
           'Intended Audience :: Science/Research',
           'Intended Audience :: End Users/Desktop',
-          'Intended Audience :: Developers',
+          'Intended Audience :: Science/Research',
           'Natural Language :: English',
           'Topic :: Scientific/Engineering',
           'Topic :: Scientific/Engineering :: Astronomy',

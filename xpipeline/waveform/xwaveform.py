@@ -8,6 +8,8 @@ import scipy.signal
 import math
 import os
 import warnings
+import lal
+import lalsimulation
 
 ###########################################################################
 #   Physical constants.
@@ -207,6 +209,8 @@ def xmakewaveform(family, parameters, T, T0, fs, **kwargs):
 
     #----- Time in column vector.
     t = numpy.arange(0, T, 1./fs)
+
+    hb = None
 
     #----- If parameters are supplied as tilde-delimited string, then convert
     #      to cell or double array.
@@ -473,30 +477,34 @@ def xmakewaveform(family, parameters, T, T0, fs, **kwargs):
         pregen = 0
 
     elif family.lower() in ['inspiral']:
-        """
-        import lal
-        import lalsimulation
-
-        # ---- Post-Newtonian inspiral waveform, using INSPIRAL2PN.
         mass1 = parameters[0]
         mass2 = parameters[1]
-        iota  = numpy.arccos(parameters[2])
+        inclination  = numpy.arccos(parameters[2])
         dist  = parameters[3]
-
-        lalsimulation.SimInspiralChooseTDWaveform(m1=mass1, m2=mass2,
-                                                  s1x=0, s1y=0, s1z=0, s2x=0,
-                                                  s2y=0, s2z=0, distance=dist,
-                                                  inclination=iota, phiRef=0,
-                      longAscNodes=0, eccentricity=0, meanPerAno=0,
-                      deltaT=1./fs, f_min =20, f_ref=20,
-                      params=lal.CreateDict(),
-                      approximant=lalsimulation.TaylorF2) 
-        [hp, hc] = inspiral2pn(mass1,mass2,iota,dist,fs,T,T0)
-
-        # ---- Turn off default interpolation (leave coalescence time
-        #      intact).
+        params = None
+        hp, hc = lalsimulation.SimInspiralTD(
+                    # Masses
+                    mass1 * lal.MSUN_SI, mass2 * lal.MSUN_SI,
+                    # Spins
+                    0, 0, 0,
+                    0, 0, 0,
+                    # distance and inclination
+                    dist * 1e6 * lal.PC_SI, inclination,
+                    # These are eccentricity and other orbital parameters
+                    0.0, 0.0, 0.0, 0.0,
+                    # frequency binning params
+                    1./fs, 10, 10,
+                    # Other extraneous options
+                    params,
+                    lalsimulation.SimInspiralGetApproximantFromString('TaylorT2'))
+        hp = TimeSeries.from_lal(hp)
+        hp.name = family
+        hc = TimeSeries.from_lal(hc)
+        hc.name = family
+        hb = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
+                        name=hp.name)
         pregen = 0
-        """
+
     elif family.lower() in ['inspiralsmooth', 'inspiralgated']:
 
         """
@@ -1050,6 +1058,29 @@ def xmakewaveform(family, parameters, T, T0, fs, **kwargs):
         hp = 100./dist * hp * (1+ciota**2) / 2
         hc = 100./dist * hc * ciota
 
+    elif family.lower() in ['oconnorcouch2018']:
+
+        # ----  Burrows 2018 2D SN waveform (pregenerated).
+        distance = parameters[0]
+        name = parameters[1]
+        pregen = 1
+
+        # Read hplus
+        hp = TimeSeries.read(os.path.join(filedir, family + '.hdf5'),
+                             path='/{0}/{1}/hp'.format(family, name))
+        hc = TimeSeries.read(os.path.join(filedir, family + '.hdf5'),
+                             path='/{0}/{1}/hc'.format(family, name))
+
+
+        pregen_fs = hp.sample_rate.value
+        pregen_T = hp.duration.value
+
+        # ---- Read waveform, which is defined at a range of 1 kiloparsec.
+        # and scale by distance (distance should be in kiloparsecs)
+        hp = 1. / distance * hp
+        hc = 1. / distance * hc
+        hb = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
+                        name=hp.name)
 
     elif family.lower() in ['onecyclesine']:
 
@@ -1206,6 +1237,54 @@ def xmakewaveform(family, parameters, T, T0, fs, **kwargs):
 
         hp = hp / (distance/20.)
         hc = hc / (distance/20.)
+
+    elif family.lower() in ['powell2018']:
+
+        # ----  Burrows 2018 2D SN waveform (pregenerated).
+        distance = parameters[0]
+        name = parameters[1]
+        pregen = 1
+
+        # Read hplus
+        hp = TimeSeries.read(os.path.join(filedir, family + '.hdf5'),
+                             path='/{0}/{1}/hp'.format(family, name))
+        hc = TimeSeries.read(os.path.join(filedir, family + '.hdf5'),
+                             path='/{0}/{1}/hc'.format(family, name))
+
+
+        pregen_fs = hp.sample_rate.value
+        pregen_T = hp.duration.value
+
+        # ---- Read waveform, which is defined at a range of 1 kiloparsec.
+        # and scale by distance (distance should be in kiloparsecs)
+        hp = 1. / distance * hp
+        hc = 1. / distance * hc
+        hb = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
+                        name=hp.name)
+
+    elif family.lower() in ['yakunin2017']:
+
+        # ----  Burrows 2018 2D SN waveform (pregenerated).
+        distance = parameters[0]
+        name = parameters[1]
+        pregen = 1
+
+        # Read hplus
+        hp = TimeSeries.read(os.path.join(filedir, family + '.hdf5'),
+                             path='/{0}/{1}/hp'.format(family, name))
+        hc = TimeSeries.read(os.path.join(filedir, family + '.hdf5'),
+                             path='/{0}/{1}/hc'.format(family, name))
+
+
+        pregen_fs = hp.sample_rate.value
+        pregen_T = hp.duration.value
+
+        # ---- Read waveform, which is defined at a range of 1 kiloparsec.
+        # and scale by distance (distance should be in kiloparsecs)
+        hp = 1. / distance * hp
+        hc = 1. / distance * hc
+        hb = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
+                        name=hp.name)
 
     elif family.lower() in ['scalarchirplet']:
 
@@ -1843,6 +1922,11 @@ def xmakewaveform(family, parameters, T, T0, fs, **kwargs):
     else:
        raise ValueError("Waveform family not recognized")
 
+    # this waveform very well may not ave the scalar polarization defined.
+    # therefore make it a time series of zeros
+    if hb is None:
+         hb = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
+                name=hp.name)
     ###########################################################################
     #   Process pre-generated waveforms.
     ###########################################################################

@@ -17,24 +17,25 @@
 # along with hveto.  If not, see <http://www.gnu.org/licenses/>.
 
 # ---- Import standard modules to the python path.
+from collections import OrderedDict
+from functools import reduce
+
 from gwpy.spectrogram import Spectrogram
 from gwpy.timeseries import TimeSeries
-from collections import OrderedDict
-from gwpy.signal.fft.ui import seconds_to_samples
-from .xfrequencyseries import XFrequencySeriesDict
-from scipy import sparse
-from functools import reduce
 
 from xpipeline.cluster import nearestneighbor
 from xpipeline.cluster import clusterproperties
 from ..cluster.cluster import XCluster
+from .xfrequencyseries import XFrequencySeriesDict
+from .sparse import csc_sparse_map
 
 import operator
 import numpy
-
+import h5py
+import tables
 
 __author__ = 'Scott Coughlin <scott.coughlin@ligo.org>'
-__all__ = ['csc_XSparseTimeFrequencyMap', 
+__all__ = ['csc_XSparseTimeFrequencyMap',
            'XSparseTimeFrequencyMapDict'
            'XTimeFrequencyMapDict',
            'residual_time_shift', 'XTimeFrequencyMap']
@@ -48,6 +49,15 @@ class XTimeFrequencyMapDict(OrderedDict):
                    power_map of all Fourier Grams in Dict
         """
         return XTimeFrequencyMapDict({k: v.abs() for k,v in self.items()})
+
+    def power2(self):
+        """Take the absolute value of all maps in dict
+
+           Returns:
+               `XTimeFrequencyMapDict`:
+                   power_map of all Fourier Grams in Dict
+        """
+        return XTimeFrequencyMapDict({k: v.abs()**2 for k,v in self.items()})
 
     def to_coherent(self):
         """Sum all maps in the dict
@@ -79,7 +89,7 @@ class XTimeFrequencyMapDict(OrderedDict):
                 projected_time_frequency_maps[pattern][det] = self[det] * asd[mask]
         return projected_time_frequency_maps
 
-    def blackout_pixels(self, blackpixel_percentile):
+    def blackout_pixels(self, blackpixel_percentile, **kwargs):
         """Set pixels below certain energy level to zero
 
         Parameters:
@@ -96,31 +106,10 @@ class XTimeFrequencyMapDict(OrderedDict):
             blackpixel_percentile = dict((c, blackpixel_percentile)
                                          for c in self)
 
-        return XSparseTimeFrequencyMapDict({k: self[k].blackout_pixels(v)
+        return XSparseTimeFrequencyMapDict({k: self[k].blackout_pixels(v, **kwargs)
                                      for k,v in blackpixel_percentile.items()})
 
-    def circular_time_slide(self, npixels_to_shift):
-        """slide all maps in dict by specified number of pixels
-
-        Parameters:
-
-            npixels_to_shift : `dict`, `int`
-                either a `dict` of (channel, `int`) pairs for key-wise
-                internal time slide calc. Since it does not make sense
-                to slide all the tfmaps the same number of pixels
-                you must specify a dict with all detectors and pixels to slide.
-
-        Returns:
-            `dict`: key-wise pair of channel
-        """
-        if not isinstance(npixels_to_shift, dict):
-            raise ValueError("Must be a dict")
-
-        return XTimeFrequencyMapDict({key :
-                self[key].circular_time_slide(npixels_to_shift=npix_to_shift)
-                for key, npix_to_shift in npixels_to_shift.items()})
-
-    def to_sparse(self, tindex, findex):
+    def to_sparse(self, tindex, findex, **kwargs):
         """
 
         Parameters:
@@ -150,7 +139,7 @@ class XTimeFrequencyMapDict(OrderedDict):
             raise ValueError("Must be a dict")
 
         return XSparseTimeFrequencyMapDict(
-            {k : v.to_sparse(tindex=tindex[k], findex=findex[k])
+            {k : v.to_sparse(tindex=tindex[k], findex=findex[k], **kwargs)
             for k, v in self.items()})
 
     def plot(self, label='key', **kwargs):
@@ -212,9 +201,30 @@ class XTimeFrequencyMapDict(OrderedDict):
                                      for k,v in self.items()}
                                     )
 
+    def crop_frequencies(self, low=None, high=None,):
+        """Crop this `Spectrogram` to the specified frequencies
+
+        Parameters
+        ----------
+        low : `float`
+            lower frequency bound for cropped `Spectrogram`
+        high : `float`
+            upper frequency bound for cropped `Spectrogram`
+
+        Returns
+        -------
+        spec : `Spectrogram`
+            A new `Spectrogram` with a subset of data from the frequency
+            axis
+        """
+        for k, v in self.items():
+            self[k] = v.crop_frequencies(low=low, high=high)
+
+        return self
+
 
 class XTimeFrequencyMap(Spectrogram):
-    def blackout_pixels(self, blackpixel_percentile):
+    def blackout_pixels(self, blackpixel_percentile, **kwargs):
         """Set pixels below certain energy level to zero
 
            Parameters:
@@ -235,7 +245,12 @@ class XTimeFrequencyMap(Spectrogram):
                                            findex=freq,
                                            energy=data,
                                            xindex=self.xindex,
-                                           yindex=self.yindex)
+                                           yindex=self.yindex,
+                                           dx=self.xindex[1] - self.xindex[0],
+                                           x0=self.xindex[0],
+                                           y0=self.yindex[0],
+                                           dy=self.yindex[1] - self.yindex[0],
+                                           name=self.name, **kwargs)
 
     def gaussianity(self):
         """Calculate the gaussianity of this map
@@ -259,47 +274,14 @@ class XTimeFrequencyMap(Spectrogram):
             The amount by which to shift (in seconds if `float`), give
             a negative value to shift backwards in time
         """
-        sqrt_of_neg_1 = numpy.sqrt(numpy.array([-1], dtype=complex))
         frequency_shift = residual_time_shift(delta,
                                               self.frequencies.to_value())
         return self * frequency_shift
 
-    def circular_time_slide(self, npixels_to_shift):
-        """Slide the TF pixels of this map
-
-        This should move the appropriate number of time bins
-        such that slide represents a slide in seconds.
-
-        Parameters
-        ----------
-        seconds : `int`,
-            How many seconds we are sliding the map
-
-        sample_frequency : `float`
-            what is the sample frequency of the data
-
-        offset : `float`
-            what offset was used to make this spectrogram
-
-        Returns:
-            `XTimeFrequencyMap`:
-                A time frequency map slide by the appropriate number
-                of seconds
-        """
-        if not npixels_to_shift:
-            return self
-
-        idx = numpy.searchsorted(self.xindex.value,
-                                 numpy.roll(self.xindex.value,
-                                            npixels_to_shift
-                                ))
-
-        return self[idx]
-
     def to_dominant_polarization_frame(self, dpf_asd):
         return self * dpf_asd
 
-    def to_sparse(self, tindex, findex):
+    def to_sparse(self, tindex, findex, **kwargs):
         """
 
         Parameters:
@@ -325,7 +307,12 @@ class XTimeFrequencyMap(Spectrogram):
         return csc_XSparseTimeFrequencyMap((data, (tindex, findex)),
                                            shape=shape, yindex=self.yindex,
                                            xindex=self.xindex, tindex=tindex,
-                                           findex=findex, energy=data)
+                                           findex=findex, energy=data,
+                                           dx=self.xindex[1] - self.xindex[0],
+                                           dy=self.yindex[1] - self.yindex[0],
+                                           x0=self.xindex[0],
+                                           y0=self.yindex[0],
+                                           name=self.name, **kwargs)
 
 class XSparseTimeFrequencyMapDict(OrderedDict):
     def to_coherent(self):
@@ -337,6 +324,24 @@ class XSparseTimeFrequencyMapDict(OrderedDict):
         """
         return reduce(operator.add, self.values())
 
+    def abs(self):
+        """Take the absolute value of all maps in dict
+
+           Returns:
+               `XTimeFrequencyMapDict`:
+                   power_map of all Fourier Grams in Dict
+        """
+        return XSparseTimeFrequencyMapDict({k: numpy.abs(v) for k, v in self.items()})
+
+    def power2(self, n=2, dtype=None):
+        """Take the absolute value of all maps in dict
+
+           Returns:
+               `XTimeFrequencyMapDict`:
+                   power_map of all Fourier Grams in Dict
+        """
+        return XSparseTimeFrequencyMapDict({k: v.power2(n, dtype=dtype) for k, v in self.items()})
+
     def to_xtimefrequencymapdict(self):
         """Convert dict fo sparse matrix to `XTimeFrequencyMapDict`
         """
@@ -344,6 +349,21 @@ class XSparseTimeFrequencyMapDict(OrderedDict):
                                       yindex=v.yindex)
                 for k, v in self.items()}
         return XTimeFrequencyMapDict(maps)
+
+    def label(self, connectivity=8):
+        """Convert dict fo sparse matrix to `XTimeFrequencyMapDict`
+        """
+        tfmap = list(self.values())[0]
+        pixels = numpy.vstack([tfmap.tindex, tfmap.findex])
+        coord_dim_array = (tfmap.xindex.size, tfmap.yindex.size)
+        npixels = pixels.shape[1]
+        labelled_map = nearestneighbor.fastlabel_wrapper(pixels + 1, coord_dim_array,
+                                                         connectivity, npixels).astype(int)
+
+        for k, v in self.items():
+            v.pixel_labels = labelled_map
+        return
+
 
     def cluster(self, method='nearest_neighbors', **kwargs):
         """Convert dict fo sparse matrix to `XTimeFrequencyMapDict`
@@ -353,6 +373,8 @@ class XSparseTimeFrequencyMapDict(OrderedDict):
             total_energy = 0
             for k, v in self.items():
                 total_energy += v.energy
+
+            total_energy = numpy.abs(total_energy)
             pixels = numpy.vstack([v.tindex, v.findex])
             coord_dim_array = (v.xindex.size, v.yindex.size)
 
@@ -360,17 +382,24 @@ class XSparseTimeFrequencyMapDict(OrderedDict):
 
             labelled_map = nearestneighbor.fastlabel_wrapper(pixels + 1, coord_dim_array, connectivity, npixels).astype(int)
 
-            dim_array = numpy.array([total_energy.shape[0], 1, 2.0])
+            cluster_array = clusterproperties.clusterproperities_wrapper(labelled_map, total_energy, True, pixels[0,:] + 1, pixels[1,:] + 1,)
 
-            cluster_array = clusterproperties.clusterproperities_wrapper(dim_array, labelled_map, total_energy, pixels[0,:] + 1, pixels[1,:] + 1).T
+            cluster_array[:, 0:3] = cluster_array[:, 0:3] * v.dx + v.x0
 
-            cluster_array[:, 0:3] = cluster_array[:, 0:3] * (v.xindex[2] - v.xindex[1])  + v.xindex[0]
-
-            cluster_array[:, 3:6] = cluster_array[:, 3:6] * (v.yindex[2] - v.yindex[1])  + v.yindex[0]
+            cluster_array[:, 3:6] = cluster_array[:, 3:6] * v.dy + v.y0
 
             return XCluster.nearest_neighbor(cluster_array, labelled_map)
         else:
             raise ValueError('Clustering method undefined')
+
+    def to_cnn(self, dim=2):
+        """Sum all maps in the dict
+
+           Returns:
+               `XTimeFrequencyMap`:
+                   A coherent TF-Map
+        """
+        return
 
     def plot(self, label='key', **kwargs):
         """Plot the data for this `XTimeFrequencyMapDict`.
@@ -393,76 +422,154 @@ class XSparseTimeFrequencyMapDict(OrderedDict):
         """
         return self.to_xtimefrequencymapdict().plot(label='key', **kwargs)
 
-class csc_XSparseTimeFrequencyMap(sparse.csc_matrix):
-    _metadata_slots = ('energy', 'tindex', 'findex', 'yindex', 'xindex')
-    def __init__(self, matrix, **kwargs):
-        self.yindex = kwargs.pop('yindex', None)
-        self.xindex = kwargs.pop('xindex', None)
-        self.tindex = kwargs.pop('tindex', None)
-        self.findex = kwargs.pop('findex', None)
-        self.energy = kwargs.pop('energy', None)
-        super(csc_XSparseTimeFrequencyMap, self).__init__(matrix, **kwargs)
+    def write(self, *args, **kwargs):
+        """Plot the data for this `XTimeFrequencyMapDict`.
 
-    def _repr_helper(self, print_):
-        if print_ is repr:
-            opstr = '='
-        else:
-            opstr = ': '
+        Parameters
+        ----------
+        **kwargs
+            all other keyword arguments are passed to the plotter as
+            appropriate
+        """
+        for k, v in self.items():
+            v.write(*args, **kwargs)
+        return
 
-        # get prefix and suffix
-        prefix = '{}('.format(type(self).__name__)
-        suffix = ')'
-        if print_ is repr:
-            prefix = '<{}'.format(prefix)
-            suffix += '>'
+class csc_XSparseTimeFrequencyMap(csc_sparse_map):
+    def write(self, filename, path, table_description=None, **kwargs):
+        """Plot the data for this `XTimeFrequencyMapDict`.
 
-        indent = ' ' * len(prefix)
+        Parameters
+        ----------
+        **kwargs
+            all other keyword arguments are passed to the plotter as
+            appropriate
+        """
+        if table_description is None:
+            table_description = {
+            'dx' : tables.Float64Col(),
+            'dy' : tables.Float64Col(),
+            'x0' : tables.Float64Col(),
+            'y0' : tables.Float64Col(),
+            'shape' : tables.Int64Col(2),
+            'phi' : tables.Float64Col(),
+            'theta' : tables.Float64Col(),
+            'map_type' : tables.StringCol(20),
+            'ifo' : tables.StringCol(2),
+            'x' : tables.Float64Col(shape=self.tindex.size),
+            'y' : tables.Float64Col(shape=self.findex.size),
+            'energy' : tables.ComplexCol(itemsize=16, shape=self.energy.size),
+            }
 
-        # format value
-        nnz = self.getnnz()
-        arrstr = ("<%dx%d sparse matrix of type '%s'\n"
-                 "\twith %d stored elements in %s format>" % \
-                 (self.shape + (self.dtype.type, nnz, "Compressed Sparse Column")))
-
-        # format unit
-        metadata = [('unit', 'dimensionless')]
-
-        # format other metadata
+        h5file = tables.open_file('{0}'.format(filename), mode="a", title="Sparse Time Frequency Maps")
+        # check if table already exists in this path
         try:
-            attrs = self._print_slots
-        except AttributeError:
-            attrs = self._metadata_slots
-        for key in attrs:
-            try:
-                val = getattr(self, key)
-            except (AttributeError, KeyError):
-                val = None
-            thisindent = indent + ' ' * (len(key) + len(opstr))
-            metadata.append((
-                key.lstrip('_'),
-                print_(val).replace('\n', '\n{}'.format(thisindent)),
-            ))
-        metadata = (',\n{}'.format(indent)).join(
-            '{0}{1}{2}'.format(key, opstr, value) for key, value in metadata)
+            table = list(h5file.walk_nodes(path, "Table"))[0]
+        except:
+            # If these groups do not exist then create a new table inside of path
+            table = h5file.create_table(path, 'event', table_description, "maps", createparents=True)
 
-        return "{0}{1}\n{2}{3}{4}".format(
-            prefix, arrstr, indent, metadata, suffix)
+        event = table.row
+        x = numpy.zeros(event['x'].size)
+        x[:self.tindex.size] = self.tindex
 
-    def __repr__(self):
-        """Return a representation of this object
+        y = numpy.zeros(event['y'].size)
+        y[:self.findex.size] = self.findex
 
-        This just represents each of the metadata objects appropriately
-        after the core data array
+        energy = numpy.zeros(event['energy'].size, dtype='complex')
+        energy[:self.energy.size] = self.energy
+
+        event['dx'] = self.dx.value
+        event['dy'] = self.dy.value
+        event['x0'] = self.x0.value
+        event['y0'] = self.y0.value
+        event['phi'] = self.phi
+        event['theta'] = self.theta
+        event['shape'] = self.shape
+        event['map_type'] = self.map_type
+        event['ifo'] = self.name
+        event['x'] = x
+        event['y'] = y
+        event['energy'] = energy
+        event.append()
+        table.flush()
+        h5file.close()
+        return
+
+    @classmethod
+    def read(cls, row):
+        """This can table a row of a PyTable and return a sparse tf map.
+
+        Parameters
+        ----------
+        row (`tables.Table.row`):
+            The is a row of a `tables.Table` generated by
+            xpipeline-analysis
+
+        **kwargs
+            all other keyword arguments are passed to the plotter as
+            appropriate
         """
-        return self._repr_helper(repr)
+        dx = row['dx']
+        dy = row['dy']
+        x0 = row['x0']
+        y0 = row['y0']
+        phi = row['phi']
+        theta = row['theta']
+        shape = row['shape']
+        map_type = row['map_type']
+        ifo = row['ifo']
+        x = row['x']
+        y = row['y']
+        energy = row['energy']
+        tf_map = cls((energy, (x, y)), shape=shape, dx=dx, dy=dy,
+                    x0=x0, y0=y0, map_type=map_type, name=ifo, phi=phi, theta=theta)
+        tf_map.tindex = x[:tf_map.size-1].astype(int)
+        tf_map.findex = y[:tf_map.size-1].astype(int)
+        tf_map.energy = energy[:tf_map.size-1]
+        tf_map.xindex = numpy.arange(x0, x0 + dx*shape[0], dx)
+        tf_map.yindex = numpy.arange(y0, y0 + dy*shape[1], dy)
+        return tf_map
 
-    def __str__(self):
-        """Return a printable string format representation of this object
-
-        This just prints each of the metadata objects appropriately
-        after the core data array
+    def label(self, connectivity=8):
+        """Convert dict fo sparse matrix to `XTimeFrequencyMapDict`
         """
-        return self._repr_helper(str)
+        pixels = numpy.vstack([self.tindex, self.findex])
+        coord_dim_array = (self.xindex.size, self.yindex.size)
+        npixels = pixels.shape[1]
+        labelled_map = nearestneighbor.fastlabel_wrapper(pixels + 1, coord_dim_array,
+                                                         connectivity, npixels).astype(int)
+
+        self.pixel_labels = labelled_map
+        return
+
+    def cluster(self, method='nearest_neighbors', **kwargs):
+        """Convert dict fo sparse matrix to `XTimeFrequencyMapDict`
+        """
+        if method=='nearest_neighbors':
+            connectivity = kwargs.pop('connectivity', 8)
+            total_energy = self.energy
+            pixels = numpy.vstack([self.tindex, self.findex])
+            coord_dim_array = self.shape
+
+            npixels = pixels.shape[1]
+
+            if getattr(self, 'pixel_labels') is None:
+                labelled_map = nearestneighbor.fastlabel_wrapper(pixels + 1, coord_dim_array, connectivity, npixels).astype(int)
+            else:
+                labelled_map = self.pixel_labels
+
+            cluster_array = clusterproperties.clusterproperities_wrapper(labelled_map, total_energy, True, pixels[0,:] + 1, pixels[1,:] + 1, kwargs.pop('projected_asd_magnitude_squared', False))
+
+            if ((getattr(self, 'dx') is not None) and (getattr(self, 'dy') is not None) and
+                (getattr(self, 'x0') is not None) and (getattr(self, 'y0') is not None)):
+                cluster_array[:, 0:3] = cluster_array[:, 0:3] * self.dx  + self.x0
+
+                cluster_array[:, 3:6] = cluster_array[:, 3:6] * self.dy  + self.y0
+
+            return XCluster.nearest_neighbor(cluster_array, labelled_map, **kwargs)
+        else:
+            raise ValueError('Clustering method undefined')
 
     def plot(self, **kwargs):
         """Plot the data for this `XTimeFrequencyMapDict`.

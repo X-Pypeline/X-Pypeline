@@ -15,12 +15,12 @@ class XsearchJob(pipeline.CondorDAGJob, pipeline.AnalysisJob):
         # ---- Get path to executable from parameters file.
         # self.__executable = cp.get('condor','xsearch')
         # ---- Get path to executable.
-        os.system('which xdetection > path_file.txt')
+        os.system('which xpipeline-analysis > path_file.txt')
         f = open('path_file.txt','r')
-        xdetectionstr = f.read()
+        xpipeline_analysisstr = f.read()
         f.close()
         os.system('rm path_file.txt')
-        self.__executable = xdetectionstr
+        self.__executable = xpipeline_analysisstr
         # ---- Get condor universe from parameters file.
         self.__universe = cp.get('condor','universe')
         pipeline.CondorDAGJob.__init__(self,self.__universe,self.__executable)
@@ -28,10 +28,7 @@ class XsearchJob(pipeline.CondorDAGJob, pipeline.AnalysisJob):
         self.__param_file = None
 
         # ---- Add required environment variables.
-        self.add_condor_cmd('environment',"USER=$ENV(USER);HOME=$ENV(HOME);" \
-            "LD_LIBRARY_PATH=$ENV(LD_LIBRARY_PATH);" \
-            "XPIPE_INSTALL_BIN=$ENV(XPIPE_INSTALL_BIN);" \
-            "PATH=/usr/bin:/bin")
+        self.add_condor_cmd('getenv',"true")
 
         # ----Add Accounting Group Flag
         grouptag = 'ligo.' + \
@@ -54,10 +51,6 @@ class XsearchJob(pipeline.CondorDAGJob, pipeline.AnalysisJob):
         self.set_stdout_file('logs/xsearch-$(cluster)-$(process).out')
         self.set_stderr_file('logs/xsearch-$(cluster)-$(process).err')
 
-        # If on Atlas, use getenv=true to pass variables
-        #if atlasFlag:
-        #   self.add_condor_cmd('getenv',"true")
-
         # ---- Name of condor job submission file to be written.
         self.set_sub_file('xsearch.sub')
 
@@ -74,12 +67,12 @@ class XsearchGPUJob(pipeline.CondorDAGJob, pipeline.AnalysisJob):
         # ---- Get path to executable from parameters file.
         # self.__executable = cp.get('condor','xsearch')
         # ---- Get path to executable.
-        os.system('which xdetection > path_file.txt')
+        os.system('which xpipeline-analysis > path_file.txt')
         f = open('path_file.txt','r')
-        xdetectionstr = f.read()
+        xpipeline_analysisstr = f.read()
         f.close()
         os.system('rm path_file.txt')
-        self.__executable = xdetectionstr
+        self.__executable = xpipeline_analysisstr
         # ---- Get condor universe from parameters file.
         self.__universe = cp.get('condor','universe')
         pipeline.CondorDAGJob.__init__(self,self.__universe,self.__executable)
@@ -138,29 +131,29 @@ class XsearchNode(pipeline.CondorDAGNode, pipeline.AnalysisNode):
         self.__x_injnum = None
 
     # ---- Set parameters file.
-    def set_param_file(self,path):
-        self.add_var_arg(path)
+    def set_param_file(self, path):
+        self.add_var_arg('--parameter-file ' + path)
         self.__param_file = path
 
     def get_param_file(self):
         return self.__param_file
 
-    def set_x_jobnum(self,n):
-        self.add_var_arg(str(n))
+    def set_x_jobnum(self, n):
+        self.add_var_arg('--event-numbers ' + str(n))
         self.__x_jobnum = n
 
     def get_x_jobnum(self):
         return self.__x_jobnum
 
-    def set_output_dir(self,path):
-        self.add_var_arg(path)
+    def set_output_dir(self, path):
+        self.add_var_arg('--job-type ' + path)
         self.__output_dir = path
 
     def get_output_dir(self,path):
         return self.__output_dir
 
-    def set_x_injnum(self,n):
-        self.add_var_arg(n)
+    def set_x_injnum(self, n):
+        self.add_var_arg('--injection-numbers ' + n)
         self.__x_injnum = n
 
     def get_x_injnum(self):

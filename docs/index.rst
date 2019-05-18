@@ -48,6 +48,7 @@ Please consult these pages for more details on using xpipeline:
 
    command-line/index
    examples/index
+   glitches/index
 
 Indices and tables
 ==================

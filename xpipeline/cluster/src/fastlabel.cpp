@@ -15,15 +15,15 @@
 
 #include "fastlabel.h"
 
-void fastlabel(const int nPixels, const double *coords, const double *coordDim, const int nNeighboors, double *labelList)
+void fastlabel(const int nPixels, const double *coords, const double *coordDim, const int nNeighbors, double *labelList)
 {
   int labelCounter = 0;
   queue<int> pixelQueue;
 
-  vector<int> neighboorsX(nNeighboors);
-  vector<int> neighboorsY(nNeighboors);
+  vector<int> neighboorsX(nNeighbors);
+  vector<int> neighboorsY(nNeighbors);
 
-  if ( nNeighboors == 8 )
+  if ( nNeighbors == 8 )
     {
       // 8 connectivity, a 3x3 square, without the middle pixel
       int iNeigh=0;
@@ -36,7 +36,7 @@ void fastlabel(const int nPixels, const double *coords, const double *coordDim, 
             iNeigh++;
           }
     }
-  else if (nNeighboors == 24)
+  else if (nNeighbors == 24)
     {
       // 24 connectivity, a 5x5 square, without the middle pixel
       int iNeigh=0;
@@ -49,7 +49,7 @@ void fastlabel(const int nPixels, const double *coords, const double *coordDim, 
             iNeigh++;
           }
     }
-  else if (nNeighboors == 48)
+  else if (nNeighbors == 48)
     {
       // 48 connectivity, a 7x7 square, without the middle pixel
       int iNeigh=0;
@@ -62,7 +62,7 @@ void fastlabel(const int nPixels, const double *coords, const double *coordDim, 
             iNeigh++;
           }
     }
-  else if (nNeighboors == 80)
+  else if (nNeighbors == 80)
     {
       // 80 connectivity, a 9x9 square, without the middle pixel
       int iNeigh=0;
@@ -93,40 +93,40 @@ void fastlabel(const int nPixels, const double *coords, const double *coordDim, 
     }
   
   // create array of graph edges (links to neighboors)
-  vector<int> edges(nPixels*nNeighboors);
+  vector<int> edges(nPixels*nNeighbors);
   for(int iPix=0; iPix < nPixels; iPix++)
     {
-      for( int iNeigh=0; iNeigh < nNeighboors; iNeigh++)
+      for( int iNeigh=0; iNeigh < nNeighbors; iNeigh++)
         {
           int newX = coords[iPix] - 1 + neighboorsX[iNeigh];
           int newY = coords[iPix + nPixels] - 1 + neighboorsY[iNeigh];
           // record linear index of neighboors or -1 if the neighboor
           // would be out of the TF map
           if ( newX >= 0 && newX < coordDim[0] && newY >= 0 && newY < coordDim[1])
-            edges[iPix*nNeighboors + iNeigh] = newX*coordDim[1] + newY;
+            edges[iPix*nNeighbors + iNeigh] = newX*coordDim[1] + newY;
           else
-            edges[iPix*nNeighboors + iNeigh] = -1;
+            edges[iPix*nNeighbors + iNeigh] = -1;
 
         }
     }
 
   // replace linear indexes by pixel number in edge array and prune
   // edges that go to non black pixels
-  for( int iNeigh=0; iNeigh < nNeighboors; iNeigh++)
+  for( int iNeigh=0; iNeigh < nNeighbors; iNeigh++)
     {
       int targetPix = 0;
       for(int iPix=0; iPix < nPixels; iPix++)
         {
-          if (edges[iPix*nNeighboors + iNeigh] < 0)
+          if (edges[iPix*nNeighbors + iNeigh] < 0)
             continue;
-          while (edges[iPix*nNeighboors + iNeigh] > pixToLinIdx[targetPix] &&
+          while (edges[iPix*nNeighbors + iNeigh] > pixToLinIdx[targetPix] &&
                  targetPix < nPixels)
             targetPix++;
           if (targetPix < nPixels && 
-              edges[iPix*nNeighboors + iNeigh] == pixToLinIdx[targetPix])
-            edges[iPix*nNeighboors + iNeigh] = targetPix;
+              edges[iPix*nNeighbors + iNeigh] == pixToLinIdx[targetPix])
+            edges[iPix*nNeighbors + iNeigh] = targetPix;
           else
-            edges[iPix*nNeighboors + iNeigh] = -1;
+            edges[iPix*nNeighbors + iNeigh] = -1;
         }
     }
 
@@ -147,11 +147,11 @@ void fastlabel(const int nPixels, const double *coords, const double *coordDim, 
           int curPix = pixelQueue.front();
           pixelQueue.pop();
 
-          for( int iNeigh=0; iNeigh < nNeighboors; iNeigh++)
+          for( int iNeigh=0; iNeigh < nNeighbors; iNeigh++)
             {
-              if (edges[curPix*nNeighboors + iNeigh] >= 0)
+              if (edges[curPix*nNeighbors + iNeigh] >= 0)
                 {
-                  int newPix = edges[curPix*nNeighboors + iNeigh];
+                  int newPix = edges[curPix*nNeighbors + iNeigh];
                   if( labelList[newPix] == 0)
                     {
                       labelList[newPix] = labelCounter;

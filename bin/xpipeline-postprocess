@@ -1,0 +1,118 @@
+#!/usr/bin/env python
+from xpipeline.core import XSparseTimeFrequencyMapDict, csc_XSparseTimeFrequencyMap
+from xpipeline.setuputils import log
+from xpipeline.utils import utils
+from xpipeline.postprocess import postprocess
+
+import argparse
+import os
+import tables
+import numpy
+import pandas
+
+def parse_commandline():
+    parser = argparse.ArgumentParser(description="This executable processes "
+                                                 "a xpipeline-analysis "
+                                                 "generated file of tfmaps.")
+    # Define groups of flags to make the help output ore useful
+    required_args = parser.add_argument_group('required named arguments')
+    required_args.add_argument("-f", "--event-file", help=
+                               """
+                               trigger file
+                               """,
+                               required=True,)
+    required_args.add_argument("-o", "--output-file", help=
+                               """
+                               Filename
+                               """,
+                               required=True,)
+    required_args.add_argument("-t", "--injection-type", help=
+                               """
+                               onsource_injection or offsource_injection or
+                               zero_noise_injection?
+                               """,
+                               required=True,)
+
+    required_args.add_argument("-s", "--randomseed", help=
+                               """
+                               Randomseed that selects 50 percent of
+                               the background and injection jobs for training.
+                               """,
+                               type=int, default=1986,)
+
+    args = parser.parse_args()
+
+    if not os.path.isfile(args.event_file):
+        raise parser.error('You have supplied a non-existent event-file.')
+
+    return args
+
+args = parse_commandline()
+
+logger = log.Logger('XPIPELINE: Post-Processing {0}'.format(args.event_file))
+
+# Read parameters
+f = tables.open_file(args.event_file)
+
+training_background_triggers, testing_background_triggers, training_injection_triggers, testing_injection_triggers = \
+    utils.choose_background_injection_training(f, injection_type=args.injection_type, randomseed=args.randomseed,)
+
+# Now get background triggers for the training and testing injections
+all_background_triggers = []
+for event in training_background_triggers:
+    for table in f.walk_nodes(event, "Table"):
+        all_clusters = postprocess.extract_clusters_from_table(table, event_type='background')
+        all_background_triggers.append(all_clusters.values)
+
+# Now stack all the background triggers from the various trials and
+# save them as one big DataFrame
+all_background_triggers = numpy.vstack(all_background_triggers)
+non_string_cols = all_clusters.columns[~all_clusters.dtypes.eq('object')]
+all_background_triggers = pandas.DataFrame(all_background_triggers, columns=all_clusters.columns,)
+all_background_triggers[non_string_cols] = all_background_triggers[non_string_cols].apply(pandas.to_numeric)
+all_background_triggers.to_hdf(args.output_file, key='/background/trainingset', append=True, index=False,)
+
+all_background_triggers = []
+for event in testing_background_triggers:
+    for table in f.walk_nodes(event, "Table"):
+        all_clusters = postprocess.extract_clusters_from_table(table, event_type='background')
+        all_background_triggers.append(all_clusters.values)
+
+# Now stack all the background triggers from the various trials and
+# save them as one big DataFrame
+all_background_triggers = numpy.vstack(all_background_triggers)
+non_string_cols = all_clusters.columns[~all_clusters.dtypes.eq('object')]
+all_background_triggers = pandas.DataFrame(all_background_triggers, columns=all_clusters.columns,)
+all_background_triggers[non_string_cols] = all_background_triggers[non_string_cols].apply(pandas.to_numeric)
+all_background_triggers.to_hdf(args.output_file, key='/background/testingset', append=True, index=False,)
+
+del all_background_triggers
+
+# Now get injection triggers for the training and testing injections
+all_injection_triggers = []
+
+for event in training_injection_triggers:
+    for table in f.walk_nodes(event, "Table"):
+        all_clusters = postprocess.extract_clusters_from_table(table, event_type='injection')
+        all_injection_triggers.append(all_clusters.values)
+
+non_string_cols = all_clusters.columns[~all_clusters.dtypes.eq('object')]
+
+all_injection_triggers = numpy.vstack(all_injection_triggers)
+all_injection_triggers = pandas.DataFrame(all_injection_triggers, columns=all_clusters.columns)
+all_injection_triggers[non_string_cols] = all_injection_triggers[non_string_cols].apply(pandas.to_numeric)
+all_injection_triggers.to_hdf(args.output_file, key='/injections/trainingset', append=True, index=False,)
+
+all_injection_triggers = []
+
+for event in testing_injection_triggers:
+    for table in f.walk_nodes(event, "Table"):
+        all_clusters = postprocess.extract_clusters_from_table(table, event_type='injection')
+        all_injection_triggers.append(all_clusters.values)
+
+non_string_cols = all_clusters.columns[~all_clusters.dtypes.eq('object')]
+
+all_injection_triggers = numpy.vstack(all_injection_triggers)
+all_injection_triggers = pandas.DataFrame(all_injection_triggers, columns=all_clusters.columns)
+all_injection_triggers[non_string_cols] = all_injection_triggers[non_string_cols].apply(pandas.to_numeric)
+all_injection_triggers.to_hdf(args.output_file, key='/injections/testingset', append=True, index=False,)

@@ -15,7 +15,7 @@ class XEvent(object):
 
 
 class XCreateEventFromFile(XEvent):
-    def __init__(self, paramsfile, eventNumber):
+    def __init__(self, paramsfile, event_number):
         """Initialize an XEvent on-source off-source or injection with pfile
 
         Parameters
@@ -30,8 +30,9 @@ class XCreateEventFromFile(XEvent):
 
             `XEvent`
         """
-        print("You are generating an xevent by supplying a "
-              "a xpipeline params file, this will overwite the defaults")
+        parameters = dict(line.rstrip('\n').split(':', 1) for line in open(args.parameter_file))
+import pdb
+pdb.set_trace()
         with open(paramsfile, 'r') as f:
             for line in f.readlines():
                 parsed_text = line.split('\n')[0].split(':')
@@ -47,7 +48,7 @@ class XCreateEventFromFile(XEvent):
         self.theta = list(EventTable.read(self.skyPositionList,
                           format='ascii')['col1'])
         self.event_time = list(EventTable.read(self.eventFileName,
-                               format='ascii')['col1'])[eventNumber]
+                               format='ascii')['col1'])[event_number]
 
         for key, item in vars(self).items():
             try:

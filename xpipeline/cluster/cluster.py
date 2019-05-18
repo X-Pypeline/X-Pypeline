@@ -20,6 +20,8 @@
 import numpy
 import pandas
 
+from xpipeline.cluster import superclustertriggers
+
 __author__ = 'Scott Coughlin <scott.coughlin@ligo.org>'
 __all__ = ['XCluster']
 
@@ -49,4 +51,14 @@ class XCluster(pandas.DataFrame):
         columns = kwargs.pop('columns', _default_columns)
         dtype = kwargs.pop('dtype', _default_dtype)
         tab = cls(cluster_array, columns=columns, dtype=dtype)
+        tab['dt'] = tab.max_time_of_cluster - tab.min_time_of_cluster
+        tab['df'] = tab.max_frequency_of_cluster - tab.min_frequency_of_cluster
         return tab
+
+    def supercluster(self, statistic_column='energy_of_cluster'):
+        bounding_box_columns = ['min_time_of_cluster', 'min_frequency_of_cluster',
+                                 'dt', 'df']
+        bounding_box_columns.append(statistic_column)
+        bound_box = self[bounding_box_columns].values
+        mask = superclustertriggers.fastsupercluster_wrapper(len(bound_box), bound_box).astype(bool)
+        return self.loc[mask]

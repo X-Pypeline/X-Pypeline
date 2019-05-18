@@ -18,8 +18,3 @@
 
 """The XPypeline algorithm
 """
-
-from .xtimefrequencymap import (XTimeFrequencyMapDict,
-                                XTimeFrequencyMap,
-                                csc_XSparseTimeFrequencyMap,
-                                XSparseTimeFrequencyMapDict)
