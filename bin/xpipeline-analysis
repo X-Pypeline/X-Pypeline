@@ -334,6 +334,11 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                     projected_asds = asds.project_onto_antenna_patterns(antenna_patterns,
                                                                         to_dominant_polarization_frame=True)
 
+                    projected_asds_magnitude = projected_asds.calculate_magnitude()
+                    # only keep frequencies in the relevant range
+                    projected_asds_magnitude = projected_asds_magnitude.slice_frequencies(numpy.arange(minimum_frequency,maximum_frequency + 1, 1./whitening_length).astype(int))
+
+                    # convert projected asds to unit vectors
                     projected_asds = projected_asds.to_unit()
 
                     # NOTE we calculate everything from here to the loop over
@@ -400,6 +405,9 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                         tindex = {k : v[tfpixel_to_keep] for k,v in tindex.items()}
                         findex = {k : v[tfpixel_to_keep] for k,v in findex.items()}
                         surviving_pixels = {k : v.to_sparse(tindex, findex, phi=phi, theta=theta, map_type=k) for k, v in projected_fftmaps.items()}
+                        for k,v in surviving_pixels.items():
+                            v.projected_asd_magnitude_squared = numpy.square(projected_asds_magnitude[k])
+
                         surviving_pixels['excess_energy'] = fft_grams.to_sparse(tindex, findex, phi=phi, theta=theta)
                         all_sparse_maps[circular_time_slide][fft_length][(phi, theta)] = surviving_pixels
 

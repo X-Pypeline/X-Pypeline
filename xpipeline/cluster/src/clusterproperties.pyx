@@ -10,11 +10,11 @@ cdef extern from "fastsparseclusterprop.h" nogil:
     vector[double] fastsparseclusterprop(numpy.double_t *labelledMap, numpy.double_t *likelihoodMap,
                           numpy.double_t *pixTime, numpy.double_t *pixFreq,
                           const bool tf_properties, numpy.double_t *dimArray,
-                          const int nClusters)
+                          const int nClusters, numpy.double_t *projectedAsdMagnitudeSquared)
 
 def clusterproperities_wrapper(object labelled_map, object likelihood,
                                tf_properties=False, pixel_time=None,
-                               pixel_freq=None):
+                               pixel_freq=None, projected_asd_magnitude_squared=None):
     """This outputs properities of every cluster on the TF map
         Returns:
             cluster_array (array):
@@ -41,6 +41,7 @@ def clusterproperities_wrapper(object labelled_map, object likelihood,
         numpy.ndarray[numpy.double_t, ndim=3, mode='c'] likelihood_tmp
         numpy.ndarray[numpy.double_t, ndim=1, mode='c'] pixel_time_tmp
         numpy.ndarray[numpy.double_t, ndim=1, mode='c'] pixel_freq_tmp
+        numpy.ndarray[numpy.double_t, ndim=1, mode='c'] projected_asd_magnitude_squared_tmp
 
     # FIXME: This crazy reshaping is from the original logic being in MATLAB
     # I am sure with the numpy array format a cpp there is a way to not have to do this
@@ -65,8 +66,14 @@ def clusterproperities_wrapper(object labelled_map, object likelihood,
         pixel_time_tmp = numpy.ascontiguousarray(numpy.zeros(labelled_map.size), dtype=numpy.float64)
         number_of_columns = int(dimension_array_tmp[2])
 
+    if projected_asd_magnitude_squared.any():
+        projected_asd_magnitude_squared_tmp = numpy.ascontiguousarray(projected_asd_magnitude_squared, dtype=numpy.float64)
+    else:
+        projected_asd_magnitude_squared_tmp = numpy.ascontiguousarray(numpy.zeros(labelled_map.size), dtype=numpy.float64)
+
     cluster_array = fastsparseclusterprop(&labelled_map_tmp[0], &likelihood_tmp[0,0,0],
                           &pixel_time_tmp[0], &pixel_freq_tmp[0],
-                          tf_properties, &dimension_array_tmp[0], labelled_map.max().astype(int))
+                          tf_properties, &dimension_array_tmp[0], labelled_map.max().astype(int),
+                          &projected_asd_magnitude_squared_tmp[0])
 
-    return numpy.asarray(cluster_array).reshape(number_of_columns, -1).T 
+    return numpy.asarray(cluster_array).reshape(number_of_columns+2, -1).T

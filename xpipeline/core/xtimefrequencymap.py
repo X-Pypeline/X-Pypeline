@@ -382,7 +382,7 @@ class XSparseTimeFrequencyMapDict(OrderedDict):
 
             labelled_map = nearestneighbor.fastlabel_wrapper(pixels + 1, coord_dim_array, connectivity, npixels).astype(int)
 
-            cluster_array = clusterproperties.clusterproperities_wrapper(labelled_map, total_energy, True, pixels[0,:] + 1, pixels[1,:] + 1)
+            cluster_array = clusterproperties.clusterproperities_wrapper(labelled_map, total_energy, True, pixels[0,:] + 1, pixels[1,:] + 1,)
 
             cluster_array[:, 0:3] = cluster_array[:, 0:3] * v.dx + v.x0
 
@@ -559,7 +559,7 @@ class csc_XSparseTimeFrequencyMap(csc_sparse_map):
             else:
                 labelled_map = self.pixel_labels
 
-            cluster_array = clusterproperties.clusterproperities_wrapper(labelled_map, total_energy, True, pixels[0,:] + 1, pixels[1,:] + 1)
+            cluster_array = clusterproperties.clusterproperities_wrapper(labelled_map, total_energy, True, pixels[0,:] + 1, pixels[1,:] + 1, kwargs.pop('projected_asd_magnitude_squared', False))
 
             if ((getattr(self, 'dx') is not None) and (getattr(self, 'dy') is not None) and
                 (getattr(self, 'x0') is not None) and (getattr(self, 'y0') is not None)):

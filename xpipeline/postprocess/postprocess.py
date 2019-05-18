@@ -37,20 +37,43 @@ def extract_clusters_from_dict(maps, statistic_column='standard_energy', connect
             all_energies = []
             all_columns = _default_columns.copy()
             all_columns.append('standard_energy')
+            projected_asd_magnitude_squared =[]
+            bayesian_statistics = []
             for k,v in imap.items():
                 all_energies.append(v.to_coherent().power2(2).energy)
                 all_columns.append('coherent_' + k)
                 all_energies.append(v.power2().to_coherent().energy)
                 all_columns.append('incoherent_' + k)
+                try:
+                    # if possible will will calculate all the bayesian statistics for each pixel
+                    if k == 'f_plus':
+                        projected_asd_magnitude_squared.append(v.projected_asd_magnitude_squared.value)
+                        bayesian_statistics.append('loghbayesian')
+                    elif k == 'f_cross':
+                        projected_asd_magnitude_squared.append(v.projected_asd_magnitude_squared.value)
+                    elif k == 'f_right':
+                        projected_asd_magnitude_squared.append(v.projected_asd_magnitude_squared.value)
+                        bayesian_statistics.append('loghbayesiancirc')
+                    elif k =='f_left':
+                        projected_asd_magnitude_squared.append(v.projected_asd_magnitude_squared.value)
+                    else:
+                        pass
+                except:
+                    pass
+            all_columns.extend(bayesian_statistics)
+            if projected_asd_magnitude_squared:
+                projected_asd_magnitude_squared =  numpy.asarray(projected_asd_magnitude_squared).flatten(order='F')
 
             # Just assign the energy attribute of the last sparse maps to be
-            # all the coherent and incoherent energies and get all clsuter properities
+            # all the coherent and incoherent energies and get all cluster properties
+            # with one call to the cluster method. (this method calls fastsparseclusterprop.cpp,
+            # which does the heavy lifting)
             tmp_sparse_map = list(v.values())[0]
             all_energies = numpy.asarray(all_energies)
-            all_energies = numpy.vstack((all_energies[0] + all_energies[2],all_energies))
+            all_energies = numpy.vstack((all_energies[0] + all_energies[2], all_energies))
             tmp_sparse_map.energy = all_energies
             for connectivity in connectivity_list:
-                clusters = tmp_sparse_map.cluster(columns=all_columns, connectivity=connectivity)
+                clusters = tmp_sparse_map.cluster(columns=all_columns, connectivity=connectivity, projected_asd_magnitude_squared=projected_asd_magnitude_squared)
                 clusters['connectivity'] = connectivity
 
                 # append the cluster to other clusters from same sky locations
