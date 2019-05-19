@@ -119,7 +119,18 @@ std::vector<double> fastsparseclusterprop(const double *labelledMap, const doubl
           nTFcols = 0;
         }
 
-    std::vector<double> clusterArray((nTFcols + nLikelihoods + 2)*percentile_index, 0);
+    // Are we calculating the bayesian statistics? If yes add two more columns
+    int nBayesianLikelihoods;
+    if(projectedAsdMagnitudeSquared[0]>0)
+        {
+        nBayesianLikelihoods = 2;
+        }
+    else
+        {
+        nBayesianLikelihoods = 0;
+        }
+
+    std::vector<double> clusterArray((nTFcols + nLikelihoods + nBayesianLikelihoods)*percentile_index, 0);
 
     if (doTFprops)
         {for(int j=0;j<colLen;j++){
