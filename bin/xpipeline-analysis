@@ -335,8 +335,9 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                                                                         to_dominant_polarization_frame=True)
 
                     projected_asds_magnitude = projected_asds.calculate_magnitude()
-                    # only keep frequencies in the relevant range
-                    projected_asds_magnitude = projected_asds_magnitude.slice_frequencies(numpy.arange(minimum_frequency,maximum_frequency + 1, 1./whitening_length).astype(int))
+                    # only keep relevant frequencies. i.e. between min and max frequency
+                    # and also frequencies relevant for this FFT length.
+                    projected_asds_magnitude = projected_asds_magnitude.slice_frequencies(numpy.arange(minimum_frequency,maximum_frequency + 1, 1./fft_length).astype(int))
 
                     # convert projected asds to unit vectors
                     projected_asds = projected_asds.to_unit()
@@ -371,7 +372,7 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                         total_energy_threshold = energy_maps.to_coherent().blackout_pixels(99).energy.min()
 
                     # Calculate all time slides
-                    tindex_findex_slided = {k : zip(numpy.mod(numpy.repeat(numpy.atleast_2d(energy_maps_zeroed[k].nonzero()[0]), len(v),0) + numpy.atleast_2d(v*(1/fft_length)).T, final_time_bin_idx).astype(int), numpy.repeat(numpy.atleast_2d(energy_maps_zeroed[k].nonzero()[1]), len(v), 0))  for k,v in slides.items()}
+                    tindex_findex_slided = {k : zip(numpy.mod(numpy.repeat(numpy.atleast_2d(energy_maps_zeroed[k].nonzero()[0]), len(v),0) + numpy.atleast_2d(v*(1./fft_length)*(1./offset_fraction)).T, final_time_bin_idx).astype(int), numpy.repeat(numpy.atleast_2d(energy_maps_zeroed[k].nonzero()[1]), len(v), 0))  for k,v in slides.items()}
 
                     # Make every TF pixels pair in all maps
                     all_maps_pixel_pairs = [zip(i[0], i[1]) for k,v in tindex_findex_slided.items() for i in v]
