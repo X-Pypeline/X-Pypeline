@@ -326,7 +326,7 @@ class XTimeSeries(TimeSeriesDict):
             fftlength = dict((c, fftlength) for c in self)
 
         for (idet, iseries) in self.items():
-            if window == 'modifiedhann'
+            if window == 'modifiedhann':
                 sample_per_seg = int((fftlength[idet] * iseries.sample_rate).decompose().value)
                 tfmaps[idet] = XTimeFrequencyMap(iseries.fftgram(
                                                  fftlength=fftlength[idet],

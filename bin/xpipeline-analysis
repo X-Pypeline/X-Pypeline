@@ -339,6 +339,7 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                     # and also frequencies relevant for this FFT length.
                     projected_asds_magnitude = projected_asds_magnitude.slice_frequencies(numpy.arange(minimum_frequency,maximum_frequency + 1, 1./fft_length).astype(int))
 
+
                     # convert projected asds to unit vectors
                     projected_asds = projected_asds.to_unit()
 
@@ -396,7 +397,7 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                         findex = {k : findex for k in channel_names}
 
                         # undo internal_time_slide
-                        tindex[channel_names[1]] = numpy.mod(tindex[channel_names[1]]-circular_time_slide*fft_length, final_time_bin_idx).astype(int)
+                        tindex[channel_names[1]] = numpy.mod(tindex[channel_names[1]]-circular_time_slide*(1./fft_length)*(1./offset_fraction), final_time_bin_idx).astype(int)
 
                         # Now that we have the pixels that are in each map
                         # let's reconstruct the sparse tf map
