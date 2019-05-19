@@ -19,7 +19,7 @@ inline double min(double a,double b)
     return b;
 }
 
-double log_sum_exp(double arr[], int count) 
+double log_sum_exp(double arr[], int count)
 {
    if(count > 0 ){
       double maxVal = arr[0];
@@ -43,7 +43,7 @@ double log_sum_exp(double arr[], int count)
    }
 }
 
-vector<double> fastsparseclusterprop(const double *labelledMap, const double *likelihoodMap, const double *pixTime, const double *pixFreq, const bool doTFprops, const double *dimArray, const int nClusters, const double *projectedAsdMagnitudeSquared)
+std::vector<double> fastsparseclusterprop(const double *labelledMap, const double *likelihoodMap, const double *pixTime, const double *pixFreq, const bool doTFprops, const double *dimArray, const int nClusters, const double *projectedAsdMagnitudeSquared)
 {
 
     int colLen=dimArray[0];
@@ -51,7 +51,7 @@ vector<double> fastsparseclusterprop(const double *labelledMap, const double *li
     int nLikelihoods=dimArray[2];
     int k = 0; //FIXME this should be a specific likelihood that you want to sort on
     double inf = std::numeric_limits<double>::infinity();
-    vector<double> energy_of_cluster(nClusters, 0.0);
+    std::vector<double> energy_of_cluster(nClusters, 0.0);
 
     for(int j=0;j<colLen;j++){
         int label=int(labelledMap[j])-1;
@@ -70,18 +70,18 @@ vector<double> fastsparseclusterprop(const double *labelledMap, const double *li
     // Find the indices of the top 10 percent of
     // clusters
     // initialize original index locations
-    vector<int> idx(energy_of_cluster.size());
-    iota(idx.begin(), idx.end(), 0);
+    std::vector<int> idx(energy_of_cluster.size());
+    std::iota(idx.begin(), idx.end(), 0);
 
     // sort indexes based on comparing values in v
     sort(idx.begin(), idx.end(),
        [&energy_of_cluster](int i1, int i2) {return energy_of_cluster[i1] > energy_of_cluster[i2];});
 
     int percentile_index = int(ceil(nClusters*0.1));
-    vector<int> idx_of_loudest_clusters(begin(idx), begin(idx) + percentile_index);
+    std::vector<int> idx_of_loudest_clusters(begin(idx), begin(idx) + percentile_index);
 
     // Map survving clusters to new clusters 0:surviving clusters
-    map<int,int> m; 
+    std::map<int,int> m;
     int i = 1;
     for (auto v : idx_of_loudest_clusters){
         m[v] = i;
@@ -96,7 +96,7 @@ vector<double> fastsparseclusterprop(const double *labelledMap, const double *li
     // These clusters and making a mask
     // of 0 if labelledMap[j] not in top 1 percent
     // of cluster and 1 if it is
-    vector<int> mask(colLen, 0);
+    std::vector<int> mask(colLen, 0);
 
     for (int i = 0; i < colLen; ++i) {
         if (binary_search(begin(idx_of_loudest_clusters),
@@ -119,7 +119,7 @@ vector<double> fastsparseclusterprop(const double *labelledMap, const double *li
           nTFcols = 0;
         }
 
-    vector<double> clusterArray((nTFcols + nLikelihoods + 2)*percentile_index, 0);
+    std::vector<double> clusterArray((nTFcols + nLikelihoods + 2)*percentile_index, 0);
 
     if (doTFprops)
         {for(int j=0;j<colLen;j++){

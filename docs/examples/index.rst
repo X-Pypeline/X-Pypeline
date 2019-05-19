@@ -83,6 +83,7 @@ so that the signal is quite clear even without any fancy statistics. Nonetheless
 let us go through the whole process.
 
 .. ipython::
+    :okwarning:
 
     In [1]: from xpipeline.core.xtimeseries import XTimeSeries
 
@@ -127,7 +128,7 @@ of the timefrequencymap, here we physically shift the livingston data.
 
 .. ipython::
 
-    In [10]: from xpipeline.core.xdetector import Detector
+    In [10]: from xpipeline.core.xdetector import Detector; import numpy
 
     In [11]: hanford = Detector('H1')
 
@@ -135,9 +136,9 @@ of the timefrequencymap, here we physically shift the livingston data.
 
     In [13]: phi = -0.3801; theta = 2.7477 # Earth fixed coordinates
 
-    In [14]: time_shift = hanford.time_delay_from_earth_center_phi_theta([phi], [theta]) - livingston.time_delay_from_earth_center_phi_theta([phi], [theta])
+    In [14]: time_shift = numpy.round((livingston.time_delay_from_earth_center_phi_theta([phi], [theta]) - hanford.time_delay_from_earth_center_phi_theta([phi], [theta]))*data['H1:GDS-CALIB_STRAIN'].sample_rate)
 
-    In [15]: whitened_timeseries['L1:GDS-CALIB_STRAIN'].shift(time_shift[0]) # In place shift
+    In [15]: whitened_timeseries['L1:GDS-CALIB_STRAIN'] = numpy.roll(whitened_timeseries['L1:GDS-CALIB_STRAIN'], -time_shift.astype(int))
 
     In [16]: fft_grams = whitened_timeseries.fftgram(1. /64)
 
@@ -166,6 +167,7 @@ of the timefrequencymap, here we physically shift the livingston data.
 
     @savefig plot-time-frequency-map-time-shifted-coherent.png
     In [22]: plot
+
 
 Clustering Pixels
 -----------------
@@ -202,7 +204,7 @@ is a nearest neighbor cpp wrapped algorithm called fastlabel.
 
     In [35]: coh_map = energy_map_zeroed.to_coherent()
 
-    In [36]: tf_indices = coh_map.nonzero()
+    In [36]: tf_indices = coh_map.nonzero() # find the union of pixels from the sparse in coherent maps
 
     In [41]: tindex = {k : tf_indices[0]
        ....:           for k in energy_maps}
@@ -212,7 +214,7 @@ is a nearest neighbor cpp wrapped algorithm called fastlabel.
 
     In [43]: energy_map_zeroed = energy_maps.to_sparse(tindex, findex)
 
-    In [44]: clusters = energy_map_zeroed.cluster()
+    In [44]: clusters = energy_map_zeroed.cluster() # cluster over the coherent pixels
 
     In [40]: print(clusters)
 
@@ -240,9 +242,7 @@ all maps.
 
 .. ipython::
 
-    In [47]: loudest_cluster_idx = clusters['energy_of_cluster'].values.argmax()
-
-    In [48]: min_time = clusters['min_time_of_cluster'][loudest_cluster_idx]; max_time = clusters['max_time_of_cluster'][loudest_cluster_idx]; weighted_center_time = clusters['weighted_center_time'][loudest_cluster_idx]; min_freq = clusters['min_frequency_of_cluster'][loudest_cluster_idx]; max_freq = clusters['max_frequency_of_cluster'][loudest_cluster_idx];
+    In [48]: min_time = clusters['min_time_of_cluster'].iloc[0]; max_time = clusters['max_time_of_cluster'].iloc[0]; weighted_center_time = clusters['weighted_center_time'].iloc[0]; min_freq = clusters['min_frequency_of_cluster'].iloc[0]; max_freq = clusters['max_frequency_of_cluster'].iloc[0];
 
     In [50]: plot = energy_map_zeroed.to_xtimefrequencymapdict().to_coherent().plot()
 
@@ -318,7 +318,7 @@ inject a number of fake gravitational wave like signals.
 This involves to steps, generating a gravitational-wave like waveform on the fly
 and then injecting that signal into a stretch of data.
 
-The parametrs that go into xmakewaveform are the `family` of waveform, a set of parameters specific for that
+The parameters that go into xmakewaveform are the `family` of waveform, a set of parameters specific for that
 waveform. In this case, the hrss is the quadrature sum of the RSS amplitudes of the plus and cross
 polarizations, tau is the duration, f0 is the central frequency, alpha is
 the chirp parameter, and delta is the phase at the peak of the envelope.
@@ -327,15 +327,17 @@ the chirp parameter, and delta is the phase at the peak of the envelope.
 
     In [40]: from xpipeline.waveform import xwaveform
 
-    In [41]: from gwpy.plotter import TimeSeriesPlot
+    In [41]: from gwpy.plot import Plot
 
     In [42]: t, hp, hc, hb = xwaveform.xmakewaveform(family='chirplet', parameters=[1e-22, 0.0033, 300.0, 0, 0, 1], T=513, T0=256.6161, fs=1024)
 
-    In [43]: plot = TimeSeriesPlot(hp, hc)
+    In [43]: fig = Plot(hp, hc)
 
-    In [44]: plot.set_epoch(256.6161)
+    In [43]: ax = fig.gca()
 
-    In [45]: plot.set_xlim([256.6161 - 0.05, 256.6161 + 0.05])
+    In [44]: ax.set_epoch(256.6161)
+
+    In [45]: ax.set_xlim([256.6161 - 0.05, 256.6161 + 0.05])
 
     @savefig chirplet.png
     In [46]: plot
@@ -349,17 +351,19 @@ full of pregenerated waveforms.
 
     In [40]: from xpipeline.waveform import xwaveform
 
-    In [41]: from gwpy.plotter import TimeSeriesPlot
+    In [41]: from gwpy.plot import Plot
 
     In [42]: t, hp, hc, hb = xwaveform.xmakewaveform(family='Morozova2018',
-       ....:     parameters=[10, 'M10_LS220'],
-       ....:     T=1, T0=0, fs=16384, catalogdirectory='../waveforms/')
+       ....:     parameters=[8, 'M10_LS220'],
+       ....:     T=1, T0=0, fs=16384, catalogdirectory='../waveforms/xpipeline-waveforms')
 
-    In [43]: plot = TimeSeriesPlot(hp, hc)
+    In [43]: fig = Plot(hp, hc)
 
-    In [44]: plot.set_xlim([0, 1.0])
+    In [43]: ax = fig.gca()
 
-    @savefig supernova-R4E1FC_L_theta2.094_phi2.094.png
+    In [44]: ax.set_xlim([0, 1.0])
+
+    @savefig supernova-M10_LS220.png
     In [45]: plot
 
 The Injection
@@ -377,48 +381,22 @@ on at the time too.
 
     In [1]: from xpipeline.waveform import xinjectsignal
 
-    In [3]: start_time = 1156609396.0; block_time = 256; channels = ['H1', 'L1']; sample_rate = 8192; injection_file_name ='examples/injection_Morozova.txt'; injection_number=2; catalogdirectory='../waveforms/';
+    In [3]: start_time = 1156609396.0; block_time = 256; channels = ['H1', 'L1']; sample_rate = 16384; injection_file_name ='examples/injection_Morozova.txt'; injection_number=2; catalogdirectory='../waveforms/xpipeline-waveforms';
 
     In [4]: [injection_data, gps_s, gps_ns, phi, theta, psi] = xinjectsignal.xinjectsignal_fromfile(start_time=start_time, block_time=block_time, channels=channels, injection_file_name=injection_file_name, injection_number=injection_number, sample_rate= sample_rate, catalogdirectory=catalogdirectory)
 
-    In [6]: from gwpy.plotter import TimeSeriesPlot
+    In [6]: from gwpy.plot import Plot
 
-    In [7]: plot = TimeSeriesPlot()
+    In [7]: fig = Plot()
+
+    In [7]: ax = fig.gca()
 
     In [8]: for k, v in injection_data.items():
-       ...:     plot.add_timeseries(v, label=k)
+       ...:     ax.plot(v, label=k,)
 
-    In [9]: plot.set_xlim([gps_s, gps_s + 2])
+    In [9]: ax.set_xlim([gps_s, gps_s + 2])
 
-    In [10]: plot.add_legend()
+    In [10]: fig.legend()
 
     @savefig Morozova2018-h1-l1.png
-    In [10]: plot
-
-Now let's inject this into some data, we could use real data but let's just generate
-some data and color it to look like gaussian distributed aLIGO noise.
-
-.. ipython::
-
-    In [1]: colored_gaussian_noise = XTimeSeries.generate_noise_from_file('../noise/aLIGOZeroDetHighPower.h5', event_time=start_time, block_time=256, channel_names=['H1', 'L1'], sample_frequency=8192)
-
-    In [2]: data_plus_signal = colored_gaussian_noise.inject(injection_data)
-
-    In [3]: asds = data_plus_signal.asd(1.0)
-
-    In [4]: whitened_timeseries = data_plus_signal.whiten(asds)
-
-    In [5]: fft_maps = whitened_timeseries.fftgram(1. /64)
-
-    In [6]: energy_maps = fft_maps.abs()
-
-    In [7]: plot = energy_maps.plot(figsize=[ 12, 6])
-
-    In [8]: for ax in plot.axes:
-       ...:     ax.set_xlim(gps_s - 0.15, gps_s + 1.0)
-       ...:     ax.set_epoch(gps_s)
-       ...:     ax.set_xlabel('Time [milliseconds]')
-       ...:     ax.set_ylim(20, 3000)
-
-    @savefig energy-map-Morozova2018.png
     In [10]: plot
