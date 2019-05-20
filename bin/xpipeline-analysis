@@ -139,7 +139,7 @@ if not os.path.isdir(output_directory):
 # Sample frequency
 sample_frequency = float(parameters['samplefrequency'])
 
-# What overlap are you using for our ffts (standard is 50%)
+# What overlap are you using for our ffts (standard is 50#)
 offset_fraction = float(parameters['offsetfraction'])
 
 frame_file = parameters['frameCacheFile']
@@ -280,6 +280,28 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
             else:
                 whitened_timeseries = data.whiten(asds)
 
+            # The whitened data using gwpy comes out with zero mean and unit variance
+            # We how want a normalization such that a Fourier transform
+            # analysis with the fft_lengths[0] results in frequency-domain
+            # coefficients with a mean-squared amplitude of unity.  Equivalently, the
+            # conditioned data will have (ignoring loss of bandwidth due to the
+            # high-pass filter) a variance of
+            #
+            #   variance = 1 / (sample_frequency * fft_lengths[0])
+            #
+            # The amplitude spectra and power spectra estimated for the input data are
+            # one-sided, in Hz.  For example, input white noise of variance sigma2 has
+            #
+            #   asd = (2 * sigma2 / sample_frequency)^0.5.
+            #
+            # With these conventions, the conditioned data will have in-band one-sided
+            # power spectrum of
+            #
+            #   psd = 2 * variance / sample_frequency = 2 / (sample_frequency^2 * fft_lengths[0])
+
+            # apply normalization to the whitened data
+            whitened_timeseries.update((k, v*(1./numpy.sqrt(sample_frequency*fft_lengths[0]))) for k,v in whitened_timeseries.items())
+
             # Obtain detector specific information
             detectors = {}
             for det in ifos:
@@ -317,6 +339,7 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                 # ---- Rescale conditioned data to normalize it appropriately for this fftlength
                 if idx>0:
                     whitened_timeseries.update((x, y*(normalization_factor[idx] / normalization_factor[idx-1])) for x, y in whitened_timeseries.items())
+
                 for idx_sky_postion, (sky_position, time_delay, residual_time_delay) in enumerate(zip(sky_positions, time_delays, residual_time_delays)):
 
                     # shift data and make fftgram
@@ -338,7 +361,6 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                     # only keep relevant frequencies. i.e. between min and max frequency
                     # and also frequencies relevant for this FFT length.
                     projected_asds_magnitude = projected_asds_magnitude.slice_frequencies(numpy.arange(minimum_frequency,maximum_frequency + 1, 1./fft_length).astype(int))
-
 
                     # convert projected asds to unit vectors
                     projected_asds = projected_asds.to_unit()
@@ -438,4 +460,4 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                 all_triggers = prep_data.window_cut(all_triggers,duration=1.0)
                 all_triggers.to_hdf('./output/grb-{0}-{1}-{2}-{3}-{4}-triggers.h5'.format(args.job_type, int(event_time), waveform_name, injection_numbers[0], injection_numbers[-1]), key='/injections', append=True, index=False,)
             else:
-                all_triggers.to_hdf('./output/grb-{0}-{1}-triggers.h5'.format(args.job_type, processed_map_info), key='/background', append=True, index=False,)       
+                all_triggers.to_hdf('./output/grb-{0}-{1}-triggers.h5'.format(args.job_type, processed_map_info), key='/background', append=True, index=False,)
