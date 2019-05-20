@@ -238,14 +238,36 @@ class XTimeSeries(TimeSeriesDict):
 
         for key, fftlen in fftlength.items():
             asds[key] = self[key].asd(fftlength=fftlen,
-                                      overlap=fftlen*0.5,
-                                      method='lal_median_mean'
-                                     )
+                                      method='lal_median_mean',
+                                      **kwargs)
 
         return asds
 
+    def psd(self, fftlength, **kwargs):
+        """Obtain the asd of items in this dict.
 
-    def whiten(self, asds):
+        Parameters
+        ----------
+        fftlength : `dict`, `float`
+            either a `dict` of (channel, `float`) pairs for key-wise
+            asd calc, or a single float/int to compute as of all items.
+
+        **kwargs
+             other keyword arguments to pass to each item's asd
+             method.
+        """
+        psds = XFrequencySeriesDict()
+        if not isinstance(fftlength, dict):
+            fftlength = dict((c, fftlength) for c in self)
+
+        for key, fftlen in fftlength.items():
+            psds[key] = self[key].psd(fftlength=fftlen,
+                                      method='lal_median_mean',
+                                      **kwargs)
+
+        return psds
+
+    def whiten(self, asds, **kwargs):
         """White this `XTimeSeries` against its own ASD
 
             Parameters
@@ -261,8 +283,8 @@ class XTimeSeries(TimeSeriesDict):
         for (idet, iseries) in self.items():
             dt = 1./asds[idet].dx
             whitened = iseries.whiten(fftlength=dt,
-                                      overlap=dt*0.5,
-                                      asd=asds[idet])
+                                      asd=asds[idet],
+                                      **kwargs)
             whitened_timeseries.append(
                                        {idet : whitened}
                                        )
@@ -308,7 +330,7 @@ class XTimeSeries(TimeSeriesDict):
         return tfmaps
 
 
-    def fftgram(self, fftlength, window='modifiedhann'):
+    def fftgram(self, fftlength, overlap=None, window='modifiedhann', **kwargs):
         """Obtain the spectrograms of items in this dict.
 
         Parameters
@@ -328,10 +350,13 @@ class XTimeSeries(TimeSeriesDict):
         for (idet, iseries) in self.items():
             if window == 'modifiedhann':
                 sample_per_seg = int((fftlength[idet] * iseries.sample_rate).decompose().value)
+                window1 = modified_hann_window(sample_per_seg)
                 tfmaps[idet] = XTimeFrequencyMap(iseries.fftgram(
                                                  fftlength=fftlength[idet],
                                                  overlap=0.5*fftlength[idet],
-                                                 window=modified_hann_window(sample_per_seg)))
+                                                 window=window1))
+                scale = numpy.sqrt((iseries.sample_rate.value * (window1*window1).sum()))
+                tfmaps[idet] = tfmaps[idet] * scale
             else:
                 tfmaps[idet] = XTimeFrequencyMap(iseries.fftgram(
                                                  fftlength=fftlength[idet],

@@ -60,9 +60,10 @@ def extract_clusters_from_dict(maps, statistic_column='standard_energy', connect
                         pass
                 except:
                     pass
+
             all_columns.extend(bayesian_statistics)
             if projected_asd_magnitude_squared:
-                projected_asd_magnitude_squared =  numpy.asarray(projected_asd_magnitude_squared).flatten(order='F')
+                projected_asd_magnitude_squared = numpy.asarray(projected_asd_magnitude_squared).flatten(order='F')
 
             # Just assign the energy attribute of the last sparse maps to be
             # all the coherent and incoherent energies and get all cluster properties

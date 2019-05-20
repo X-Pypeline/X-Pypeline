@@ -108,7 +108,7 @@ class XFrequencySeriesDict(OrderedDict):
         """
         return numpy.sqrt(sum([v.real**2 + v.imag**2 for v in self.values()]))
 
-    def slice_frequencies(self, indices):
+    def slice_frequencies(self, frequencies):
         """select a subset of frequencies from XFrequencySeriesDict
 
            Parameters:
@@ -121,7 +121,7 @@ class XFrequencySeriesDict(OrderedDict):
         """
         asd_subset = XFrequencySeriesDict()
         for det, asd in self.items():
-            asd_subset[det] = self[det][indices]
+            asd_subset[det] = self[det][numpy.in1d(self[det].xindex, frequencies)]
 
         return asd_subset
 
