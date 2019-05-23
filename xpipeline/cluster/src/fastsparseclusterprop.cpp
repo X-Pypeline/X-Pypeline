@@ -19,7 +19,31 @@ inline double min(double a,double b)
     return b;
 }
 
-vector<double> fastsparseclusterprop(const double *labelledMap, const double *likelihoodMap, const double *pixTime, const double *pixFreq, const bool doTFprops, const double *dimArray, const int nClusters)
+double log_sum_exp(double arr[], int count)
+{
+   if(count > 0 ){
+      double maxVal = arr[0];
+      double sum = 0;
+
+      for (int i = 1 ; i < count ; i++){
+         if (arr[i] > maxVal){
+            maxVal = arr[i];
+         }
+      }
+
+      for (int i = 0; i < count ; i++){
+         sum += exp(arr[i] - maxVal);
+      }
+      return log(sum) + maxVal;
+
+   }
+   else
+   {
+      return 0.0;
+   }
+}
+
+vector<double> fastsparseclusterprop(const double *labelledMap, const double *likelihoodMap, const double *pixTime, const double *pixFreq, const bool doTFprops, const double *dimArray, const int nClusters, const double *projectedAsdMagnitudeSquared)
 {
 
     int colLen=dimArray[0];
@@ -94,7 +118,18 @@ vector<double> fastsparseclusterprop(const double *labelledMap, const double *li
           nTFcols = 0;
         }
 
-    vector<double> clusterArray((nTFcols + nLikelihoods)*percentile_index, 0);
+    // Are we calculating the bayesian statistics? If yes add two more columns
+    int nBayesianLikelihoods;
+    if(projectedAsdMagnitudeSquared[0]>0)
+        {
+        nBayesianLikelihoods = 2;
+        }
+    else
+        {
+        nBayesianLikelihoods = 0;
+        }
+
+    vector<double> clusterArray((nTFcols + nLikelihoods + nBayesianLikelihoods)*percentile_index, 0);
 
     if (doTFprops)
         {for(int j=0;j<colLen;j++){
@@ -144,7 +179,51 @@ vector<double> fastsparseclusterprop(const double *labelledMap, const double *li
                 clusterArray[((nTFcols+k)*percentile_index)+label]+
                 likelihoodMap[k*colLen*rowLen + j];
             }
-        }}
+        }
+        if(projectedAsdMagnitudeSquared[0]>0)
+            {
+            double loghbayesian[5*percentile_index];
+            double loghbayesiancirc[10*percentile_index];
+            std::fill_n(loghbayesian, 5*percentile_index, 0);
+            std::fill_n(loghbayesiancirc, 10*percentile_index, 0);
+            double sigma_squared[5];
+            sigma_squared[0] = 1.0e-46;
+            sigma_squared[1] = 1.0e-45;
+            sigma_squared[2] = 1.0e-44;
+            sigma_squared[3] = 1.0e-43;
+            sigma_squared[4] = 1.0e-42;
+            for(int j=0;j<colLen;j++){
+                int label=int(mask[j])-1;
+                if( -1 == label) {continue;}
+                int fIndex = pixFreq[j];
+                for(int k=0;k<5;k++){
+                    double denom_plus_magnitude = sigma_squared[k]*projectedAsdMagnitudeSquared[fIndex*4];
+                    double denom_cross_magnitude = sigma_squared[k]*projectedAsdMagnitudeSquared[fIndex*4+1];
+                    double denom_right_magnitude = sigma_squared[k]*projectedAsdMagnitudeSquared[fIndex*4+2];
+                    double denom_left_magnitude = sigma_squared[k]*projectedAsdMagnitudeSquared[fIndex*4+3];
+                    loghbayesian[(percentile_index*k)+label] = loghbayesian[(percentile_index*k)+label] +
+                    0.5*((likelihoodMap[1*colLen + j] / (1 + (1 / denom_plus_magnitude))) + (likelihoodMap[3*colLen + j] / (1 + (1 / denom_cross_magnitude))) - log(1 + denom_plus_magnitude) - log(1 + denom_cross_magnitude));
+
+                    loghbayesiancirc[(percentile_index*(2*k))+label] = loghbayesiancirc[(percentile_index*(2*k))+label] +
+                    0.5*(likelihoodMap[8*colLen + j] / (1 + 1 / denom_right_magnitude) - log(1 + denom_right_magnitude));
+
+                    loghbayesiancirc[(percentile_index*(2*k+1))+label] = loghbayesiancirc[(percentile_index*(2*k+1))+label] +
+                    0.5*(likelihoodMap[6*colLen + j] / (1 + 1 / denom_left_magnitude) - log(1 + denom_left_magnitude));
+                 }
+            }
+            for(int j=0;j<percentile_index;j++){
+                double logbayesianh_sum_exp_of_cluster[5] = {};
+                double logbayesiancirc_sum_exp_of_cluster[10] = {};
+                for(int k=0;k<5;k++){
+                    logbayesianh_sum_exp_of_cluster[k] = loghbayesian[j + (percentile_index*k)];
+                    logbayesiancirc_sum_exp_of_cluster[2*k] = loghbayesiancirc[j + (percentile_index*(2*k))];
+                    logbayesiancirc_sum_exp_of_cluster[2*k+1] = loghbayesiancirc[j + (percentile_index*(2*k+1))];
+
+                 }
+                clusterArray[(nTFcols+nLikelihoods)*percentile_index+j] = log_sum_exp(logbayesianh_sum_exp_of_cluster, 5);
+                clusterArray[(nTFcols+nLikelihoods+1)*percentile_index+j] = log_sum_exp(logbayesiancirc_sum_exp_of_cluster, 10);
+            }
+           }}
     else
         // Just return the likelihood values for the clusters
         {for(int j=0;j<colLen;j++){
