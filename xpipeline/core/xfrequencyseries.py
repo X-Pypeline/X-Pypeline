@@ -106,14 +106,14 @@ class XFrequencySeriesDict(OrderedDict):
                `gwpy.frequencyseries.FrequencySeries`
                    Units Hz
         """
-        return numpy.sqrt(sum([v**2 for v in self.values()]))
+        return numpy.sqrt(sum([v.real**2 + v.imag**2 for v in self.values()]))
 
-    def slice_frequencies(self, indices):
+    def slice_frequencies(self, frequencies):
         """select a subset of frequencies from XFrequencySeriesDict
 
            Parameters:
-               indices (array):
-                   an array of indexs to select from all elements
+               frequencies (array):
+                   an array of frequencies to select from all elements
                    of `XFrequencySeriesDict`
 
            Returns:
@@ -121,7 +121,7 @@ class XFrequencySeriesDict(OrderedDict):
         """
         asd_subset = XFrequencySeriesDict()
         for det, asd in self.items():
-            asd_subset[det] = self[det][indices]
+            asd_subset[det] = self[det][numpy.in1d(self[det].xindex, frequencies)]
 
         return asd_subset
 
@@ -172,10 +172,10 @@ class XAntennaProjectedFrequencySeriesDict(OrderedDict):
         f_cross_magnitude_squared = numpy.square(self['f_cross'].calculate_magnitude())
 
         for f_plus, f_cross in zip(self['f_plus'].values(), self['f_cross'].values()):
-            self['f_left'][f_plus.name] = f_plus + SQRT_OF_NEG_1 * f_cross
-            self['f_right'][f_plus.name] = f_plus - SQRT_OF_NEG_1 * f_cross
-            self['f_left_null'][f_plus.name] = f_plus / f_plus_magnitude_squared - SQRT_OF_NEG_1 * f_cross / f_cross_magnitude_squared
-            self['f_right_null'][f_plus.name] = f_plus / f_plus_magnitude_squared + SQRT_OF_NEG_1 * f_cross / f_cross_magnitude_squared
+            self['f_right'][f_plus.name] = f_plus + SQRT_OF_NEG_1 * f_cross
+            self['f_left'][f_plus.name] = f_plus - SQRT_OF_NEG_1 * f_cross
+            self['f_right_null'][f_plus.name] = f_plus / f_plus_magnitude_squared - SQRT_OF_NEG_1 * f_cross / f_cross_magnitude_squared
+            self['f_left_null'][f_plus.name] = f_plus / f_plus_magnitude_squared + SQRT_OF_NEG_1 * f_cross / f_cross_magnitude_squared
 
         return self
 

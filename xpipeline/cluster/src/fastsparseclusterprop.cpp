@@ -195,20 +195,20 @@ vector<double> fastsparseclusterprop(const double *labelledMap, const double *li
             for(int j=0;j<colLen;j++){
                 int label=int(mask[j])-1;
                 if( -1 == label) {continue;}
-                int fIndex = pixFreq[j];
+                int fIndex = pixFreq[j]-1;
                 for(int k=0;k<5;k++){
                     double denom_plus_magnitude = sigma_squared[k]*projectedAsdMagnitudeSquared[fIndex*4];
                     double denom_cross_magnitude = sigma_squared[k]*projectedAsdMagnitudeSquared[fIndex*4+1];
                     double denom_right_magnitude = sigma_squared[k]*projectedAsdMagnitudeSquared[fIndex*4+2];
                     double denom_left_magnitude = sigma_squared[k]*projectedAsdMagnitudeSquared[fIndex*4+3];
                     loghbayesian[(percentile_index*k)+label] = loghbayesian[(percentile_index*k)+label] +
-                    0.5*((likelihoodMap[1*colLen + j] / (1 + (1 / denom_plus_magnitude))) + (likelihoodMap[3*colLen + j] / (1 + (1 / denom_cross_magnitude))) - log(1 + denom_plus_magnitude) - log(1 + denom_cross_magnitude));
+                    0.5*((likelihoodMap[3*colLen + j]*8192.0 / (1 + (1 / denom_plus_magnitude))) + (likelihoodMap[5*colLen + j]*8192.0 / (1 + (1 / denom_cross_magnitude))) - log(1 + denom_plus_magnitude) - log(1 + denom_cross_magnitude));
 
                     loghbayesiancirc[(percentile_index*(2*k))+label] = loghbayesiancirc[(percentile_index*(2*k))+label] +
-                    0.5*(likelihoodMap[8*colLen + j] / (1 + 1 / denom_right_magnitude) - log(1 + denom_right_magnitude));
+                    0.5*(likelihoodMap[9*colLen + j]*8192.0 / (1 + 1 / denom_right_magnitude) - log(1 + denom_right_magnitude));
 
                     loghbayesiancirc[(percentile_index*(2*k+1))+label] = loghbayesiancirc[(percentile_index*(2*k+1))+label] +
-                    0.5*(likelihoodMap[6*colLen + j] / (1 + 1 / denom_left_magnitude) - log(1 + denom_left_magnitude));
+                    0.5*(likelihoodMap[7*colLen + j]*8192.0 / (1 + 1 / denom_left_magnitude) - log(1 + denom_left_magnitude));
                  }
             }
             for(int j=0;j<percentile_index;j++){

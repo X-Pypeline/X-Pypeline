@@ -66,7 +66,7 @@ def clusterproperities_wrapper(object labelled_map, object likelihood,
         pixel_time_tmp = numpy.ascontiguousarray(numpy.zeros(labelled_map.size), dtype=numpy.float64)
         number_of_columns = int(dimension_array_tmp[2])
 
-    if projected_asd_magnitude_squared.any():
+    if projected_asd_magnitude_squared is not None:
         projected_asd_magnitude_squared_tmp = numpy.ascontiguousarray(projected_asd_magnitude_squared, dtype=numpy.float64)
         number_of_bayesian_likelihoods = 2
     else:
