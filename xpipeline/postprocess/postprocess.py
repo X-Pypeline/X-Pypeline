@@ -29,7 +29,7 @@ _default_columns = ['min_time_of_cluster',
                     'max_frequency_of_cluster',
                     'number_of_pixels',]
 
-def extract_clusters_from_dict(maps, statistic_column='standard_energy', connectivity_list=[8],):
+def extract_clusters_from_dict(maps, statistic_column='standard_energy', connectivity_list=[8,24,48,80],):
     all_clusters = XCluster()
     for fft_length in maps.keys():
         for skypostion, imap in maps[fft_length].items():
@@ -76,7 +76,7 @@ def extract_clusters_from_dict(maps, statistic_column='standard_energy', connect
                 # append the cluster to other clusters from same sky locations
                 all_clusters = all_clusters.append(clusters)
 
-    all_clusters = all_clusters.groupby(['connectivity']).apply(lambda x, statistic_column: XCluster(x).supercluster(statistic_column=statistic_column), statistic_column=statistic_column).reset_index(drop=True)
+    all_clusters = all_clusters.groupby(['connectivity']).apply(lambda x, statistic_column: XCluster(x).supercluster(statistic_column=statistic_column).nlargest(64, [statistic_column]), statistic_column=statistic_column).reset_index(drop=True)
 
     return all_clusters
 

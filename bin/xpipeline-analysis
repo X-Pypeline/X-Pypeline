@@ -443,8 +443,16 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                 all_triggers['waveform'] = waveform_name
                 all_triggers['injection_scale'] = injection_scale
                 all_triggers['injection_number'] = injection_number
-                all_triggers = prep_data.window_cut(all_triggers,duration=0.5)
-                all_triggers = XCluster(all_triggers).supercluster('standard_energy')
+                # see if any trigger lie close to the injection if not save only the first trigger
+                # from each connectivity (these will get thrown out in the postprocessing anyways because they
+                # lie outside an acceptable window of the injection.
+                # however HDF5 doe not like empty data frames and we need SOME records of this injection
+                # and injection scale and waveform.
+                if prep_data.window_cut(all_triggers,duration=1.5).empty:
+                    all_triggers = all_triggers.groupby(['connectivity']).apply(lambda x: x.iloc[0:1]).reset_index(drop=True)
+                else:
+                    all_triggers = prep_data.window_cut(all_triggers,duration=1.5)
+
                 all_triggers.to_hdf('./output/grb-{0}-{1}-{2}-{3}-{4}-triggers.h5'.format(args.job_type, int(event_time), waveform_name, injection_numbers[0], injection_numbers[-1]), key='/injections', append=True, index=False,)
             else:
                 all_triggers.to_hdf('./output/grb-{0}-{1}-triggers.h5'.format(args.job_type, processed_map_info), key='/background', append=True, index=False,)       
