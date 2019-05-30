@@ -50,23 +50,8 @@ def prep_data(injection_triggers_df, background_triggers_df, injection_info_dir=
     background_triggers_df['circinc'] = background_triggers_df[['incoherent_f_left','incoherent_f_right']].max(1)
     background_triggers_df['circnullinc'] = background_triggers_df[['incoherent_f_left_null','incoherent_f_right_null']].max(1)
 
-    # Log all likelihoods
-    injection_triggers_df[likelihood_columns] = numpy.log(injection_triggers_df[likelihood_columns])
-    background_triggers_df[likelihood_columns] = numpy.log(background_triggers_df[likelihood_columns])
 
-
-    # Calculate all ratio values
-    injection_triggers_df['circ_ratio_e_over_i'] = injection_triggers_df['circenergy'] - injection_triggers_df['circinc']
-    injection_triggers_df['circ_ratio_i_over_e'] = injection_triggers_df['circinc'] - injection_triggers_df['circenergy']
-    injection_triggers_df['circnull_ratio_e_over_i'] = injection_triggers_df['circnullenergy'] - injection_triggers_df['circnullinc']
-    injection_triggers_df['circnull_ratio_i_over_e'] = injection_triggers_df['circnullinc'] - injection_triggers_df['circnullenergy']
-
-    injection_triggers_df['plus_ratio_e_over_i'] = injection_triggers_df['coherent_f_plus'] - injection_triggers_df['incoherent_f_plus']
-    injection_triggers_df['plus_ratio_i_over_e'] = injection_triggers_df['incoherent_f_plus'] - injection_triggers_df['coherent_f_plus']
-    injection_triggers_df['cross_ratio_e_over_i'] = injection_triggers_df['coherent_f_cross'] - injection_triggers_df['incoherent_f_cross']
-    injection_triggers_df['cross_ratio_i_over_e'] = injection_triggers_df['incoherent_f_cross'] - injection_triggers_df['coherent_f_cross']
-
-    # Calculate all alpha values
+    # Calculate all alpha values injection
     denominator_plus = (injection_triggers_df['coherent_f_plus'] + injection_triggers_df['incoherent_f_plus'])**0.8
     denominator_cross = (injection_triggers_df['coherent_f_cross'] + injection_triggers_df['incoherent_f_cross'])**0.8
     denominator_circenergy = (injection_triggers_df['circenergy'] + injection_triggers_df['circinc'])**0.8
@@ -82,18 +67,7 @@ def prep_data(injection_triggers_df, background_triggers_df, injection_info_dir=
     injection_triggers_df['circnull_alpha_e_over_i'] = (2*(injection_triggers_df['circnullenergy'] - injection_triggers_df['circnullinc'])/denominator_circnull) + 1
     injection_triggers_df['circnull_alpha_i_over_e'] = (2*(injection_triggers_df['circnullinc'] - injection_triggers_df['circnullenergy'])/denominator_circnull) + 1
 
-    # Calculate all ratio values
-    background_triggers_df['circ_ratio_e_over_i'] = background_triggers_df['circenergy'] - background_triggers_df['circinc']
-    background_triggers_df['circ_ratio_i_over_e'] = background_triggers_df['circinc'] - background_triggers_df['circenergy']
-    background_triggers_df['circnull_ratio_e_over_i'] = background_triggers_df['circnullenergy'] - background_triggers_df['circnullinc']
-    background_triggers_df['circnull_ratio_i_over_e'] = background_triggers_df['circnullinc'] - background_triggers_df['circnullenergy']
-
-    background_triggers_df['plus_ratio_e_over_i'] = background_triggers_df['coherent_f_plus'] - background_triggers_df['incoherent_f_plus']
-    background_triggers_df['plus_ratio_i_over_e'] = background_triggers_df['incoherent_f_plus'] - background_triggers_df['coherent_f_plus']
-    background_triggers_df['cross_ratio_e_over_i'] = background_triggers_df['coherent_f_cross'] - background_triggers_df['incoherent_f_cross']
-    background_triggers_df['cross_ratio_i_over_e'] = background_triggers_df['incoherent_f_cross'] - background_triggers_df['coherent_f_cross']
-
-    # Calculate all alpha values
+    # Calculate all alpha values background
     denominator_plus = (background_triggers_df['coherent_f_plus'] + background_triggers_df['incoherent_f_plus'])**0.8
     denominator_cross = (background_triggers_df['coherent_f_cross'] + background_triggers_df['incoherent_f_cross'])**0.8
     denominator_circenergy = (background_triggers_df['circenergy'] + background_triggers_df['circinc'])**0.8
@@ -109,5 +83,31 @@ def prep_data(injection_triggers_df, background_triggers_df, injection_info_dir=
     background_triggers_df['circnull_alpha_e_over_i'] = (2*(background_triggers_df['circnullenergy'] - background_triggers_df['circnullinc'])/denominator_circnull) + 1
     background_triggers_df['circnull_alpha_i_over_e'] = (2*(background_triggers_df['circnullinc'] - background_triggers_df['circnullenergy'])/denominator_circnull) + 1
 
+    # Log all likelihoods
+    injection_triggers_df[likelihood_columns] = numpy.log(injection_triggers_df[likelihood_columns])
+    background_triggers_df[likelihood_columns] = numpy.log(background_triggers_df[likelihood_columns])
+
+
+    # Calculate all ratio values injection
+    injection_triggers_df['circ_ratio_e_over_i'] = injection_triggers_df['circenergy'] - injection_triggers_df['circinc']
+    injection_triggers_df['circ_ratio_i_over_e'] = injection_triggers_df['circinc'] - injection_triggers_df['circenergy']
+    injection_triggers_df['circnull_ratio_e_over_i'] = injection_triggers_df['circnullenergy'] - injection_triggers_df['circnullinc']
+    injection_triggers_df['circnull_ratio_i_over_e'] = injection_triggers_df['circnullinc'] - injection_triggers_df['circnullenergy']
+
+    injection_triggers_df['plus_ratio_e_over_i'] = injection_triggers_df['coherent_f_plus'] - injection_triggers_df['incoherent_f_plus']
+    injection_triggers_df['plus_ratio_i_over_e'] = injection_triggers_df['incoherent_f_plus'] - injection_triggers_df['coherent_f_plus']
+    injection_triggers_df['cross_ratio_e_over_i'] = injection_triggers_df['coherent_f_cross'] - injection_triggers_df['incoherent_f_cross']
+    injection_triggers_df['cross_ratio_i_over_e'] = injection_triggers_df['incoherent_f_cross'] - injection_triggers_df['coherent_f_cross']
+
+    # Calculate all ratio values
+    background_triggers_df['circ_ratio_e_over_i'] = background_triggers_df['circenergy'] - background_triggers_df['circinc']
+    background_triggers_df['circ_ratio_i_over_e'] = background_triggers_df['circinc'] - background_triggers_df['circenergy']
+    background_triggers_df['circnull_ratio_e_over_i'] = background_triggers_df['circnullenergy'] - background_triggers_df['circnullinc']
+    background_triggers_df['circnull_ratio_i_over_e'] = background_triggers_df['circnullinc'] - background_triggers_df['circnullenergy']
+
+    background_triggers_df['plus_ratio_e_over_i'] = background_triggers_df['coherent_f_plus'] - background_triggers_df['incoherent_f_plus']
+    background_triggers_df['plus_ratio_i_over_e'] = background_triggers_df['incoherent_f_plus'] - background_triggers_df['coherent_f_plus']
+    background_triggers_df['cross_ratio_e_over_i'] = background_triggers_df['coherent_f_cross'] - background_triggers_df['incoherent_f_cross']
+    background_triggers_df['cross_ratio_i_over_e'] = background_triggers_df['incoherent_f_cross'] - background_triggers_df['coherent_f_cross']
 
     return injection_triggers_df, background_triggers_df
