@@ -388,7 +388,6 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                     all_pixels = numpy.apply_along_axis(lambda x: reduce(lambda x, y: frozenset(x).union(y), x.tolist()), 0, array_of_tf_pixels_per_slide_per_det)
 
                     for coherent_pixels, circular_time_slide in zip(all_pixels, internal_slides):
-
                         # extract the tindices and the findices
                         tindex, findex = zip(*coherent_pixels)
                         tindex = numpy.asarray(tindex)
@@ -407,7 +406,7 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                         tmp_map_to_find_total_energy_threshold = fft_grams.to_sparse(tindex, findex, phi=phi, theta=theta).power2().to_coherent()
                         tfpixel_to_keep = numpy.where(tmp_map_to_find_total_energy_threshold.energy>total_energy_threshold)[0]
 
-                        coherent_pixels = sorted(zip(tindex[channel_names[0]][tfpixel_to_keep],findex[channel_names[0]][tfpixel_to_keep]))
+                        coherent_pixels = sorted(set(zip(tindex[channel_names[0]][tfpixel_to_keep],findex[channel_names[0]][tfpixel_to_keep])))
                         tindex, findex = zip(*coherent_pixels)
                         tindex = numpy.asarray(tindex)
                         findex = numpy.asarray(findex)
@@ -427,7 +426,7 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
             # cluster sparse time-frequency maps and save info
             all_triggers = []
             for circular_time_slide in internal_slides:
-                all_clusters = postprocess.extract_clusters_from_dict(all_sparse_maps[circular_time_slide], connectivity_list=[8])
+                all_clusters = postprocess.extract_clusters_from_dict(all_sparse_maps[circular_time_slide],)
                 all_clusters['internal_time_slide'] = circular_time_slide
                 all_triggers.append(all_clusters.values)
 
