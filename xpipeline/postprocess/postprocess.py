@@ -19,6 +19,9 @@
 # ---- Import standard modules to the python path.
 import numpy
 import pandas
+import operator
+
+from functools import reduce
 from xpipeline.core import XSparseTimeFrequencyMapDict, csc_XSparseTimeFrequencyMap
 from ..cluster.cluster import XCluster
 
@@ -38,26 +41,35 @@ def extract_clusters_from_dict(maps, statistic_column='standard_energy', connect
             all_columns = _default_columns.copy()
             all_columns.append('standard_energy')
 
-            # Extract the relavant projected asds for the findex
-            # of each pixel
-            # Extact the first detector excess energy map for reference
-            reference_map = list(imap['excess_energy'].values())[0]
-
-            # find the frequency index of all the pixels
-            findex = reference_map.findex
-            for polarization, asds in imap.projected_asds.items():
-                polarization_maps = XSparseTimeFrequencyMapDict()
-                for detector, asd in asds.items():
-                    polarization_map = csc_XSparseTimeFrequencyMap(0)
-                    polarization_map.energy = imap['excess_energy'][detector].energy * asd[findex]
-                    polarization_maps[detector] = polarization_map
-                imap[polarization] = polarization_maps
-
+            # Start by calculating the incoherent and coherent excess energy
             for k,v in imap.items():
                 all_energies.append(v.to_coherent().power2(2).energy)
                 all_columns.append('coherent_' + k)
                 all_energies.append(v.power2().to_coherent().energy)
                 all_columns.append('incoherent_' + k)
+
+            # Extract the relavant projected asds for the findex
+            # of each pixel
+            # Extact the first detector excess energy map for reference
+            reference_map = list(imap['excess_energy'].values())[0]
+
+            # find the frequency index of all the pixels in this map
+            findex = reference_map.findex
+
+            # loop over all plausible projections
+            for polarization, asds in imap.projected_asds.items():
+                # loop over all detector data streams
+                energies = []
+                for detector, asd in asds.items():
+                    energies.append(imap['excess_energy'][detector].energy * asd.value[findex])
+
+                # calculate the coherent energy for this polarization
+                all_energies.append(numpy.square(numpy.abs(reduce(operator.add, energies))))
+                all_columns.append('coherent_' + polarization)
+
+                # calculate the incoherent energy for this polarization
+                all_energies.append(reduce(operator.add,map(lambda x: numpy.square(numpy.abs(x)),energies)))
+                all_columns.append('incoherent_' + polarization)
 
             # we will also be calculating the bayesian stats
             all_columns.extend(['loghbayesian', 'loghbayesiancirc'])
@@ -65,6 +77,9 @@ def extract_clusters_from_dict(maps, statistic_column='standard_energy', connect
             # We assign the energy attribute of the excess energy map to
             # all the coherent and incoherent energies (i.e. including the polarization energies)
             # and get the cluster properities (i.e time frequency and statistics info)
+
+            # here we quickly calculate the standard lieklhiood
+            # which is just coherent plus + coherent cross energy
             all_energies = numpy.asarray(all_energies)
             all_energies = numpy.vstack((all_energies[2] + all_energies[4], all_energies))
             reference_map.energy = all_energies

@@ -75,38 +75,27 @@ class XTimeSeries(TimeSeriesDict):
         # If frametype is None then make dictionary
         # of key channel and value None
         frame_types = kwargs.pop('frame_types', {det : None for det in channel_names})
-        if not isinstance(time_slides, dict):
+        if not isinstance(frame_types, dict):
             raise ValueError("frame_types must be supplied "
                               "in the form of a dict "
                               "with key channel and value frametype "
                               "assosciated with that channel")
 
+        source = kwargs.pop('source', None)
+
         #----- Start and stop time for this event.
         start_time = event_time - block_time / 2;
         stop_time = event_time + block_time / 2;
 
-        try:
-            data = cls()
-            for det in channel_names:
-                data.append({det : TimeSeries.get(det,
-                                           start_time + time_slides[det],
-                                           stop_time + time_slides[det],
-                                           frametype=frame_types[det],
-                                           **kwargs
-                                          )
-                             })
-        except:
-            # Retrieve data useing the get classmethod 
-            data = cls()
-            for det in channel_names:
-                data.append({det : TimeSeries.fetch_open_data(
-                                                              det.split(':')[0],
-                                           start_time + time_slides[det],
-                                           stop_time + time_slides[det],
-                                           sample_rate=sample_frequency,
-                                           **kwargs
-                                          )
-                                 })
+        data = cls()
+        for det in channel_names:
+            data.append({det : TimeSeries.get(det,
+                                       start_time + time_slides[det],
+                                       stop_time + time_slides[det],
+                                       frametype=frame_types[det],
+                                       **kwargs
+                                      )
+                         })
 
         for key, series in data.items():
             if series.sample_rate.decompose().value != sample_frequency:

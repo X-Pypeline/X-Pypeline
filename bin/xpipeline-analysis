@@ -3,7 +3,6 @@
 from xpipeline.core.xtimeseries import XTimeSeries
 from xpipeline.core.xdetector import Detector
 from xpipeline.core.xdetector import compute_antenna_patterns
-from xpipeline.likelihood.xlikelihood import XLikelihoodMap
 from xpipeline.core.xtimefrequencymap import XTimeFrequencyMapDict
 from xpipeline.core.xtimefrequencymap import csc_XSparseTimeFrequencyMap,XSparseTimeFrequencyMapDict
 from xpipeline.waveform import xinjectsignal
@@ -221,7 +220,7 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
     time_slides = dict(zip(channel_names, time_slide))
     analysis_data = XTimeSeries.retrieve_data(event_time, block_time,
                                               channel_names, sample_frequency*2,
-                                              frame_types=frame_types, time_slides=time_slides)
+                                              frame_types=frame_types, time_slides=time_slides,)
 
     # Are we doing injections and if so how many injection scales are we doing?
     if args.job_type in _injection_analysis_types:
@@ -379,19 +378,16 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                         total_energy_threshold = energy_maps.to_coherent().blackout_pixels(99).energy.min()
 
                     # Calculate all time slides
-                    tindex_findex_slided = {k : zip(numpy.mod(numpy.repeat(numpy.atleast_2d(energy_maps_zeroed[k].nonzero()[0]), len(v),0) + numpy.atleast_2d(v*(circular_time_slide*(1./fft_length)*(1./offset_fraction))).T, final_time_bin_idx).astype(int), numpy.repeat(numpy.atleast_2d(energy_maps_zeroed[k].nonzero()[1]), len(v), 0))  for k,v in slides.items()}
+                    tindex_findex_slided = {k : zip(numpy.mod(numpy.repeat(numpy.atleast_2d(energy_maps_zeroed[k].nonzero()[0]), len(v),0) + numpy.atleast_2d(v*(1./fft_length)*(1./offset_fraction)).T, final_time_bin_idx).astype(int), numpy.repeat(numpy.atleast_2d(energy_maps_zeroed[k].nonzero()[1]), len(v), 0))  for k,v in slides.items()}
 
                     # Make every TF pixels pair in all maps
                     all_maps_pixel_pairs = [zip(i[0], i[1]) for k,v in tindex_findex_slided.items() for i in v]
                     array_of_tf_pixels_per_slide_per_det = numpy.asarray(all_maps_pixel_pairs).reshape(-1, internal_slides.size,)
 
                     # all coherent tf pixels accross all maps
-                    all_pixels = numpy.apply_along_axis(lambda x: reduce(lambda x, y: set(x).union(y), x.tolist()), 0, array_of_tf_pixels_per_slide_per_det)
+                    all_pixels = numpy.apply_along_axis(lambda x: reduce(lambda x, y: frozenset(x).union(y), x.tolist()), 0, array_of_tf_pixels_per_slide_per_det)
 
                     for coherent_pixels, circular_time_slide in zip(all_pixels, internal_slides):
-
-                        # make sure that the coherent time frequency pixels are sorted
-                        coherent_pixels = sorted(coherent_pixels)
 
                         # extract the tindices and the findices
                         tindex, findex = zip(*coherent_pixels)
@@ -410,8 +406,15 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                         # Now with pixels from both detectors
                         tmp_map_to_find_total_energy_threshold = fft_grams.to_sparse(tindex, findex, phi=phi, theta=theta).power2().to_coherent()
                         tfpixel_to_keep = numpy.where(tmp_map_to_find_total_energy_threshold.energy>total_energy_threshold)[0]
-                        tindex = {k : v[tfpixel_to_keep] for k,v in tindex.items()}
-                        findex = {k : v[tfpixel_to_keep] for k,v in findex.items()}
+
+                        coherent_pixels = sorted(zip(tindex[channel_names[0]][tfpixel_to_keep],findex[channel_names[0]][tfpixel_to_keep]))
+                        tindex, findex = zip(*coherent_pixels)
+                        tindex = numpy.asarray(tindex)
+                        findex = numpy.asarray(findex)
+
+                        # extract the tindices and the findices
+                        tindex = {k : tindex for k in channel_names}
+                        findex = {k : findex for k in channel_names}
 
                         # Create a Sparse Map Dict to save the surviving coherent pixels for this
                         # time slide, fft_length and sky position
@@ -424,7 +427,7 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
             # cluster sparse time-frequency maps and save info
             all_triggers = []
             for circular_time_slide in internal_slides:
-                all_clusters = postprocess.extract_clusters_from_dict(all_sparse_maps[circular_time_slide],)
+                all_clusters = postprocess.extract_clusters_from_dict(all_sparse_maps[circular_time_slide], connectivity_list=[8])
                 all_clusters['internal_time_slide'] = circular_time_slide
                 all_triggers.append(all_clusters.values)
 
@@ -455,4 +458,4 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
 
                 all_triggers.to_hdf('./output/grb-{0}-{1}-{2}-{3}-{4}-triggers.h5'.format(args.job_type, int(event_time), waveform_name, injection_numbers[0], injection_numbers[-1]), key='/injections', append=True, index=False,)
             else:
-                all_triggers.to_hdf('./output/grb-{0}-{1}-triggers.h5'.format(args.job_type, processed_map_info), key='/background', append=True, index=False,)       
+                all_triggers.to_hdf('./output/grb-{0}-{1}-triggers.h5'.format(args.job_type, processed_map_info), key='/background', append=True, index=False,)
