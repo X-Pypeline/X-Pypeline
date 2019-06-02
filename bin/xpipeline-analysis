@@ -313,8 +313,8 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
             #########################
             for idx_fft_length, fft_length in enumerate(fft_lengths):
                 # ---- Rescale conditioned data to normalize it appropriately for this fftlength
-                if idx>0:
-                    whitened_timeseries.update((x, y*(normalization_factor[idx] / normalization_factor[idx-1])) for x, y in whitened_timeseries.items())
+                if idx_fft_length>0:
+                    whitened_timeseries.update((x, y*(normalization_factor[idx_fft_length] / normalization_factor[idx_fft_length-1])) for x, y in whitened_timeseries.items())
 
                 # only keep relevant frequencies. i.e. between min and max frequency
                 # and also frequencies relevant for this FFT length.
