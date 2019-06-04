@@ -876,6 +876,29 @@ def xmakewaveform(family, parameters, T, T0, fs, **kwargs):
         hb = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
                         name=hp.name)
 
+    elif family.lower() in ['richers2017']:
+
+        # ----  Burrows 2018 2D SN waveform (pregenerated).
+        distance = parameters[0]
+        name = parameters[1]
+        pregen = 1
+
+        # Read hplus
+        hp = TimeSeries.read(os.path.join(filedir, family + '.hdf5'),
+                             path='/{0}/{1}/hp'.format(family, name))
+
+        pregen_fs = hp.sample_rate.value
+        pregen_T = hp.duration.value
+
+        # ---- Read waveform, which is defined at a range of 1cm.
+        #      therefore we convert it first to 1 kpc then divide
+        #      through by provided distance
+        #      Make sure h is same type of vector (column) as t.
+        hp = 1. / distance * hp
+        hc = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
+                        name=hp.name)
+        hb = TimeSeries(numpy.zeros(hp.size), dx=1/hp.sample_rate.value,
+                        name=hp.name)
 
     elif family.lower() in ['mono', 'mono-a', 'mono-b', 'mono-c',
                             'line-a', 'line-b', 'quad-a', 'quad-b']:
