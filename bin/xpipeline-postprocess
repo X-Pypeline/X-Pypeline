@@ -16,47 +16,6 @@ import os
 import random
 import argparse
 
-params = {
-        # latex
-        'text.usetex': True,
-
-        # fonts
-        'font.family': 'serif',
-        #'font.serif': 'Palatino',
-        #'font.sans-serif': 'Helvetica',
-        #'font.monospace': 'Ubunto Mono',
-
-        # figure and axes
-        'figure.figsize': (10, 10),
-        'figure.titlesize': 35,
-        'axes.grid': True,
-        'axes.titlesize':35,
-        #'axes.labelweight': 'bold',
-        'axes.labelsize': 30,
-
-        # tick markers
-        'xtick.direction': 'in',
-        'ytick.direction': 'in',
-        'xtick.labelsize': 25,
-        'ytick.labelsize': 25,
-        'xtick.major.size': 10.0,
-        'ytick.major.size': 10.0,
-        'xtick.minor.size': 3.0,
-        'ytick.minor.size': 3.0,
-
-        'legend.fontsize': 16,
-        'legend.frameon': True,
-        'legend.framealpha': 0.5,
-
-        # colors
-        'image.cmap': 'viridis',
-
-        # saving figures
-        'savefig.dpi': 150
-        }
-
-pyplot.rcParams.update(params)
-
 def parse_commandline():
     parser = argparse.ArgumentParser(description="This executable processes "
                                                  "a xpipeline-analysis "
