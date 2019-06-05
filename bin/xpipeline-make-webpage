@@ -1,0 +1,94 @@
+#!/usr/bin/env python
+from gwpy.segments import Segment, SegmentList
+
+from matplotlib import pyplot
+from six.moves import urllib
+
+import pandas
+import numpy
+import numpy
+import re
+import os
+import random
+import argparse
+
+params = {
+        # latex
+        'text.usetex': True,
+
+        # fonts
+        'font.family': 'serif',
+        #'font.serif': 'Palatino',
+        #'font.sans-serif': 'Helvetica',
+        #'font.monospace': 'Ubunto Mono',
+
+        # figure and axes
+        'figure.figsize': (10, 10),
+        'figure.titlesize': 35,
+        'axes.grid': True,
+        'axes.titlesize':35,
+        #'axes.labelweight': 'bold',
+        'axes.labelsize': 30,
+
+        # tick markers
+        'xtick.direction': 'in',
+        'ytick.direction': 'in',
+        'xtick.labelsize': 25,
+        'ytick.labelsize': 25,
+        'xtick.major.size': 10.0,
+        'ytick.major.size': 10.0,
+        'xtick.minor.size': 3.0,
+        'ytick.minor.size': 3.0,
+
+        'legend.fontsize': 16,
+        'legend.frameon': True,
+        'legend.framealpha': 0.5,
+
+        # colors
+        'image.cmap': 'viridis',
+
+        # saving figures
+        'savefig.dpi': 150
+        }
+
+pyplot.rcParams.update(params)
+
+def parse_commandline():
+    parser = argparse.ArgumentParser(description="This executable processes "
+                                                 "a xpipeline-analysis "
+                                                 "generated file of tfmaps.")
+    # Define groups of flags to make the help output ore useful
+    required_args = parser.add_argument_group('required named arguments')
+    required_args.add_argument("-f", "--pp-file", help=
+                               """
+                               File holding information after postproccesing
+                               """,
+                               required=True,)
+    args = parser.parse_args()
+
+    if not os.path.isfile(args.pp_file):
+        raise parser.error('You have supplied a non-existent event-file.')
+
+    return args
+
+args = parse_commandline()
+
+rf = pandas.read_hdf('rf.hdf5')
+standard = pandas.read_hdf('new_wavefroms_results.hdf5')
+joint_df = rf.merge(standard)
+
+# convect ampltiude scaling to equilavant distance scaling.
+# most of the waveforms used for thesis where injection at a distance of 1kpc
+joint_df['distance'] = 1./joint_df['injection scale']
+# expect for these RR CCSN which was at 10 kpc
+joint_df.loc[joint_df.waveform.isin(['richers1','richers2']), 'distance'] = 10./joint_df.loc[joint_df.waveform.isin(['richers1','richers2']),'injection scale']
+
+fig,ax = pyplot.subplots(figsize=(16,8)) 
+for label, group in joint_df.groupby('waveform'): 
+    group.plot(x='distance', y=['RF Connectivity 8'],logx=True, ylim=[-0.02,1.02], marker='o',sharex=True,sharey=True,ax=ax, label=[label + ' STANDARD',])
+
+ax.set_xlabel('Distance [kpc]')
+ax.set_ylabel('Fraction above loudest background at 99% FAP')
+ax.set_title('Detection Efficiency Across Injections')
+
+fig.savefig('/home/scoughlin//public_html/PhD/Project/LIGO/BURST/xpipeline/thesis_runs/rf_standard_efficiency_curves_rf.png') 

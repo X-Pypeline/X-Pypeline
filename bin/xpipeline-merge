@@ -3,8 +3,10 @@ from xpipeline.setuputils import log
 
 import argparse
 import os
-import tables
-import itertools
+import pandas
+import re
+import numpy
+import random
 
 def parse_commandline():
     parser = argparse.ArgumentParser(description="This executable processes "
@@ -22,6 +24,12 @@ def parse_commandline():
                                Merged triggers file
                                """,
                                required=True,)
+    required_args.add_argument("-s", "--randomseed", help=
+                               """
+                               Randomseed that selects 50 percent of
+                               the background and injection jobs for training.
+                               """,
+                               type=int, default=1986,)
 
     args = parser.parse_args()
 
@@ -31,37 +39,68 @@ def parse_commandline():
     return args
 
 args = parse_commandline()
+# Set random seed
+numpy.random.seed(args.randomseed)
 
 logger = log.Logger('XPIPELINE: Merging Files')
 
-# Read parameters
-all_files = os.listdir(args.trigger_directory)
-all_files = [os.path.join(args.trigger_directory, ifile) for ifile in all_files]
+# list all trigger files
+all_trigger_files = os.listdir(args.trigger_directory)
 
-# Open outfile
-for ifile in all_files:
-    logger.info('Processing {0} ...'.format(ifile))
-    f = tables.open_file(ifile)
-    group = f.list_nodes('/')[0]._v_pathname
-    if group in ['/onsource_injection', '/zero_noise_injection', '/offsource_injection']:
-        # First we figure out how many waveforms we injected
-        injection_events = [i for i in f.list_nodes('/')[0]._v_children.keys()]
+# for storing background and injection clusters
+background = []
+injection = []
 
-        waveforms = [waveform for waveform in f.get_node('{0}/{1}'.format(group, injection_events[0]))._v_children.keys()]
-
-        inj_scales = [inj_scale for inj_scale in f.get_node('/{0}/{1}/{2}'.format(group, injection_events[0], waveforms[0]))._v_children.keys()]
-
-        groups_to_transfer = [[group], injection_events, waveforms,
-                                            inj_scales,]
-
-        all_groups_for_copy = list(map(lambda x: '/'.join(x), itertools.product(*groups_to_transfer)))
-        f.close()
-        for grp in all_groups_for_copy:
-            command = 'ptrepack {0}:{1} {2}:{3} --verbose'.format(ifile, grp, args.outfile, grp)
-            os.system(command)
-
+for ifile in all_trigger_files:
+    if re.search('background.*', ifile) is not None:
+        backgrounddf = pandas.read_hdf(os.path.join('output', ifile), '/background/')
+        background.append(backgrounddf.values)
     else:
-        # background easier to merge into the new file
-        f.close()
-        command = 'ptrepack {0}:{1} {2}:{3} --verbose'.format(ifile, group, args.outfile, group)
-        os.system(command)
+        injectiondf = pandas.read_hdf(os.path.join('output', ifile), '/injections')
+        injection.append(injectiondf.values)
+
+non_string_cols_background = backgrounddf.columns[~backgrounddf.dtypes.eq('object')]
+non_string_cols_injection = injectiondf.columns[~injectiondf.dtypes.eq('object')]
+
+background = pandas.DataFrame(numpy.vstack(background), columns=backgrounddf.columns)
+background[non_string_cols_background] = background[non_string_cols_background].apply(pandas.to_numeric)
+
+injection = pandas.DataFrame(numpy.vstack(injection), columns=injectiondf.columns)
+injection[non_string_cols_injection] = injection[non_string_cols_injection].apply(pandas.to_numeric)
+
+injection = injection.reset_index(drop=True)
+background = background.reset_index(drop=True)
+
+injection = injection.drop_duplicates()
+
+#randomly select inejction on a waveform by waveform basis
+number_of_injection_per_waveform = injection.groupby(['waveform',]).apply(lambda x : numpy.unique(x['injection_number']).size)
+training_indices = []
+testing_indices = []
+for waveform, number_of_injections in number_of_injection_per_waveform.items():
+    idx = random.sample(range(number_of_injections), int(0.5*number_of_injections))
+    training_injections = injection.injection_number.unique()[idx]
+    training_indices.extend(injection.loc[(injection.waveform == waveform) & (injection.injection_number.isin(training_injections))].index.tolist())
+    testing_indices.extend(injection.loc[(injection.waveform == waveform) & (~injection.injection_number.isin(training_injections))].index.tolist())
+
+injection_training = injection.loc[training_indices]
+injection_testing = injection.loc[testing_indices]
+
+all_background_trials = background.groupby(['event','internal_time_slide']).groups
+
+all_background_groups = numpy.vstack(list(all_background_trials.keys()))
+
+number_of_background_events = len(all_background_groups)
+
+training_events = numpy.array(random.sample(range(number_of_background_events), int(0.5*number_of_background_events)))
+testing_events = numpy.setxor1d(numpy.indices(numpy.arange(number_of_background_events).shape), training_events)
+
+background_trial_indices = numpy.asarray(list(all_background_trials.values()))
+
+background_testing = background.loc[numpy.hstack(background_trial_indices[testing_events])]
+background_training = background.loc[numpy.hstack(background_trial_indices[training_events])]
+
+background_training.to_hdf('{0}'.format(args.outfile), key='/background/trainingset', append=True, index=False)
+background_testing.to_hdf('{0}'.format(args.outfile), key='/background/testingset', append=True, index=False)
+injection_training.to_hdf('{0}'.format(args.outfile), key='/injections/trainingset', append=True, index=False)
+injection_testing.to_hdf('{0}'.format(args.outfile), key='/injections/testingset', append=True, index=False)
