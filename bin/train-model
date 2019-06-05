@@ -1,19 +1,30 @@
 #!/usr/bin/env python
 from xpipeline.setuputils import log
 
+import keras as K
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation, Flatten
 from keras.layers import MaxPooling2D, Conv2D
+from keras.layers import UpSampling2D, Reshape
 from keras.metrics import categorical_accuracy
 from keras.regularizers import l2
 from keras.optimizers import RMSprop
 from keras.layers import GaussianNoise
+from keras.callbacks import ModelCheckpoint
 
+
+from sklearn.utils import class_weight
+from sklearn import metrics
+
+from matplotlib import pyplot
+
+import keras_metrics as km
 import argparse
 import os
 import tables
 import numpy
 import pandas
+import seaborn
 
 def parse_commandline():
     """Parse the options given on the command-line.
@@ -27,6 +38,8 @@ def parse_commandline():
                         "if you have time concern for training.")
     parser.add_argument("--randomseed", type=int, default=1986,
                         help="Set random seed")
+    parser.add_argument("--plot-heatmap", action="store_true", default=False,
+                        help="Plot an example of the image the net is learning")
     args = parser.parse_args()
 
     return args
@@ -34,68 +47,70 @@ def parse_commandline():
 args = parse_commandline()
 numpy.random.seed(args.randomseed)
 
-background_trainingset = numpy.load('background_trainingset.npy',)
-background_validation = numpy.load('background_validation.npy',)
+trainingset = numpy.load('training_set.npy',)
+trainingset_labels = numpy.load('training_set_labels.npy',)
+validation = numpy.load('testing_set.npy',)
+validation_labels = numpy.load('testing_set_labels.npy',)
 
-injection_trainingset = numpy.load('injection_trainingset.npy',)
-injection_validation = numpy.load('injection_validation.npy',)
 
-background_labels_training = numpy.zeros(background_trainingset.shape[0])
-background_labels_validation = numpy.zeros(background_validation.shape[0])
+tmp = numpy.stack((validation.real, validation.imag),2)
+validation = numpy.concatenate((validation.real, validation.imag),1)
+validation[:,::2,:,:] = tmp[:,:,0,:,:]
+validation[:,1::2,:,:] = tmp[:,:,1,:,:]
 
-injection_labels_training = numpy.ones(injection_trainingset.shape[0])
-injection_labels_validation = numpy.ones(injection_validation.shape[0])
+tmp = numpy.stack((trainingset.real, trainingset.imag),2)
+trainingset = numpy.concatenate((trainingset.real, trainingset.imag),1)
+trainingset[:,::2,:,:] = tmp[:,:,0,:,:]
+trainingset[:,1::2,:,:] = tmp[:,:,1,:,:]
 
-trainingset = numpy.concatenate([background_trainingset, injection_trainingset])
-trainingset_labels = numpy.concatenate([background_labels_training, injection_labels_training])
+trainingset = trainingset[:,:,0:7,:]
+validation = validation[:,:,0:7,:]
 
-validation = numpy.abs(numpy.concatenate([background_validation , injection_validation ]))
-validation_labels = numpy.concatenate([background_labels_validation, injection_labels_validation])
+if args.plot_heatmap:
+    fig, ax = pyplot.subplots(nrows=2, ncols=2, figsize=(24, 12))
+    seaborn.heatmap(validation[0,0:8732,:,0], ax = ax[0][0])
+    seaborn.heatmap(validation[0,0:8732,:,1], ax = ax[1][0])
+    fig.savefig('/home/scott.coughlin/public_html/Project/LIGO/xpipeline/heatpmap_loud_injection.png')
 
-reshuffle_training = numpy.arange(0, trainingset_labels.size,).astype(int)
-reshuffle_validation = numpy.random.randint(0, validation_labels.size,size = int(validation_labels.size*0.5)).astype(int)
-numpy.random.shuffle(reshuffle_training)
 
-trainingset = numpy.abs(trainingset[reshuffle_training])
-trainingset_labels = trainingset_labels[reshuffle_training]
-
-testing_set = validation[~reshuffle_validation]
-testing_set_labels = validation_labels[~reshuffle_validation]
-
-validation = validation[reshuffle_validation]
-validation_labels = validation_labels[reshuffle_validation]
-
-del background_trainingset
-del background_validation
-del injection_trainingset
-del injection_validation
+del tmp
 
 input_shape = trainingset[0].shape
 
 model = Sequential()
 W_reg = 1e-4
-model.add(Conv2D(16, (1, 7), strides=(1, 7), padding='valid',
-          input_shape=input_shape,
-          kernel_regularizer=l2(W_reg)))
-model.add(Activation("tanh"))
+model.add(Conv2D(16, (2, 1), strides=(2, 1), padding='valid', input_shape=input_shape, kernel_regularizer=l2(W_reg)))
+model.add(Activation('relu'))
 
-model.add(Conv2D(32, (1, 1), strides=(1, 1), padding='valid', kernel_regularizer=l2(W_reg)))
-model.add(Activation("tanh"))
+model.add(Conv2D(32, (1, 1), padding='valid', kernel_regularizer=l2(W_reg)))
+model.add(Activation('relu'))
 
 model.add(Flatten())
 model.add(Dense(128, kernel_regularizer=l2(W_reg)))
-model.add(Activation('tanh'))
+model.add(Activation('relu'))
 
-model.add(Dense(1, activation='sigmoid'))
+model.add(Dense(1, activation="sigmoid"))
 
 print(model.summary())
 
-model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+model.compile(loss='binary_crossentropy', optimizer='adam', metrics=[km.binary_precision(), km.binary_recall()])
 
-model.fit(trainingset, trainingset_labels,
-    batch_size=args.batch_size, epochs=args.nb_epoch, verbose=1,
-    validation_data=(validation, validation_labels), callbacks=[],)
+checkpointer = ModelCheckpoint(filepath='weights.hdf5', monitor='val_precision', verbose=1, save_best_only=True, mode='max', save_weights_only=True, period=1,)
+
+class_weights = class_weight.compute_class_weight('balanced', numpy.unique(trainingset_labels), trainingset_labels)
+
+model.fit(trainingset, trainingset_labels, batch_size=args.batch_size, epochs=args.nb_epoch, verbose=1, validation_data=(validation, validation_labels), callbacks=[checkpointer],class_weight=class_weights)
+
+model.load_weights("weights.hdf5")
 
 model.save('cnn.h5')
+
+import pdb
+pdb.set_trace()
+scores = model.predict_proba(validation)
+probs = numpy.hstack((1-scores, scores)).argmax(1)
+confusion_matrix = metrics.confusion_matrix(validation_labels, probs)
+classification_report = metrics.classification_report(validation_labels, probs, output_dict=True)
 print(model.evaluate(validation, validation_labels, verbose=0))
-print(model.evaluate(testing_set, testing_set_labels, verbose=0))
+import pdb
+pdb.set_trace()

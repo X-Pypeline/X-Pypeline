@@ -50,7 +50,6 @@ def prep_data(injection_triggers_df, background_triggers_df, injection_info_dir=
     background_triggers_df['circinc'] = background_triggers_df[['incoherent_f_left','incoherent_f_right']].max(1)
     background_triggers_df['circnullinc'] = background_triggers_df[['incoherent_f_left_null','incoherent_f_right_null']].max(1)
 
-
     # Calculate all alpha values injection
     denominator_plus = (injection_triggers_df['coherent_f_plus'] + injection_triggers_df['incoherent_f_plus'])**0.8
     denominator_cross = (injection_triggers_df['coherent_f_cross'] + injection_triggers_df['incoherent_f_cross'])**0.8
@@ -86,7 +85,6 @@ def prep_data(injection_triggers_df, background_triggers_df, injection_info_dir=
     # Log all likelihoods
     injection_triggers_df[likelihood_columns] = numpy.log(injection_triggers_df[likelihood_columns])
     background_triggers_df[likelihood_columns] = numpy.log(background_triggers_df[likelihood_columns])
-
 
     # Calculate all ratio values injection
     injection_triggers_df['circ_ratio_e_over_i'] = injection_triggers_df['circenergy'] - injection_triggers_df['circinc']
