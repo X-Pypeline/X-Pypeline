@@ -231,4 +231,4 @@ def undo_slides(x,block_time=256):
     external_slide = int(x['event'].split('_')[-1])
     internal_slide = x['internal_time_slide']
     event_time = int(x['event'].split('_')[1])
-    return event_time+numpy.mod(h_min_time-event_time-180,block_time) + external_slide
+    return event_time+numpy.mod(h_min_time-event_time-internal_slide,block_time) + external_slide
