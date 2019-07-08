@@ -382,7 +382,7 @@ class XSparseTimeFrequencyMapDict(OrderedDict):
 
             labelled_map = nearestneighbor.fastlabel_wrapper(pixels + 1, coord_dim_array, connectivity, npixels).astype(int)
 
-            cluster_array = clusterproperties.clusterproperities_wrapper(labelled_map, total_energy, True, pixels[0,:] + 1, pixels[1,:] + 1)
+            cluster_array = clusterproperties.clusterproperities_wrapper(labelled_map, total_energy, True, pixels[0,:] + 1, pixels[1,:] + 1,)
 
             cluster_array[:, 0:3] = cluster_array[:, 0:3] * v.dx + v.x0
 

@@ -47,6 +47,25 @@ def extract_clusters_from_dict(maps, statistic_column='standard_energy', connect
                 all_columns.append('coherent_' + k)
                 all_energies.append(v.power2().to_coherent().energy)
                 all_columns.append('incoherent_' + k)
+                try:
+                    # if possible will will calculate all the bayesian statistics for each pixel
+                    if k == 'f_plus':
+                        projected_asd_magnitude_squared.append(v.projected_asd_magnitude_squared.value)
+                        bayesian_statistics.append('loghbayesian')
+                    elif k == 'f_cross':
+                        projected_asd_magnitude_squared.append(v.projected_asd_magnitude_squared.value)
+                    elif k == 'f_right':
+                        projected_asd_magnitude_squared.append(v.projected_asd_magnitude_squared.value)
+                        bayesian_statistics.append('loghbayesiancirc')
+                    elif k =='f_left':
+                        projected_asd_magnitude_squared.append(v.projected_asd_magnitude_squared.value)
+                    else:
+                        pass
+                except:
+                    pass
+            all_columns.extend(bayesian_statistics)
+            if projected_asd_magnitude_squared:
+                projected_asd_magnitude_squared =  numpy.asarray(projected_asd_magnitude_squared).flatten(order='F')
 
             # Extract the relavant projected asds for the findex
             # of each pixel

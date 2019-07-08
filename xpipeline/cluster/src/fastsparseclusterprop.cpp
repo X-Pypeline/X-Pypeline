@@ -50,6 +50,7 @@ vector<double> fastsparseclusterprop(const double *labelledMap, const double *li
     int rowLen=dimArray[1];
     int nLikelihoods=dimArray[2];
     int k = 0; //FIXME this should be a specific likelihood that you want to sort on
+    double inf = std::numeric_limits<double>::infinity();
     vector<double> energy_of_cluster(nClusters, 0.0);
 
     for(int j=0;j<colLen;j++){
