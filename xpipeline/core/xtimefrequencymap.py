@@ -559,7 +559,11 @@ class csc_XSparseTimeFrequencyMap(csc_sparse_map):
             else:
                 labelled_map = self.pixel_labels
 
-            cluster_array = clusterproperties.clusterproperities_wrapper(labelled_map, total_energy, True, pixels[0,:] + 1, pixels[1,:] + 1, kwargs.pop('projected_asd_magnitude_squared', False))
+            projected_asds_magnitude_squared = kwargs.pop('projected_asds_magnitude_squared', None)
+            if projected_asds_magnitude_squared is not None:
+                projected_asds_magnitude_squared = projected_asds_magnitude_squared.flatten(order='F')
+
+            cluster_array = clusterproperties.clusterproperities_wrapper(labelled_map, total_energy, True, pixels[0,:] + 1, pixels[1,:] + 1, projected_asds_magnitude_squared)
 
             if ((getattr(self, 'dx') is not None) and (getattr(self, 'dy') is not None) and
                 (getattr(self, 'x0') is not None) and (getattr(self, 'y0') is not None)):

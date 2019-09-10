@@ -66,14 +66,16 @@ def clusterproperities_wrapper(object labelled_map, object likelihood,
         pixel_time_tmp = numpy.ascontiguousarray(numpy.zeros(labelled_map.size), dtype=numpy.float64)
         number_of_columns = int(dimension_array_tmp[2])
 
-    if projected_asd_magnitude_squared.any():
+    if projected_asd_magnitude_squared is not None:
         projected_asd_magnitude_squared_tmp = numpy.ascontiguousarray(projected_asd_magnitude_squared, dtype=numpy.float64)
+        number_of_bayesian_likelihoods = 2
     else:
         projected_asd_magnitude_squared_tmp = numpy.ascontiguousarray(numpy.zeros(labelled_map.size), dtype=numpy.float64)
+        number_of_bayesian_likelihoods = 0
 
     cluster_array = fastsparseclusterprop(&labelled_map_tmp[0], &likelihood_tmp[0,0,0],
                           &pixel_time_tmp[0], &pixel_freq_tmp[0],
                           tf_properties, &dimension_array_tmp[0], labelled_map.max().astype(int),
                           &projected_asd_magnitude_squared_tmp[0])
 
-    return numpy.asarray(cluster_array).reshape(number_of_columns+2, -1).T
+    return numpy.asarray(cluster_array).reshape(number_of_columns + number_of_bayesian_likelihoods, -1).T

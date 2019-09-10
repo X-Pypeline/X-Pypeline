@@ -1,14 +1,20 @@
 #!/usr/bin/env python
-from xpipeline.core import XSparseTimeFrequencyMapDict, csc_XSparseTimeFrequencyMap
-from xpipeline.setuputils import log
+from gwpy.segments import Segment, SegmentList
 from xpipeline.utils import utils
-from xpipeline.postprocess import postprocess
+from xpipeline.postprocess import postprocess, prep_data, xcuts
+from xpipeline.setuputils import log
 
-import argparse
-import os
-import tables
-import numpy
+from matplotlib import pyplot
+from IPython.display import display, HTML
+from six.moves import urllib
+
 import pandas
+import numpy
+import numpy
+import re
+import os
+import random
+import argparse
 
 def parse_commandline():
     parser = argparse.ArgumentParser(description="This executable processes "
@@ -21,25 +27,27 @@ def parse_commandline():
                                trigger file
                                """,
                                required=True,)
-    required_args.add_argument("-o", "--output-file", help=
-                               """
-                               Filename
-                               """,
-                               required=True,)
-    required_args.add_argument("-t", "--injection-type", help=
-                               """
-                               onsource_injection or offsource_injection or
-                               zero_noise_injection?
-                               """,
-                               required=True,)
-
-    required_args.add_argument("-s", "--randomseed", help=
-                               """
-                               Randomseed that selects 50 percent of
-                               the background and injection jobs for training.
-                               """,
-                               type=int, default=1986,)
-
+    parser.add_argument("--FAP", help=
+                        """
+                        False Alarm Probability Desired
+                        """,
+                        type=float,
+                        required=True,)
+    parser.add_argument("--detection-statistic", help=
+                        """
+                        What ranking statistic do you want to use
+                        when claiming a signal or not
+                        """,
+                        required=True,)
+    parser.add_argument("--coherent-cut-method", help=
+                        """
+                        Do you want to perform just the ratio cut?
+                        just the alpha cut?
+                        Do you want to perform both the alpha and ratio cut?
+                        What coherent and incoherent energies would you like to perform the cuts on
+                        i.e. plus, cross, circular, etc?
+                        """,
+                        default='alphaLinCut',)
     args = parser.parse_args()
 
     if not os.path.isfile(args.event_file):
@@ -49,70 +57,335 @@ def parse_commandline():
 
 args = parse_commandline()
 
+vetoMethod = args.coherent_cut_method
+detection_statistic_column_name = args.detection_statistic 
+ifos = ['H1', 'L1']
+FAR_Tuning = args.FAP
+
 logger = log.Logger('XPIPELINE: Post-Processing {0}'.format(args.event_file))
 
-# Read parameters
-f = tables.open_file(args.event_file)
+injection_triggers_df = pandas.read_hdf('{0}'.format(args.event_file), key='/injections/trainingset')
+background_triggers_df = pandas.read_hdf('{0}'.format(args.event_file), key='/background/trainingset')
 
-training_background_triggers, testing_background_triggers, training_injection_triggers, testing_injection_triggers = \
-    utils.choose_background_injection_training(f, injection_type=args.injection_type, randomseed=args.randomseed,)
+injection_triggers_df_testing = pandas.read_hdf('{0}'.format(args.event_file), key='/injections/testingset')
+background_triggers_df_testing = pandas.read_hdf('{0}'.format(args.event_file), key='/background/testingset')
 
-# Now get background triggers for the training and testing injections
-all_background_triggers = []
-for event in training_background_triggers:
-    for table in f.walk_nodes(event, "Table"):
-        all_clusters = postprocess.extract_clusters_from_table(table, event_type='background')
-        all_background_triggers.append(all_clusters.values)
+number_of_injection_for_training = injection_triggers_df.groupby(['waveform',]).apply(lambda x : numpy.unique(x['injection_number']).size)[0]
+number_of_injection_for_testing = injection_triggers_df_testing.groupby(['waveform',]).apply(lambda x : numpy.unique(x['injection_number']).size)[0]
 
-# Now stack all the background triggers from the various trials and
-# save them as one big DataFrame
-all_background_triggers = numpy.vstack(all_background_triggers)
-non_string_cols = all_clusters.columns[~all_clusters.dtypes.eq('object')]
-all_background_triggers = pandas.DataFrame(all_background_triggers, columns=all_clusters.columns,)
-all_background_triggers[non_string_cols] = all_background_triggers[non_string_cols].apply(pandas.to_numeric)
-all_background_triggers.to_hdf(args.output_file, key='/background/trainingset', append=True, index=False,)
+background_triggers_df['min_time_of_cluster_livingston'] = background_triggers_df[['event', 'internal_time_slide', 'min_time_of_cluster']].apply(postprocess.undo_slides, axis=1)
+background_triggers_df['max_time_of_cluster_livingston'] = background_triggers_df['min_time_of_cluster_livingston'] +background_triggers_df['dt']
 
-all_background_triggers = []
-for event in testing_background_triggers:
-    for table in f.walk_nodes(event, "Table"):
-        all_clusters = postprocess.extract_clusters_from_table(table, event_type='background')
-        all_background_triggers.append(all_clusters.values)
+background_triggers_df_testing['min_time_of_cluster_livingston'] = background_triggers_df_testing[['event', 'internal_time_slide', 'min_time_of_cluster']].apply(postprocess.undo_slides, axis=1)
+background_triggers_df_testing['max_time_of_cluster_livingston'] = background_triggers_df_testing['min_time_of_cluster_livingston'] +background_triggers_df_testing['dt']
 
-# Now stack all the background triggers from the various trials and
-# save them as one big DataFrame
-all_background_triggers = numpy.vstack(all_background_triggers)
-non_string_cols = all_clusters.columns[~all_clusters.dtypes.eq('object')]
-all_background_triggers = pandas.DataFrame(all_background_triggers, columns=all_clusters.columns,)
-all_background_triggers[non_string_cols] = all_background_triggers[non_string_cols].apply(pandas.to_numeric)
-all_background_triggers.to_hdf(args.output_file, key='/background/testingset', append=True, index=False,)
+H1_segs_training = SegmentList([Segment(x[0],x[1]) for x in background_triggers_df[['min_time_of_cluster','max_time_of_cluster']].values])
+L1_segs_training = SegmentList([Segment(x[0],x[1]) for x in background_triggers_df[['min_time_of_cluster_livingston','max_time_of_cluster_livingston']].values])
 
-del all_background_triggers
+H1_segs_testing = SegmentList([Segment(x[0],x[1]) for x in background_triggers_df_testing[['min_time_of_cluster','max_time_of_cluster']].values])
+L1_segs_testing = SegmentList([Segment(x[0],x[1]) for x in background_triggers_df_testing[['min_time_of_cluster_livingston','max_time_of_cluster_livingston']].values])
 
-# Now get injection triggers for the training and testing injections
-all_injection_triggers = []
+veto_seg_h1 = SegmentList.read('input/H1_cat24veto.txt')
+veto_seg_l1 = SegmentList.read('input/L1_cat24veto.txt')
 
-for event in training_injection_triggers:
-    for table in f.walk_nodes(event, "Table"):
-        all_clusters = postprocess.extract_clusters_from_table(table, event_type='injection')
-        all_injection_triggers.append(all_clusters.values)
+background_triggers_df = background_triggers_df.loc[~numpy.asarray([veto_seg_h1.intersects_segment(cluster_seg) for cluster_seg in H1_segs_training])]
+background_triggers_df_testing = background_triggers_df_testing.loc[~numpy.asarray([veto_seg_h1.intersects_segment(cluster_seg) for cluster_seg in H1_segs_testing])]
 
-non_string_cols = all_clusters.columns[~all_clusters.dtypes.eq('object')]
+#background_triggers_df = background_triggers_df.loc[~numpy.asarray([veto_seg_l1.intersects_segment(cluster_seg) for cluster_seg in L1_segs_training])]
+#background_triggers_df_testing = background_triggers_df_testing.loc[~numpy.asarray([veto_seg_l1.intersects_segment(cluster_seg) for cluster_seg in L1_segs_testing])]
 
-all_injection_triggers = numpy.vstack(all_injection_triggers)
-all_injection_triggers = pandas.DataFrame(all_injection_triggers, columns=all_clusters.columns)
-all_injection_triggers[non_string_cols] = all_injection_triggers[non_string_cols].apply(pandas.to_numeric)
-all_injection_triggers.to_hdf(args.output_file, key='/injections/trainingset', append=True, index=False,)
+injection_triggers_df['standard_energy'] = injection_triggers_df['coherent_f_plus'] + injection_triggers_df['coherent_f_cross']
+injection_triggers_df['circenergy'] = injection_triggers_df[['coherent_f_right', 'coherent_f_left']].max(1)
+injection_triggers_df['circnullenergy'] = injection_triggers_df[['coherent_f_right_null', 'coherent_f_left_null']].min(1)
+injection_triggers_df['circinc'] = injection_triggers_df[['incoherent_f_left','incoherent_f_right']].max(1)
+injection_triggers_df['circnullinc'] = injection_triggers_df[['incoherent_f_left_null','incoherent_f_right_null']].max(1)
 
-all_injection_triggers = []
+background_triggers_df['standard_energy'] = background_triggers_df['coherent_f_plus'] + background_triggers_df['coherent_f_cross']
+background_triggers_df['circenergy'] = background_triggers_df[['coherent_f_right', 'coherent_f_left']].max(1)
+background_triggers_df['circnullenergy'] = background_triggers_df[['coherent_f_right_null', 'coherent_f_left_null']].min(1)
+background_triggers_df['circinc'] = background_triggers_df[['incoherent_f_left','incoherent_f_right']].max(1)
+background_triggers_df['circnullinc'] = background_triggers_df[['incoherent_f_left_null','incoherent_f_right_null']].max(1)
 
-for event in testing_injection_triggers:
-    for table in f.walk_nodes(event, "Table"):
-        all_clusters = postprocess.extract_clusters_from_table(table, event_type='injection')
-        all_injection_triggers.append(all_clusters.values)
+injection_triggers_df_testing['standard_energy'] = injection_triggers_df_testing['coherent_f_plus'] + injection_triggers_df_testing['coherent_f_cross']
+injection_triggers_df_testing['circenergy'] = injection_triggers_df_testing[['coherent_f_right', 'coherent_f_left']].max(1)
+injection_triggers_df_testing['circnullenergy'] = injection_triggers_df_testing[['coherent_f_right_null', 'coherent_f_left_null']].min(1)
+injection_triggers_df_testing['circinc'] = injection_triggers_df_testing[['incoherent_f_left','incoherent_f_right']].max(1)
+injection_triggers_df_testing['circnullinc'] = injection_triggers_df_testing[['incoherent_f_left_null','incoherent_f_right_null']].max(1)
 
-non_string_cols = all_clusters.columns[~all_clusters.dtypes.eq('object')]
+background_triggers_df_testing['standard_energy'] = background_triggers_df_testing['coherent_f_plus'] + background_triggers_df_testing['coherent_f_cross']
+background_triggers_df_testing['circenergy'] = background_triggers_df_testing[['coherent_f_right', 'coherent_f_left']].max(1)
+background_triggers_df_testing['circnullenergy'] = background_triggers_df_testing[['coherent_f_right_null', 'coherent_f_left_null']].min(1)
+background_triggers_df_testing['circinc'] = background_triggers_df_testing[['incoherent_f_left','incoherent_f_right']].max(1)
+background_triggers_df_testing['circnullinc'] = background_triggers_df_testing[['incoherent_f_left_null','incoherent_f_right_null']].max(1)
 
-all_injection_triggers = numpy.vstack(all_injection_triggers)
-all_injection_triggers = pandas.DataFrame(all_injection_triggers, columns=all_clusters.columns)
-all_injection_triggers[non_string_cols] = all_injection_triggers[non_string_cols].apply(pandas.to_numeric)
-all_injection_triggers.to_hdf(args.output_file, key='/injections/testingset', append=True, index=False,)
+all_data_frames = {}
+for connectivity in background_triggers_df_testing.connectivity.unique():
+    injection_triggers_df_downselect = injection_triggers_df.loc[injection_triggers_df.connectivity == connectivity]
+    background_triggers_df_downselect = background_triggers_df.loc[background_triggers_df.connectivity == connectivity]
+
+    injection_triggers_df_downselect_testing = injection_triggers_df_testing.loc[injection_triggers_df_testing.connectivity == connectivity]
+    background_triggers_df_downselect_testing = background_triggers_df_testing.loc[background_triggers_df_testing.connectivity == connectivity]
+
+    #############################################################################
+    #       Based on vetoMethod determine appropriate tuning numbers            #
+    #############################################################################
+
+    # Initialize flag fo assume that an alphaLinCut has not been requested
+    prePassFlag = 0
+
+    # ---- Identify cuts to loop over.
+    if re.search('alphaLinCut.*', vetoMethod) is not None:
+
+        nullOneSidedRangeAlphaCut = [0,-0.5,-1,-1.5,-2,-2.5,-3,-3.5,-4,-4.5,-5,-5.5,-6,-6.5,-7]
+        oneSidedRangeAlphaCut = [0,-0.5,-1,-1.5,-2,-2.5,-3,-3.5,-4,-4.5,-5,-5.5,-6,-6.5,-7]
+        twoSidedRangeAlphaCut = [0,0.18,0.22,0.27,0.34,0.43,0.54,0.67,
+                                 0.84,1.05,1.31,1.64,2.05,2.56,3.2,4.0,5.0,6.0,7.0]
+        prePassFlag           = 1
+
+    if (re.search('(linearCut.*|alphaCut.*)', vetoMethod) is not None) or (prePassFlag ==1):
+
+        nullOneSidedRangeLinearCut = [0,-1,-1.01,-1.03,-1.06,-1.1,-1.15,-1.2,
+                                      -1.27,-1.35,-1.45,-1.57,-1.71,-1.9,-2.1,
+                                      -2.4,-2.7,-3,-3.3,-3.6,-4]
+        oneSidedRangeLinearCut     = [0,-1,-1.01,-1.03,-1.06,-1.1,-1.15,-1.2,
+                                      -1.27,-1.35,-1.45,-1.57,-1.71,-1.9,-2.1,
+                                      -2.4,-2.7,-3,-3.3,-3.6,-4]
+        twoSidedRangeLinearCut     = [0,1,1.01,1.03,1.06,1.1,1.15,1.2,1.27,1.35,
+                                      1.45,1.57,1.71,1.9,2.1,2.4,2.7,3,3.3,3.6,4]
+
+    # vetoMethod determine the appropriate range (one or two sided)
+    if re.search('(alphaLinCut)($|Linear)', vetoMethod) is not None:
+        vetoPlusRangeAlphaCut  = twoSidedRangeAlphaCut
+        vetoCrossRangeAlphaCut = twoSidedRangeAlphaCut
+
+    elif re.search('(alphaLinCut)(Scalar|Circ|Amp)', vetoMethod) is not None:
+        vetoPlusRangeAlphaCut  = oneSidedRangeAlphaCut
+        vetoCrossRangeAlphaCut = oneSidedRangeAlphaCut
+
+    if re.search('(.*Cut$|.*Linear)', vetoMethod) is not None:
+        vetoPlusRangeLinearCut  = twoSidedRangeLinearCut
+        vetoCrossRangeLinearCut = twoSidedRangeLinearCut
+
+    elif re.search('(.*Scalar|.*Circ|.*Amp)', vetoMethod) is not None:
+        vetoPlusRangeLinearCut  = oneSidedRangeLinearCut
+        vetoCrossRangeLinearCut = oneSidedRangeLinearCut
+
+    # Determine whether Null cuts are necessary (more than 2 detectors)
+    # Also even if nullenergy, nullinc was not calculated..calculate anyways
+    if len(ifos) <= 2:
+        vetoNullRangeLinearCut      = [0]
+        vetoNullRangeAlphaCut       = [0]
+    else:
+        vetoNullRangeLinearCut      = nullOneSidedRangeLinearCut
+        vetoNullRangeAlphaCut       = nullOneSidedRangeAlphaCut
+
+    if re.search('None', vetoMethod) is not None:
+        vetoNullRangeLinearCut  = [0]
+        vetoPlusRangeLinearCut  = [0]
+        vetoCrossRangeLinearCut = [0]
+
+    ###########################################################################
+    #                Preparation for veto cuts
+    ###########################################################################
+    # ---- Get all distinct combinations of veto thresholds, pack into vectors.
+    if re.search('alphaLinCut.*', vetoMethod) is not None:
+
+        [X,Y,Z] = numpy.meshgrid(vetoNullRangeAlphaCut,vetoPlusRangeAlphaCut,vetoCrossRangeAlphaCut)
+        alphaCutNullRange  = X.flatten()
+        alphaCutPlusRange  = Y.flatten()
+        alphaCutCrossRange = Z.flatten()
+
+
+    if (re.search('(linearCut.*|alphaCut.*)', vetoMethod) is not None) or (prePassFlag ==1):
+
+        [X,Y,Z] = numpy.meshgrid(vetoNullRangeLinearCut,vetoPlusRangeLinearCut,vetoCrossRangeLinearCut)
+        linearCutNullRange  = X.flatten()
+        linearCutPlusRange  = Y.flatten()
+        linearCutCrossRange = Z.flatten()
+
+    ###########################################################################
+    #            Identify likelihoods used for coherent vetoes.
+    ###########################################################################
+    # ---- Figure our which column of onSource.likelihood contains each
+    #      likelihoodType
+    if re.search('.*Cut$', vetoMethod) is not None:
+
+        ePlusIndex = 'coherent_f_plus'
+        eCrossIndex = 'coherent_f_cross'
+        iPlusIndex = 'incoherent_f_plus'
+        iCrossIndex = 'incoherent_f_cross'
+
+    elif re.search('.*CutCirc', vetoMethod) is not None:
+
+        ePlusIndex = 'circenergy'
+        eCrossIndex = 'circnullenergy'
+        iPlusIndex = 'circinc'
+        iCrossIndex = 'circnullinc'
+
+    else:
+        raise ValueError('Cut Type cannot assign E and I values')
+
+
+    if (len(ifos) > 2):
+        eNullIndex  = 'nullenergy'
+        iNullIndex  = 'nullinc'
+        typeOfCutNull = 'IoverE'
+    else:
+        eNullIndex = 0
+        iNullIndex = 0
+
+    ###########################################################################
+    #            If your cut is a one-sided cut, determine
+    #           determine whether I over E or E over I
+    #           should be used for tuning your cuts by seeing what part of the
+    #           E/I plan your triggers for your first Waveform fall in.
+    ###########################################################################
+    if re.search('(.*CutLinear|.*CutScalar|.*CutCirc)', vetoMethod) is not None:
+        plusRatioEoverI = numpy.log(injection_triggers_df_downselect[ePlusIndex] / injection_triggers_df_downselect[iPlusIndex])
+        crossRatioEoverI = numpy.log(injection_triggers_df_downselect[eCrossIndex] / injection_triggers_df_downselect[iCrossIndex])
+        plusRatioIoverE = numpy.log(injection_triggers_df_downselect[iPlusIndex] / injection_triggers_df_downselect[ePlusIndex])
+        crossRatioIoverE = numpy.log(injection_triggers_df_downselect[iCrossIndex] / injection_triggers_df_downselect[eCrossIndex])
+
+
+        if (numpy.sum(plusRatioEoverI > 0)> numpy.sum(plusRatioIoverE > 0)):
+            typeOfCutPlus  = 'EoverI'
+        else:
+            typeOfCutPlus  = 'IoverE'
+
+        if (sum(crossRatioEoverI > 0)> sum(crossRatioIoverE > 0)):
+            typeOfCutCross = 'EoverI'
+        else:
+            typeOfCutCross = 'IoverE'
+
+        typeOfCutPlus
+        typeOfCutCross
+
+    else:
+        typeOfCutPlus = 'twosided'
+        typeOfCutCross = 'twosided'
+
+    # First will will apply a variety of linear cuts in the E/I or I/E space
+    loudestBackgroundRatioJob = xcuts.xapplyratiocuts(background_triggers_df_downselect, ePlusIndex,eCrossIndex,eNullIndex,
+                                                iPlusIndex,iCrossIndex,iNullIndex,
+                                                linearCutPlusRange,linearCutCrossRange,linearCutNullRange,
+                                                FAR_Tuning,typeOfCutPlus,typeOfCutCross,detection_statistic_column_name)
+
+    injection_triggers_df_downselect = xcuts.xapplyratiocutsinjections(injection_triggers_df_downselect, ePlusIndex,eCrossIndex,eNullIndex,
+                                         iPlusIndex,iCrossIndex,iNullIndex,
+                                         linearCutPlusRange,linearCutCrossRange,linearCutNullRange,
+                                         loudestBackgroundRatioJob,typeOfCutPlus,typeOfCutCross,
+                                         detection_statistic_column_name,)
+
+    ratio_cut_columns = list(range(linearCutPlusRange.size))
+    # Find all injections for which at lest one clusters from a specific waveform, injection scale, and injection trial passed
+    # both the coherent conistency checks and was louder than the loudest suriving background from said coherent consistency check
+    dataframe = injection_triggers_df_downselect.groupby(['waveform','injection_scale','injection_number'])[ratio_cut_columns].sum() >= 1
+
+    # Now we sum how many injections had at lest one cluster pass for every cut combination
+    dataframe = dataframe.reset_index().groupby(['waveform','injection_scale'])[ratio_cut_columns].sum() / number_of_injection_for_training
+
+    # Determine injection scale where 95 percent of the triggers would be retain
+    all_ratio_cuts_95_percent_efficiency = dataframe.apply(lambda x: x.reset_index().groupby('waveform').apply(lambda x: numpy.interp(0.95,x.iloc[:,2],x.iloc[:,1]))) #print(numpy.interp(0.95,x.values,x.reset_index().injection_scale.to_numpy())))
+
+    injection_triggers_df_downselect.drop(ratio_cut_columns, axis=1, inplace=True)
+
+    mostEffRatioCut = ((all_ratio_cuts_95_percent_efficiency.subtract(all_ratio_cuts_95_percent_efficiency.min(1), axis=0)).divide(all_ratio_cuts_95_percent_efficiency.min(1), axis=0)**2).sum().idxmin()
+    linearCutPlusTuned   = linearCutPlusRange[mostEffRatioCut]
+    linearCutCrossTuned  = linearCutCrossRange[mostEffRatioCut]
+    linearCutNullTuned   = linearCutNullRange[mostEffRatioCut]
+    print('Successfully chose optimal ratio cut! Plus {0} Cross {1} Null {2}\n'.format(linearCutPlusTuned,
+                                                                                       linearCutCrossTuned,
+                                                                                       linearCutNullTuned))
+
+
+    # If requested we will apply a variety of alpha cuts in the E-I/(E+I)**0.8 or I-E/(E+I)**0.8 space
+
+    # If requested we will apply a variety of alpha cuts in the E-I/(E+I)**0.8 or I-E/(E+I)**0.8 space
+    if re.search('alphaLinCut.*', vetoMethod) is not None:
+        print('Using optimal ratio cut decisions to help pick alpha cuts')
+        loudestBackgroundAlpha, _, _ = xcuts.xapplyalphacuts(background_triggers_df_downselect,
+                                                    ePlusIndex,eCrossIndex,eNullIndex,
+                                                    iPlusIndex,iCrossIndex,iNullIndex,
+                                                    numpy.array([linearCutPlusTuned]),
+                                                    numpy.array([linearCutCrossTuned]),
+                                                    numpy.array([linearCutNullTuned]),
+                                                    alphaCutPlusRange,alphaCutCrossRange,alphaCutNullRange,
+                                                    FAR_Tuning,typeOfCutPlus,typeOfCutCross,detection_statistic_column_name)
+
+        injection_triggers_df_downselect = xcuts.xapplyalphacutsinjection(injection_triggers_df_downselect,
+                                                      ePlusIndex,eCrossIndex,eNullIndex,
+                                                      iPlusIndex,iCrossIndex,iNullIndex,
+                                                      numpy.array([linearCutPlusTuned]),
+                                                      numpy.array([linearCutCrossTuned]),
+                                                      numpy.array([linearCutNullTuned]),
+                                                      alphaCutPlusRange,alphaCutCrossRange,alphaCutNullRange,
+                                                      loudestBackgroundAlpha,typeOfCutPlus,typeOfCutCross,
+                                                      detection_statistic_column_name,)
+
+        alpha_cut_columns = list(range(alphaCutPlusRange.size))
+
+        # Find all injections for which at lest one clusters from a specific waveform, injection scale, and injection trial passed
+        # both the coherent conistency checks and was louder than the loudest suriving background from said coherent consistency check
+        dataframe = injection_triggers_df_downselect.groupby(['waveform','injection_scale','injection_number'])[alpha_cut_columns].sum() >= 1
+
+        # Now we sum how many injections had at lest one cluster pass for every cut combination
+        dataframe = dataframe.reset_index().groupby(['waveform','injection_scale'])[alpha_cut_columns].sum() / number_of_injection_for_training
+
+        # Determine injection scale where 95 percent of the triggers would be retain
+        all_alpha_cuts_50_percent_efficiency = dataframe.apply(lambda x: x.reset_index().groupby('waveform').apply(lambda x: numpy.interp(0.5,x.iloc[:,2],x.iloc[:,1])))
+
+        injection_triggers_df_downselect.drop(alpha_cut_columns, axis=1, inplace=True)
+
+        mostEffAlphaCut = ((all_alpha_cuts_50_percent_efficiency.subtract(all_alpha_cuts_50_percent_efficiency.min(1), axis=0)).divide(all_alpha_cuts_50_percent_efficiency.min(1), axis=0)**2).sum().idxmin()
+
+        alphaCutPlusTuned = alphaCutPlusRange[mostEffAlphaCut]
+        alphaCutCrossTuned = alphaCutCrossRange[mostEffAlphaCut]
+        alphaCutNullTuned = alphaCutNullRange[mostEffAlphaCut]
+        print('Successfully chose optimal alpha cut! Plus {0} Cross {1} Null {2}\n'.format(alphaCutPlusTuned,
+                                                                                           alphaCutCrossTuned,
+                                                                                           alphaCutNullTuned))
+    else:
+        alphaCutPlusTuned = 0
+        alphaCutCrossTuned = 0
+        alphaCutNullTuned = 0
+
+    loudestBackgroundtuned, trials, allbackground = xcuts.xapplyalphacuts(background_triggers_df_downselect_testing,
+                                                         ePlusIndex,eCrossIndex,eNullIndex,
+                                                         iPlusIndex,iCrossIndex,iNullIndex,
+                                                         numpy.array([linearCutPlusTuned]),
+                                                         numpy.array([linearCutCrossTuned]),
+                                                         numpy.array([linearCutNullTuned]),
+                                                         numpy.array([alphaCutPlusTuned]),
+                                                         numpy.array([alphaCutCrossTuned]),
+                                                         numpy.array([alphaCutNullTuned]),
+                                                         FAR_Tuning,typeOfCutPlus,typeOfCutCross,
+                                                         detection_statistic_column_name)
+
+    print('The loudest surviving background trigger at a FAR of {0} has a value of {1} in the {2} statistic'.format(FAR_Tuning,
+                                                                                                                   loudestBackgroundtuned,
+                                                                                                                   detection_statistic_column_name))
+
+    injection_triggers_df_downselect_testing = xcuts.xapplyalphacutsinjection(injection_triggers_df_downselect_testing,
+                                                                 ePlusIndex,eCrossIndex,eNullIndex,
+                                                                 iPlusIndex,iCrossIndex,iNullIndex,
+                                                                 numpy.array([linearCutPlusTuned]),
+                                                                 numpy.array([linearCutCrossTuned]),
+                                                                 numpy.array([linearCutNullTuned]),
+                                                                 numpy.array([alphaCutPlusTuned]),
+                                                                 numpy.array([alphaCutCrossTuned]),
+                                                                 numpy.array([alphaCutNullTuned]),
+                                                                 loudestBackgroundtuned,typeOfCutPlus,typeOfCutCross,
+                                                                 detection_statistic_column_name,)
+
+    # Find all injections for which at lest one clusters from a specific waveform, injection scale, and injection trial passed
+    # both the coherent conistency checks and was louder than the loudest suriving background from said coherent consistency check
+    dataframe = injection_triggers_df_downselect_testing.groupby(['waveform','injection_scale','injection_number'])[0].sum() >= 1
+
+    # Now we sum how many injections had at lest one cluster pass for every cut combination
+    dataframe = dataframe.reset_index().groupby(['waveform','injection_scale'])[0].sum() / number_of_injection_for_testing
+
+    all_data_frames[connectivity] = dataframe
+
+joint_dataframe = all_data_frames[8].reset_index().rename(columns={'injection_scale': 'injection scale', 0:'Connectivity 8'}).merge(all_data_frames[24].reset_index().rename(columns={'injection_scale': 'injection scale', 0:'Connectivity 24'})).merge(all_data_frames[48].reset_index().rename(columns={'injection_scale': 'injection scale', 0:'Connectivity 48'})).merge(all_data_frames[80].reset_index().rename(columns={'injection_scale': 'injection scale', 0:'Connectivity 80'}))
+joint_dataframe.to_hdf('new_wavefroms_results.hdf5','python_x')
+

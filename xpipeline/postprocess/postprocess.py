@@ -19,6 +19,9 @@
 # ---- Import standard modules to the python path.
 import numpy
 import pandas
+import operator
+
+from functools import reduce
 from xpipeline.core import XSparseTimeFrequencyMapDict, csc_XSparseTimeFrequencyMap
 from ..cluster.cluster import XCluster
 
@@ -37,8 +40,8 @@ def extract_clusters_from_dict(maps, statistic_column='standard_energy', connect
             all_energies = []
             all_columns = _default_columns.copy()
             all_columns.append('standard_energy')
-            projected_asd_magnitude_squared =[]
-            bayesian_statistics = []
+
+            # Start by calculating the incoherent and coherent excess energy
             for k,v in imap.items():
                 all_energies.append(v.to_coherent().power2(2).energy)
                 all_columns.append('coherent_' + k)
@@ -64,22 +67,50 @@ def extract_clusters_from_dict(maps, statistic_column='standard_energy', connect
             if projected_asd_magnitude_squared:
                 projected_asd_magnitude_squared =  numpy.asarray(projected_asd_magnitude_squared).flatten(order='F')
 
-            # Just assign the energy attribute of the last sparse maps to be
-            # all the coherent and incoherent energies and get all cluster properties
-            # with one call to the cluster method. (this method calls fastsparseclusterprop.cpp,
-            # which does the heavy lifting)
-            tmp_sparse_map = list(v.values())[0]
+            # Extract the relavant projected asds for the findex
+            # of each pixel
+            # Extact the first detector excess energy map for reference
+            reference_map = list(imap['excess_energy'].values())[0]
+
+            # find the frequency index of all the pixels in this map
+            findex = reference_map.findex
+
+            # loop over all plausible projections
+            for polarization, asds in imap.projected_asds.items():
+                # loop over all detector data streams
+                energies = []
+                for detector, asd in asds.items():
+                    energies.append(imap['excess_energy'][detector].energy * asd.value[findex])
+
+                # calculate the coherent energy for this polarization
+                all_energies.append(numpy.square(numpy.abs(reduce(operator.add, energies))))
+                all_columns.append('coherent_' + polarization)
+
+                # calculate the incoherent energy for this polarization
+                all_energies.append(reduce(operator.add,map(lambda x: numpy.square(numpy.abs(x)),energies)))
+                all_columns.append('incoherent_' + polarization)
+
+            # we will also be calculating the bayesian stats
+            all_columns.extend(['loghbayesian', 'loghbayesiancirc'])
+
+            # We assign the energy attribute of the excess energy map to
+            # all the coherent and incoherent energies (i.e. including the polarization energies)
+            # and get the cluster properities (i.e time frequency and statistics info)
+
+            # here we quickly calculate the standard lieklhiood
+            # which is just coherent plus + coherent cross energy
             all_energies = numpy.asarray(all_energies)
-            all_energies = numpy.vstack((all_energies[0] + all_energies[2], all_energies))
-            tmp_sparse_map.energy = all_energies
+            all_energies = numpy.vstack((all_energies[2] + all_energies[4], all_energies))
+            reference_map.energy = all_energies
             for connectivity in connectivity_list:
-                clusters = tmp_sparse_map.cluster(columns=all_columns, connectivity=connectivity, projected_asd_magnitude_squared=projected_asd_magnitude_squared)
+                clusters = reference_map.cluster(columns=all_columns, connectivity=connectivity,
+                                                 projected_asds_magnitude_squared=imap.projected_asds_magnitude_squared)
                 clusters['connectivity'] = connectivity
 
                 # append the cluster to other clusters from same sky locations
                 all_clusters = all_clusters.append(clusters)
 
-    all_clusters = all_clusters.groupby(['connectivity']).apply(lambda x, statistic_column: XCluster(x).supercluster(statistic_column=statistic_column), statistic_column=statistic_column).reset_index(drop=True)
+    all_clusters = all_clusters.groupby(['connectivity']).apply(lambda x, statistic_column: XCluster(x).supercluster(statistic_column=statistic_column).nlargest(64, [statistic_column]), statistic_column=statistic_column).reset_index(drop=True)
 
     return all_clusters
 
@@ -211,12 +242,12 @@ def extract_energy_maps_from_table(table, **kwargs):
 
 def undo_slides(x,block_time=256):
     # (blocktime + (cluster_min_time_hanford + external slide livingston) -
-    # (event_time + extenral slide livingsto) - half blocktime - internal slide) + 
+    # (event_time + extenral slide livingsto) - half blocktime - internal slide) +
     # (cluster_min_time_hanford + external slide livingston)
     # min time of cluster hanford
-    
+
     h_min_time = x['min_time_of_cluster']
     external_slide = int(x['event'].split('_')[-1])
     internal_slide = x['internal_time_slide']
     event_time = int(x['event'].split('_')[1])
-    return event_time+numpy.mod(h_min_time-event_time-180,block_time) + external_slide
+    return event_time+numpy.mod(h_min_time-event_time-internal_slide,block_time) + external_slide

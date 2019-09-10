@@ -1,0 +1,198 @@
+#!/usr/bin/env python
+from gwpy.segments import Segment, SegmentList
+from xpipeline.utils import utils
+from xpipeline.postprocess import postprocess, prep_data, xcuts
+from xpipeline.setuputils import log
+from sklearn.ensemble import GradientBoostingClassifier,RandomForestClassifier
+
+from matplotlib import pyplot
+from IPython.display import display, HTML
+from six.moves import urllib
+
+import pandas
+import numpy
+import numpy
+import re
+import os
+import random
+import argparse
+
+params = {
+        # latex
+        'text.usetex': True,
+
+        # fonts
+        'font.family': 'serif',
+        #'font.serif': 'Palatino',
+        #'font.sans-serif': 'Helvetica',
+        #'font.monospace': 'Ubunto Mono',
+
+        # figure and axes
+        'figure.figsize': (10, 10),
+        'figure.titlesize': 35,
+        'axes.grid': True,
+        'axes.titlesize':35,
+        #'axes.labelweight': 'bold',
+        'axes.labelsize': 30,
+
+        # tick markers
+        'xtick.direction': 'in',
+        'ytick.direction': 'in',
+        'xtick.labelsize': 25,
+        'ytick.labelsize': 25,
+        'xtick.major.size': 10.0,
+        'ytick.major.size': 10.0,
+        'xtick.minor.size': 3.0,
+        'ytick.minor.size': 3.0,
+
+        'legend.fontsize': 16,
+        'legend.frameon': True,
+        'legend.framealpha': 0.5,
+
+        # colors
+        'image.cmap': 'viridis',
+
+        # saving figures
+        'savefig.dpi': 150
+        }
+
+pyplot.rcParams.update(params)
+
+def parse_commandline():
+    parser = argparse.ArgumentParser(description="This executable processes "
+                                                 "a xpipeline-analysis "
+                                                 "generated file of tfmaps.")
+    # Define groups of flags to make the help output ore useful
+    required_args = parser.add_argument_group('required named arguments')
+    required_args.add_argument("-f", "--event-file", help=
+                               """
+                               trigger file
+                               """,
+                               required=True,)
+    parser.add_argument("--FAP", help=
+                        """
+                        False Alarm Probability Desired
+                        """,
+                        type=float,
+                        required=True,)
+    args = parser.parse_args()
+
+    if not os.path.isfile(args.event_file):
+        raise parser.error('You have supplied a non-existent event-file.')
+
+    return args
+
+args = parse_commandline()
+
+ifos = ['H1', 'L1']
+FAR_Tuning = args.FAP
+
+if FAR_Tuning > 1:
+    FAR_Tuning = (FAR_Tuning/100)
+
+logger = log.Logger('XPIPELINE: Post-Processing {0}'.format(args.event_file))
+
+injection_triggers_df = pandas.read_hdf('{0}'.format(args.event_file), key='/injections/trainingset')
+background_triggers_df = pandas.read_hdf('{0}'.format(args.event_file), key='/background/trainingset')
+
+injection_triggers_df_testing = pandas.read_hdf('{0}'.format(args.event_file), key='/injections/testingset')
+background_triggers_df_testing = pandas.read_hdf('{0}'.format(args.event_file), key='/background/testingset')
+
+number_of_injection_for_training = injection_triggers_df.groupby(['waveform',]).apply(lambda x : numpy.unique(x['injection_number']).size)[0]
+number_of_injection_for_testing = injection_triggers_df_testing.groupby(['waveform',]).apply(lambda x : numpy.unique(x['injection_number']).size)[0]
+
+background_triggers_df['min_time_of_cluster_livingston'] = background_triggers_df[['event', 'internal_time_slide', 'min_time_of_cluster']].apply(postprocess.undo_slides, axis=1)
+background_triggers_df['max_time_of_cluster_livingston'] = background_triggers_df['min_time_of_cluster_livingston'] +background_triggers_df['dt']
+
+background_triggers_df_testing['min_time_of_cluster_livingston'] = background_triggers_df_testing[['event', 'internal_time_slide', 'min_time_of_cluster']].apply(postprocess.undo_slides, axis=1)
+background_triggers_df_testing['max_time_of_cluster_livingston'] = background_triggers_df_testing['min_time_of_cluster_livingston'] +background_triggers_df_testing['dt']
+
+H1_segs_training = SegmentList([Segment(x[0],x[1]) for x in background_triggers_df[['min_time_of_cluster','max_time_of_cluster']].values])
+L1_segs_training = SegmentList([Segment(x[0],x[1]) for x in background_triggers_df[['min_time_of_cluster_livingston','max_time_of_cluster_livingston']].values])
+
+H1_segs_testing = SegmentList([Segment(x[0],x[1]) for x in background_triggers_df_testing[['min_time_of_cluster','max_time_of_cluster']].values])
+L1_segs_testing = SegmentList([Segment(x[0],x[1]) for x in background_triggers_df_testing[['min_time_of_cluster_livingston','max_time_of_cluster_livingston']].values])
+
+veto_seg_h1 = SegmentList.read('input/H1_cat24veto.txt')
+veto_seg_l1 = SegmentList.read('input/L1_cat24veto.txt')
+
+background_triggers_df = background_triggers_df.loc[~numpy.asarray([veto_seg_h1.intersects_segment(cluster_seg) for cluster_seg in H1_segs_training])]
+background_triggers_df_testing = background_triggers_df_testing.loc[~numpy.asarray([veto_seg_h1.intersects_segment(cluster_seg) for cluster_seg in H1_segs_testing])]
+
+#background_triggers_df = background_triggers_df.loc[~numpy.asarray([veto_seg_l1.intersects_segment(cluster_seg) for cluster_seg in L1_segs_training])]
+#background_triggers_df_testing = background_triggers_df_testing.loc[~numpy.asarray([veto_seg_l1.intersects_segment(cluster_seg) for cluster_seg in L1_segs_testing])]
+
+injection_triggers_df, background_triggers_df = prep_data.prep_data(injection_triggers_df, background_triggers_df,duration=1.0)
+injection_triggers_df_testing, background_triggers_df_testing = prep_data.prep_data(injection_triggers_df_testing, background_triggers_df_testing,duration=1.0)
+
+likelihood_columns = ['standard_energy','coherent_f_plus','incoherent_f_plus', 'coherent_f_cross', 'incoherent_f_cross',
+                      'plus_ratio_e_over_i','plus_ratio_i_over_e','cross_ratio_e_over_i','cross_ratio_i_over_e',
+                      'plus_alpha_e_over_i', 'plus_alpha_i_over_e', 'cross_alpha_e_over_i','cross_alpha_i_over_e']
+
+all_data_frames = {}
+for connectivity in background_triggers_df_testing.connectivity.unique():
+    injection_triggers_df_downselect = injection_triggers_df.loc[injection_triggers_df.connectivity == connectivity]
+    background_triggers_df_downselect = background_triggers_df.loc[background_triggers_df.connectivity == connectivity]
+
+    injection_triggers_df_downselect_testing = injection_triggers_df_testing.loc[injection_triggers_df_testing.connectivity == connectivity]
+    background_triggers_df_downselect_testing = background_triggers_df_testing.loc[background_triggers_df_testing.connectivity == connectivity]
+
+    # Get data ready for training
+    injection_x = injection_triggers_df_downselect[likelihood_columns].to_numpy()
+    background_x = background_triggers_df_downselect[likelihood_columns].to_numpy()
+
+    number_of_injection_triggers = len(injection_x)
+    labels_injection = numpy.ones((number_of_injection_triggers)).reshape(-1,1)
+
+    number_of_background_triggers = len(background_x)
+    labels_background = numpy.zeros((number_of_background_triggers)).reshape(-1,1)
+
+    labels_training = numpy.vstack((labels_injection,labels_background))
+    triggers_training = numpy.vstack((injection_x,background_x))
+
+    clf = RandomForestClassifier(max_depth = 13, min_samples_split =10, n_estimators= 300, n_jobs=-1,).fit(triggers_training, labels_training.flatten())
+
+    print('feature importance: {0}'.format(clf.feature_importances_))
+
+    injection_x = injection_triggers_df_downselect_testing[likelihood_columns].to_numpy()
+    background_x = background_triggers_df_downselect_testing[likelihood_columns].to_numpy()
+
+    number_of_injection_triggers = len(injection_x)
+    labels_injection = numpy.ones((number_of_injection_triggers)).reshape(-1,1)
+
+    number_of_background_triggers = len(background_x)
+    labels_background = numpy.zeros((number_of_background_triggers)).reshape(-1,1)
+
+    labels_testing = numpy.vstack((labels_injection,labels_background))
+    triggers_testing = numpy.vstack((injection_x,background_x))
+
+    background_triggers_df_downselect_testing['probability']  = clf.predict_proba(background_triggers_df_downselect_testing[likelihood_columns].to_numpy())[:,1]
+
+    background_per_trial = []
+    for key, item in background_triggers_df_downselect_testing.groupby(['event','internal_time_slide']):
+        background_per_trial.append(item['probability'].max())
+    background_per_trial = numpy.asarray(background_per_trial)
+    background_per_trial.sort()
+
+    try:
+        loudest_background = background_per_trial[numpy.ceil(FAR_Tuning*background_per_trial.size).astype(int)]
+    except:
+        loudest_background = background_per_trial[-1]
+
+
+    injection_triggers_df_downselect_testing['probability'] = clf.predict_proba(injection_triggers_df_downselect_testing[likelihood_columns].to_numpy())[:,1]
+    injection_triggers_df_downselect_testing['pass'] = injection_triggers_df_downselect_testing['probability'] > loudest_background
+
+        # Find all injections for which at lest one clusters from a specific waveform, injection scale, and injection trial passed
+    # both the coherent conistency checks and was louder than the loudest suriving background from said coherent consistency check
+    dataframe2 = injection_triggers_df_downselect_testing.groupby(['waveform','injection_scale','injection_number'])['pass'].sum() >= 1
+
+    # Now we sum how many injections had at lest one cluster pass for every cut combination
+    dataframe2 = dataframe2.reset_index().groupby(['waveform','injection_scale'])['pass'].sum() / number_of_injection_for_testing
+
+    all_data_frames[connectivity] = dataframe2
+
+
+joint_dataframe = all_data_frames[8].reset_index().rename(columns={'injection_scale': 'injection scale', 'pass':'RF Connectivity 8'}).merge(all_data_frames[24].reset_index().rename(columns={'injection_scale': 'injection scale', 'pass':'RF Connectivity 24'})).merge(all_data_frames[48].reset_index().rename(columns={'injection_scale': 'injection scale', 'pass':'RF Connectivity 48'})).merge(all_data_frames[80].reset_index().rename(columns={'injection_scale': 'injection scale', 'pass':'RF Connectivity 80'}))
+joint_dataframe.to_hdf('rf.hdf5','python_x')
+

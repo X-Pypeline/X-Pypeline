@@ -3,13 +3,13 @@
 from xpipeline.core.xtimeseries import XTimeSeries
 from xpipeline.core.xdetector import Detector
 from xpipeline.core.xdetector import compute_antenna_patterns
-from xpipeline.likelihood.xlikelihood import XLikelihoodMap
 from xpipeline.core.xtimefrequencymap import XTimeFrequencyMapDict
-from xpipeline.core.xtimefrequencymap import csc_XSparseTimeFrequencyMap
+from xpipeline.core.xtimefrequencymap import csc_XSparseTimeFrequencyMap,XSparseTimeFrequencyMapDict
 from xpipeline.waveform import xinjectsignal
 from xpipeline.setuputils import log
 from xpipeline.utils import utils
 from xpipeline.postprocess import postprocess, prep_data
+from xpipeline.cluster.cluster import XCluster
 
 from gwpy.table import EventTable
 from gwpy.timeseries import TimeSeries
@@ -220,7 +220,7 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
     time_slides = dict(zip(channel_names, time_slide))
     analysis_data = XTimeSeries.retrieve_data(event_time, block_time,
                                               channel_names, sample_frequency*2,
-                                              frame_types=frame_types, time_slides=time_slides)
+                                              frame_types=frame_types, time_slides=time_slides,)
 
     # Are we doing injections and if so how many injection scales are we doing?
     if args.job_type in _injection_analysis_types:
@@ -308,15 +308,21 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
 
             whitened_timeseries[channel_names[1]] = numpy.roll(whitened_timeseries[channel_names[1]], -3)
 
-            # Now let's loop
+            #########################
+            # Loop over FFT lengths #
+            #########################
             for idx_fft_length, fft_length in enumerate(fft_lengths):
-                ####################
-                # Create FFT grams #
-                ####################
-
                 # ---- Rescale conditioned data to normalize it appropriately for this fftlength
-                if idx>0:
-                    whitened_timeseries.update((x, y*(normalization_factor[idx] / normalization_factor[idx-1])) for x, y in whitened_timeseries.items())
+                if idx_fft_length>0:
+                    whitened_timeseries.update((x, y*(normalization_factor[idx_fft_length] / normalization_factor[idx_fft_length-1])) for x, y in whitened_timeseries.items())
+
+                # only keep relevant frequencies. i.e. between min and max frequency
+                # and also frequencies relevant for this FFT length.
+                sliced_asds = asds.slice_frequencies(numpy.arange(minimum_frequency,maximum_frequency + 1, 1./fft_length).astype(int))
+
+                ###########################
+                # Loop over sky locations #
+                ###########################
                 for idx_sky_postion, (sky_position, time_delay, residual_time_delay) in enumerate(zip(sky_positions, time_delays, residual_time_delays)):
 
                     # shift data and make fftgram
@@ -327,23 +333,26 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                     # with respect to the internal time slides
                     final_time_bin_idx = fft_grams[channel_names[0]].shape[0]
 
+
                     phi = sky_position['phi']
                     theta = sky_position['theta']
                     antenna_patterns = compute_antenna_patterns(['H1', 'L1'], phi, theta,
                                                                 antenna_patterns=['f_plus', 'f_cross'])
-                    projected_asds = asds.project_onto_antenna_patterns(antenna_patterns,
-                                                                        to_dominant_polarization_frame=True)
 
+                    projected_asds = sliced_asds.project_onto_antenna_patterns(antenna_patterns,
+                                                                               to_dominant_polarization_frame=True)
+
+                    # calcualte the magnitude of the projected asds for use in the bayesian statistics
                     projected_asds_magnitude = projected_asds.calculate_magnitude()
-                    # only keep frequencies in the relevant range
-                    projected_asds_magnitude = projected_asds_magnitude.slice_frequencies(numpy.arange(minimum_frequency,maximum_frequency + 1, 1./whitening_length).astype(int))
+
+                    projected_asds_magnitude_squared = numpy.square(numpy.asarray(list(map(projected_asds_magnitude.get, ['f_plus', 'f_cross', 'f_left', 'f_right']))))
 
                     # convert projected asds to unit vectors
                     projected_asds = projected_asds.to_unit()
 
                     # NOTE we calculate everything from here to the loop over
                     # internal time slides for the non-slide maps
-                    # this way when we find pizels for the slide maps
+                    # this way when we find pixels for the slide maps
                     # if we undo the slide to the non-slide maps values
                     # then we do not need to recalculate say likelihood maps again
                     # and again
@@ -354,8 +363,6 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
 
                     # Make a spectrogram that contains phase information
                     fft_grams[channel_names[1]] = fft_grams[channel_names[1]].phaseshift(residual_time_delay)
-                    # Create Dominant Polariztion Frame projected TF map
-                    projected_fftmaps = fft_grams.to_dominant_polarization_frame(projected_asds)
 
                     ####################################################
                     # Find loud pixels and down select maps            #
@@ -371,20 +378,16 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                         total_energy_threshold = energy_maps.to_coherent().blackout_pixels(99).energy.min()
 
                     # Calculate all time slides
-                    tindex_findex_slided = {k : zip(numpy.mod(numpy.repeat(numpy.atleast_2d(energy_maps_zeroed[k].nonzero()[0]), len(v),0) + numpy.atleast_2d(v*(1/fft_length)).T, final_time_bin_idx).astype(int), numpy.repeat(numpy.atleast_2d(energy_maps_zeroed[k].nonzero()[1]), len(v), 0))  for k,v in slides.items()}
+                    tindex_findex_slided = {k : zip(numpy.mod(numpy.repeat(numpy.atleast_2d(energy_maps_zeroed[k].nonzero()[0]), len(v),0) + numpy.atleast_2d(v*(1./fft_length)*(1./offset_fraction)).T, final_time_bin_idx).astype(int), numpy.repeat(numpy.atleast_2d(energy_maps_zeroed[k].nonzero()[1]), len(v), 0))  for k,v in slides.items()}
 
                     # Make every TF pixels pair in all maps
                     all_maps_pixel_pairs = [zip(i[0], i[1]) for k,v in tindex_findex_slided.items() for i in v]
                     array_of_tf_pixels_per_slide_per_det = numpy.asarray(all_maps_pixel_pairs).reshape(-1, internal_slides.size,)
 
                     # all coherent tf pixels accross all maps
-                    all_pixels = numpy.apply_along_axis(lambda x: reduce(lambda x, y: set(x).union(y), x.tolist()), 0, array_of_tf_pixels_per_slide_per_det)
+                    all_pixels = numpy.apply_along_axis(lambda x: reduce(lambda x, y: frozenset(x).union(y), x.tolist()), 0, array_of_tf_pixels_per_slide_per_det)
 
                     for coherent_pixels, circular_time_slide in zip(all_pixels, internal_slides):
-
-                        # make sure that the coherent time frequency pixels are sorted
-                        coherent_pixels = sorted(coherent_pixels)
-
                         # extract the tindices and the findices
                         tindex, findex = zip(*coherent_pixels)
                         tindex = numpy.asarray(tindex)
@@ -395,20 +398,29 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                         findex = {k : findex for k in channel_names}
 
                         # undo internal_time_slide
-                        tindex[channel_names[1]] = numpy.mod(tindex[channel_names[1]]-circular_time_slide*fft_length, final_time_bin_idx).astype(int)
+                        tindex[channel_names[1]] = numpy.mod(tindex[channel_names[1]]-(circular_time_slide*(1./fft_length)*(1./offset_fraction)), final_time_bin_idx).astype(int)
 
                         # Now that we have the pixels that are in each map
                         # let's reconstruct the sparse tf map
                         # Now with pixels from both detectors
                         tmp_map_to_find_total_energy_threshold = fft_grams.to_sparse(tindex, findex, phi=phi, theta=theta).power2().to_coherent()
                         tfpixel_to_keep = numpy.where(tmp_map_to_find_total_energy_threshold.energy>total_energy_threshold)[0]
-                        tindex = {k : v[tfpixel_to_keep] for k,v in tindex.items()}
-                        findex = {k : v[tfpixel_to_keep] for k,v in findex.items()}
-                        surviving_pixels = {k : v.to_sparse(tindex, findex, phi=phi, theta=theta, map_type=k) for k, v in projected_fftmaps.items()}
-                        for k,v in surviving_pixels.items():
-                            v.projected_asd_magnitude_squared = numpy.square(projected_asds_magnitude[k])
 
+                        coherent_pixels = sorted(set(zip(tindex[channel_names[0]][tfpixel_to_keep],findex[channel_names[0]][tfpixel_to_keep])))
+                        tindex, findex = zip(*coherent_pixels)
+                        tindex = numpy.asarray(tindex)
+                        findex = numpy.asarray(findex)
+
+                        # extract the tindices and the findices
+                        tindex = {k : tindex for k in channel_names}
+                        findex = {k : findex for k in channel_names}
+
+                        # Create a Sparse Map Dict to save the surviving coherent pixels for this
+                        # time slide, fft_length and sky position
+                        surviving_pixels = XSparseTimeFrequencyMapDict()
                         surviving_pixels['excess_energy'] = fft_grams.to_sparse(tindex, findex, phi=phi, theta=theta)
+                        surviving_pixels.projected_asds = projected_asds
+                        surviving_pixels.projected_asds_magnitude_squared = projected_asds_magnitude_squared
                         all_sparse_maps[circular_time_slide][fft_length][(phi, theta)] = surviving_pixels
 
             # cluster sparse time-frequency maps and save info
@@ -433,7 +445,16 @@ for event_time, time_slide in zip(event[:,0], event[:,1:]):
                 all_triggers['waveform'] = waveform_name
                 all_triggers['injection_scale'] = injection_scale
                 all_triggers['injection_number'] = injection_number
-                all_triggers = prep_data.window_cut(all_triggers,duration=1.0)
+                # see if any trigger lie close to the injection if not save only the first trigger
+                # from each connectivity (these will get thrown out in the postprocessing anyways because they
+                # lie outside an acceptable window of the injection.
+                # however HDF5 doe not like empty data frames and we need SOME records of this injection
+                # and injection scale and waveform.
+                if prep_data.window_cut(all_triggers,duration=1.5).empty:
+                    all_triggers = all_triggers.groupby(['connectivity']).apply(lambda x: x.iloc[0:1]).reset_index(drop=True)
+                else:
+                    all_triggers = prep_data.window_cut(all_triggers,duration=1.5)
+
                 all_triggers.to_hdf('./output/grb-{0}-{1}-{2}-{3}-{4}-triggers.h5'.format(args.job_type, int(event_time), waveform_name, injection_numbers[0], injection_numbers[-1]), key='/injections', append=True, index=False,)
             else:
-                all_triggers.to_hdf('./output/grb-{0}-{1}-triggers.h5'.format(args.job_type, processed_map_info), key='/background', append=True, index=False,)       
+                all_triggers.to_hdf('./output/grb-{0}-{1}-triggers.h5'.format(args.job_type, processed_map_info), key='/background', append=True, index=False,)

@@ -617,8 +617,7 @@ else:
         with open(frameCacheAll, 'a+') as fobj:
             write_cache(map(CacheEntry.from_T050017, cache), fobj)
     logger.info("Convert lal style frame cache to MATLAB style")
-    os.system('convertlalcache.pl {0} {0}_temp.txt'.format(frameCacheAll))
-    os.system('cat {0}_temp.txt > {0}'.format(frameCacheAll))
+    os.system('convertlalcache.pl {0} {0}_MATLAB.txt'.format(frameCacheAll))
 
     # ---- Status message.
     logger.info("... finished writing framecache file for ifo data")

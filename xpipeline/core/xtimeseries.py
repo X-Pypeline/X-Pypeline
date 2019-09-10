@@ -18,6 +18,7 @@
 
 # ---- Import standard modules to the python path.
 import numpy
+import scipy
 
 from gwpy.timeseries import TimeSeriesDict
 from gwpy.timeseries import TimeSeries
@@ -80,32 +81,21 @@ class XTimeSeries(TimeSeriesDict):
                               "with key channel and value frametype "
                               "assosciated with that channel")
 
+        source = kwargs.pop('source', None)
+
         #----- Start and stop time for this event.
         start_time = event_time - block_time / 2;
         stop_time = event_time + block_time / 2;
 
-        try:
-            data = cls()
-            for det in channel_names:
-                data.append({det : TimeSeries.get(det,
-                                           start_time + time_slides[det],
-                                           stop_time + time_slides[det],
-                                           frametype=frame_types[det],
-                                           **kwargs
-                                          )
-                             })
-        except:
-            # Retrieve data useing the get classmethod 
-            data = cls()
-            for det in channel_names:
-                data.append({det : TimeSeries.fetch_open_data(
-                                                              det.split(':')[0],
-                                           start_time + time_slides[det],
-                                           stop_time + time_slides[det],
-                                           sample_rate=sample_frequency,
-                                           **kwargs
-                                          )
-                                 })
+        data = cls()
+        for det in channel_names:
+            data.append({det : TimeSeries.get(det,
+                                       start_time + time_slides[det],
+                                       stop_time + time_slides[det],
+                                       frametype=frame_types[det],
+                                       **kwargs
+                                      )
+                         })
 
         for key, series in data.items():
             if series.sample_rate.decompose().value != sample_frequency:
@@ -307,7 +297,7 @@ class XTimeSeries(TimeSeriesDict):
         return tfmaps
 
 
-    def fftgram(self, fftlength):
+    def fftgram(self, fftlength, window='modifiedhann', **kwargs):
         """Obtain the spectrograms of items in this dict.
 
         Parameters
@@ -325,12 +315,22 @@ class XTimeSeries(TimeSeriesDict):
             fftlength = dict((c, fftlength) for c in self)
 
         for (idet, iseries) in self.items():
-            tfmaps[idet] = XTimeFrequencyMap(iseries.fftgram(
-                                             fftlength=fftlength[idet],
-                                             overlap=0.5*fftlength[idet],
-                                             window='hann'))
-        return tfmaps
+            if window == 'modifiedhann':
+                sample_per_seg = int((fftlength[idet] * iseries.sample_rate).decompose().value)
+                window1 = modified_hann_window(sample_per_seg)
+                tfmaps[idet] = XTimeFrequencyMap(iseries.fftgram(
+                                                 fftlength=fftlength[idet],
+                                                 overlap=0.5*fftlength[idet],
+                                                 window=window1))
+                #scale = numpy.sqrt((iseries.sample_rate.value * (window1*window1).sum()))
+                #tfmaps[idet] = tfmaps[idet] * scale
+            else:
+                tfmaps[idet] = XTimeFrequencyMap(iseries.fftgram(
+                                                 fftlength=fftlength[idet],
+                                                 overlap=0.5*fftlength[idet],
+                                                 window=window))
 
+        return tfmaps
 
     def inject(self, injection_data, **kwargs):
         """Take an injection time series and inject into `XTimeSeries`
@@ -359,3 +359,16 @@ class XTimeSeries(TimeSeriesDict):
                 )
 
         return injection_timeseries
+
+def modified_hann_window(N):
+    hann_window = scipy.signal.hann(int(0.5*N))
+    modified_hann_window = numpy.zeros(N)
+    # Split window in half and insert ones in the middle
+    one_fourth_N = int(N/4)
+    modified_hann_window[0:one_fourth_N] = hann_window[0:one_fourth_N]
+    modified_hann_window[3*one_fourth_N:N] = hann_window[one_fourth_N:N]
+    modified_hann_window[one_fourth_N:3*one_fourth_N] = 1.
+
+    window_mean_square = numpy.mean(modified_hann_window**2)
+    modified_hann_window = modified_hann_window / numpy.sqrt(window_mean_square)
+    return modified_hann_window
