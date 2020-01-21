@@ -193,6 +193,6 @@ for connectivity in background_triggers_df_testing.connectivity.unique():
     all_data_frames[connectivity] = dataframe2
 
 
-joint_dataframe = all_data_frames[8].reset_index().rename(columns={'injection_scale': 'injection scale', 'pass':'RF Connectivity 8'}).merge(all_data_frames[24].reset_index().rename(columns={'injection_scale': 'injection scale', 'pass':'RF Connectivity 24'})).merge(all_data_frames[48].reset_index().rename(columns={'injection_scale': 'injection scale', 'pass':'RF Connectivity 48'})).merge(all_data_frames[80].reset_index().rename(columns={'injection_scale': 'injection scale', 'pass':'RF Connectivity 80'}))
+joint_dataframe = all_data_frames[8].reset_index().rename(columns={'injection_scale': 'injection scale', 'pass':'RF Connectivity 8'})
 joint_dataframe.to_hdf('rf.hdf5','python_x')
 

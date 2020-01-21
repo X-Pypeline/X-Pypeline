@@ -2162,7 +2162,10 @@ if cp.has_section('waveforms') :
                   node.set_x_jobnum("{0}".format(thisInjSeg[i]))
 
                   # this is background trial
-                  node.set_output_dir("injection")
+                  if offSourceInj:
+                      node.set_output_dir("offsource_injection")
+                  else:
+                      node.set_output_dir("onsource_injection")
 
                   # set path to param file
                   matlab_param_file = cwdstr + "/input/parameters_simulation_" + set + "_0_" + str(thisInjSeg[i]) + ".txt" 
@@ -2242,7 +2245,10 @@ if cp.has_section('waveforms') :
                     node.set_x_jobnum("{0}".format(i))
 
                     # this is background trial
-                    node.set_output_dir("injection")
+                    if offSourceInj:
+                        node.set_output_dir("offsource_injection")
+                    else:
+                        node.set_output_dir("onsource_injection")
 
                     # set path to param file
                     matlab_param_file = cwdstr + "/input/parameters_simulation_" \
@@ -2274,7 +2280,11 @@ if cp.has_section('waveforms') :
                             node.set_x_jobnum("{0}".format(i+iWindow*jobsPerWindow))
 
                             # this is background trial
-                            node.set_output_dir("injection")
+                            # this is background trial
+                            if offSourceInj:
+                                node.set_output_dir("offsource_injection")
+                            else:
+                                node.set_output_dir("onsource_injection")
 
                             # set path to param file
                             matlab_param_file = cwdstr + "/input/parameters_simulation_" \
