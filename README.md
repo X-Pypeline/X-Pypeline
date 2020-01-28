@@ -5,9 +5,10 @@ An attempt to create a pythonic version of X-Pipeline: https://trac.ligo.caltech
 
 ## CONDA
 ### Basic
-`conda create -c conda-forge -n xpipeline-py37 gwpy cython pytables pandas python=3.7`
-`pip install git+https://github.com/X-Pypeline/X-Pypeline.git`
-
+```
+conda create -c conda-forge -n xpipeline-py37 gwpy cython pytables pandas python=3.7
+pip install git+https://github.com/X-Pypeline/X-Pypeline.git
+```
 
 # Reproduce Thesis or Paper Analysis on CIT
 After cloning the repository locally to CIT copy the `./examples/snews` to somewhere you want to do the analysis on CIT
