@@ -293,7 +293,7 @@ minimalMem = args.minimalMem
 FAR = args.FAR
 FAP = args.FAP
 
-logger = log.Logger('X-Pypline')
+logger = log.Logger('X-Pypeline')
 
 if ra2 and decl2 and sky_pos_err2:
     raise ValueError('New setup script no longer supports supplying two sky locations due '
