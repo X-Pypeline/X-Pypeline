@@ -1645,12 +1645,12 @@ if not use_xpypeline :
     # ---- Make instance of XmergeJob.
     mergejob = xcondor.XmergeJob(cp,UserName)
     # ---- Put a single merge job node in mergejob.  This job will combine
-    #      into a single file the output of all of the off-source analysis jobs.
+    #      into a single file the output of all of the on-source analysis jobs.
     mergenode = xcondor.XmergeNode(mergejob)
     if xtmvaFlag:
         xtmvanode.add_parent(mergenode)
 
-# ---- if clustering.
+# ---- If using smart clustering - THIS CODE MAY NOT WORK.
 if smartCluster == True:
   logger.info("Writing on-source clustering dag ... ")
   logger.info(log_file_on_source_clustered)
@@ -1659,12 +1659,11 @@ if smartCluster == True:
   mergeclusteredjob = xcondor.XmergeClusteredJob(cp,len(detector))
   mergeclusterednode = xcondor.XmergeClusteredNode(mergeclusteredjob)
 
-# ---- Make analysis jobs for all segments (currently 1) in the on-source
-#      segment list.
+# ---- Make analysis jobs for all segments in the on-source segment list.
 segmentList = pipeline.ScienceData()
 segmentList.read( 'input/segment_on_source.txt' , blockTime )
 
-# ---- Read the number of chunks from the event list
+# ---- Read the number of chunks from the event list.
 event_on_file = open('input/event_on_source.txt')
 event_on_list = event_on_file.readlines()
 nOnEvents = len(event_on_list)
@@ -1676,30 +1675,33 @@ for i in range(len(segmentList)):
         node = xcondor.XsearchNode(job)
     else :
         node = xcondor.XmatlabSearchNode(job)
-    # ---- Parameters file:
+        mergenode.add_parent(node)
+    # ---- Set the arguments of the on-source jobs.
     matlab_param_file = cwdstr + "/input/parameters_on_source_" + str(i) + ".txt"
     node.set_param_file(matlab_param_file)
     node.set_x_jobnum(i)
-    # ---- On-source results files are always written to the local
-    #      output/on_source directory - there are very few such jobs.
     node.set_output_dir( os.path.join( cwdstr + "/output/on_source" ) )
     node.set_x_injnum('0')
-    #mergenode.add_parent(node)
+    # ---- Set the retry number.
     node.set_retry(retryNumber)
     # ---- Prepend human readable description to node name.
     node.set_name("xdetection_on_source_seg" + str(i) + "_" + node.get_name())
+    # ---- Add this node to the dag.
     dag.add_node(node)
 
 if not use_xpypeline :
-    # ---- Supply remaining XmergeJob node parameters, add job to the dag.
+    # ---- Set the arguments of the merge job.
     mergenode.set_dir_prefix("on_source/")
     mergenode.set_sn_flag("0 " + mergingCutsString)
+    # ---- Set the retry number.
     mergenode.set_retry(retryNumber)
     # ---- Prepend human readable description to node name.
     mergenode.set_name("xmerge_on_source_" + mergenode.get_name())
+    # ---- Add this node to the dag.
     dag.add_node(mergenode)
 
-# ---- do the same if clustering.
+# ---- Set the arguments of the smart-clustering merge job if using smart 
+#      clustering. THIS CODE MAY NOT WORK.
 if smartCluster == True:
   mergeclusterednode.set_dir_prefix("on_source/")
   mergeclusterednode.set_sn_flag("0 " + mergingCutsString)
@@ -1712,17 +1714,17 @@ if smartCluster == True:
 dag.write_sub_files()
 # ---- Write out the DAG itself.
 dag.write_dag()
-# ---- Delete used dag job
+# ---- Delete used dag and jobs.
 del dag
 del job
 if not use_xpypeline :
     del mergejob
-# --- if we cluster
 if smartCluster == True:
-  dag_clustered.write_sub_files()
-  dag_clustered.write_dag()
-  del dag_clustered
-  del mergeclusteredjob
+    dag_clustered.write_sub_files()
+    dag_clustered.write_dag()
+    del dag_clustered
+    del mergeclusteredjob
+
 
 # -------------------------------------------------------------------------
 #      Write ul-source dag.
@@ -1734,27 +1736,28 @@ dag = pipeline.CondorDAG(log_file_on_source + uuidtag)
 # ---- Set the name of the file that will contain the DAG.
 dag.set_dag_file( 'grb_ul_source' )
 
-# ---- Make instance of XsearchJob.
-job = xcondor.XsearchJob(cp)
+# ---- Make instance of search job.
+if outputType == 'seedless' and doGPUOnSource == "true":
+    job = xcondor.XsearchGPUJob(cp)
+else :
+    job = xcondor.XsearchJob(cp,UserName,use_xpypeline)
 
-if outputType == 'seedless':
-    if doGPUUL == "true":
-        job = xcondor.XsearchGPUJob(cp)
+# ---- Make merge jobs if needed.
+if not use_xpypeline :
+    # ---- Make instance of XmergeJob.
+    mergejob = xcondor.XmergeJob(cp,UserName)
+    # ---- Put a single merge job node in mergejob.  This job will combine
+    #      into a single file the output of all of the ul-source analysis jobs.
+    mergenode = xcondor.XmergeNode(mergejob)
+    if xtmvaFlag:
+        xtmvanode.add_parent(mergenode)
 
-# ---- Make instance of XmergeJob.
-#mergejob = xcondor.XmergeJob(cp)
-# ---- Put a single merge job node in mergejob.  This job will combine
-#      into a single file the output of all of the off-source analysis jobs.
-#mergenode = xcondor.XmergeNode(mergejob)
-if xtmvaFlag:
-    xtmvanode.add_parent(mergenode)
-
-# ---- Make analysis jobs for all segments (currently 1) in the on-source
-#      segment list.
+# ---- Make analysis jobs for all segments in the on-source segment list (used
+#      for UL jobs as well).
 segmentList = pipeline.ScienceData()
 segmentList.read( 'input/segment_on_source.txt' , blockTime )
 
-# ---- Read the number of chunks from the event list
+# ---- Read the number of chunks from the event list.
 event_on_file = open('input/event_on_source.txt')
 event_on_list = event_on_file.readlines()
 nOnEvents = len(event_on_list)
@@ -1762,38 +1765,45 @@ event_on_file.close()
 
 # ---- Add one node to the job for each segment to be analysed.
 for i in range(len(segmentList)):
-    node = xcondor.XsearchNode(job)
-    # ---- Parameters file:
+    if use_xpypeline :
+        node = xcondor.XsearchNode(job)
+    else :
+        node = xcondor.XmatlabSearchNode(job)
+        mergenode.add_parent(node)
+    # ---- Set the arguments of the ul-source jobs.
     matlab_param_file = cwdstr + "/input/parameters_ul_source_" + str(i) + ".txt"
     node.set_param_file(matlab_param_file)
     node.set_x_jobnum(i)
-    # ---- Ul-source results files are always written to the local
-    #      output/ul_source directory - there are very few such jobs.
     node.set_output_dir( os.path.join( cwdstr + "/output/ul_source" ) )
     node.set_x_injnum('0')
-    #mergenode.add_parent(node)
+    # ---- Set the retry number. 
     node.set_retry(retryNumber)
     # ---- Prepend human readable description to node name.
     node.set_name("xdetection_ul_source_seg" + str(i) + "_" + node.get_name())
+    # ---- Add this node to the dag.
     dag.add_node(node)
 
-# ---- Supply remaining XmergeJob node parameters, add job to the dag.
-#mergenode.set_dir_prefix("ul_source/")
-#mergenode.set_sn_flag("0 " + mergingCutsString)
-#mergenode.set_retry(retryNumber)
-# ---- Prepend human readable description to node name.
-#mergenode.set_name("xmerge_ul_source_" + mergenode.get_name())
-#dag.add_node(mergenode)
-
+if not use_xpypeline :
+    # ---- Set the arguments of the merge job.
+    mergenode.set_dir_prefix("ul_source/")
+    mergenode.set_sn_flag("0 " + mergingCutsString)
+    # ---- Set the retry number. 
+    mergenode.set_retry(retryNumber)
+    # ---- Prepend human readable description to node name.
+    mergenode.set_name("xmerge_ul_source_" + mergenode.get_name())
+    # ---- Add this node to the dag.
+    dag.add_node(mergenode)
 
 # ---- Write out the submit files needed by condor.
 dag.write_sub_files()
 # ---- Write out the DAG itself.
 dag.write_dag()
-# ---- Delete used dag job
+# ---- Delete used dag and jobs.
 del dag
 del job
-#del mergejob
+if not use_xpypeline :
+    del mergejob
+
 
 # -------------------------------------------------------------------------
 #      Write off-source dag.
