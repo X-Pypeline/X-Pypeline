@@ -108,26 +108,6 @@ def parse_commandline():
 			Default 'circular'.
                         """,
                         default='circular')
-    parser.add_argument("--right-ascension2", help=
-                        """
-                        Right ascension of center of second trigger
-                              error circle (degrees, from 0 to 360).  Intended
-                              for ANTARES HEN analysis.
-                        """,
-                        type=float, dest='ra2')
-    parser.add_argument("--declination2", help=
-                        """
-                        Declination of center of second trigger\
-                        error circle (degrees, from -90 to 90).  Intended\
-                        for ANTARES HEN analysis.
-                        """,
-                        type=float, dest='decl2')
-    parser.add_argument("--sky-pos-err2", help=
-                        """
-                        1-sigma uncertainty in sky position of second\
-                        trigger error circle (degrees).
-                        """,
-                        type=float)
     parser.add_argument("-f", "--grid-sim-file", help=
                        """
                        File which contains (R.A.,Dec) coordinates
@@ -157,12 +137,6 @@ def parse_commandline():
 			    [stat_sigma sys_core_sigma fraction_core sys_tail_sigma]
 			    all sigma are in degrees
                         """)
-    parser.add_argument("--injdistrib2", help=
-                        """
-                        Same as --injdistrib but for second error circle.
-                        """)
-    parser.add_argument("--elognormal", help="Same as --injdistrib")
-    parser.add_argument("--elognormal2", help="Same as --injdistrib2")
     parser.add_argument("--priority", help=
                         """
                         Integer specifying the priority of condor jobs.
@@ -177,15 +151,6 @@ def parse_commandline():
 			file and <offset> is used.
                         """,
                         type=float, default=0, dest='manualEndOffset')
-    parser.add_argument("-m", "--mdc-path", help=
-                        """
-                        Path to mdc parent dir
-                        If this option is used then the mdc log files
-		        for each GRB will be copied from
-		        <mdc-path>/GRB_<grb-name>/<waveform>/logs
-		        into the GRBs /input dir and renamed according
-		        to X-Pipeline conventions.
-                        """)
     parser.add_argument("--disable-fast-injections", help=
                         """
                         If set disables the fast processing of injections
@@ -263,42 +228,32 @@ args = parse_commandline()
 
 # Set command line arguments to variables to be used later in the code
 # Also based on command line arguments set some other defaults
-reUseInj = args.reUseInj
-mergingCutsPath = args.mergingCutsPath
-grid_type = args.grid_type
-grb_name = args.grb_name
-params_file = args.params_file
-trigger_time = round(args.trigger_time)
-ra = args.ra
-decl = args.decl
-sky_pos_err = args.sky_pos_err
-injdistrib = args.injdistrib
-ra2 = args.ra2
-decl2 = args.decl2
-sky_pos_err2 = args.sky_pos_err2
-injdistrib2 = args.injdistrib2
-detector = args.detector
-network_selection = args.network_selection
-mdc_path = args.mdc_path
-condorPriority = args.condorPriority
-xtmvaFlag = args.xtmvaFlag
-manualEndOffset = args.manualEndOffset
-longInjections = args.longInjections
+reUseInj              = args.reUseInj
+mergingCutsPath       = args.mergingCutsPath
+grid_type             = args.grid_type
+grb_name              = args.grb_name
+params_file           = args.params_file
+trigger_time          = round(args.trigger_time)
+ra                    = args.ra
+decl                  = args.decl
+sky_pos_err           = args.sky_pos_err
+injdistrib            = args.injdistrib
+detector              = args.detector
+network_selection     = args.network_selection
+condorPriority        = args.condorPriority
+xtmvaFlag             = args.xtmvaFlag
+manualEndOffset       = args.manualEndOffset
+longInjections        = args.longInjections
 disableFastInjections = args.disableFastInjections
-catalog_dir = args.catalog_dir
-offSourceInj = args.offSourceInj
-grid_sim_file = args.grid_sim_file
-smartCluster = args.smartCluster
-minimalMem = args.minimalMem
-FAR = args.FAR
-FAP = args.FAP
+catalog_dir           = args.catalog_dir
+offSourceInj          = args.offSourceInj
+grid_sim_file         = args.grid_sim_file
+smartCluster          = args.smartCluster
+minimalMem            = args.minimalMem
+FAR                   = args.FAR
+FAP                   = args.FAP
 
 logger = log.Logger('X-Pypeline')
-
-if ra2 and decl2 and sky_pos_err2:
-    raise ValueError('New setup script no longer supports supplying two sky locations due '
-                     'the amount of extra lines of code it requires.')
-
 
 #
 #    Validating inputs
@@ -317,16 +272,9 @@ for iDet in detector:
 #
 
 # ---- grb_name should have format e.g., "GRB070201"
-#      we append GRB prefix if missing unless we are analysing a
-#      MOCK GRB.
-if not(grb_name.startswith('MOCK')) and not(grb_name.startswith('GRB')):
+#      we append GRB prefix if missing 
+if not(grb_name.startswith('GRB')):
     grb_name = 'GRB' + grb_name
-
-# ---- if grb_name begins with MOCK then we are doing a MOCK analysis.
-if grb_name.startswith('MOCK'):
-    mockAnalysis = 1
-else:
-    mockAnalysis = 0
 
 
 # -------------------------------------------------------------------------
@@ -341,10 +289,6 @@ fullhostname = socket.getfqdn()
 
 # ---- Check hostname and set flag if necessary.
 if 'atlas' in fullhostname:
-    atlasFlag = 1
-elif 'h2' in hostname:
-    atlasFlag = 1
-elif 'coma' in fullhostname:
     atlasFlag = 1
 else:
     atlasFlag = 0
@@ -404,7 +348,7 @@ sfile.close()
 #      the options to have been used
 command_string = 'xpipeline-workflow '
 with open('xpipeline-workflow.param', 'w') as f:
-    f.write(command_string + ' '.join(sys.argv[1:]))
+    f.write(command_string + ' '.join(sys.argv[1:]) + '\n')
 
 # -------------------------------------------------------------------------
 #      Preparatory.
@@ -601,7 +545,7 @@ if dataFrameCache:
     if not os.path.isfile(dataFrameCache):
         logger.error("non existant framecache: {0}".format(dataFrameCache))
 
-    # ---- if the specified mdc frame cache exists then concat it other frame caches
+    # ---- if the specified frame cache exists then concat it other frame caches
     command = 'cat ' + dataFrameCache + '  >> ' + frameCacheAll
     os.system(command)
 else:
@@ -1065,21 +1009,6 @@ sfile.close()
 
 # ---- Status message.
 logger.info("... finished writing on-source event file.")
-
-
-# -------------------------------------------------------------------------
-#      Determine MDCs to process, write mdcChannelFiles.
-# -------------------------------------------------------------------------
-
-# ---- Parameter files for MDC waveform analyses, if requested.
-if cp.has_option('mdc','mdc_sets') :
-    # ---- Read [mdc] sets and injection scales.  If mdc_sets is empty or specifies
-    #      unknown MDC sets then the script will have already exited when trying to
-    #      write the mdcchannel file above.
-    ioutils.write_mdc(filename, outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, parameters, onSourceEndOffset, cp, injectionScalesList, disableFastInjections, waveform)
-
-# ---- Status message.
-logger.info("... finished writing parameter files.     ")
 
 
 # -------------------------------------------------------------------------
@@ -1596,8 +1525,6 @@ if cp.has_section('waveforms') :
     log_file_simulations = cp.get('condor','dagman_log_simulations')
     if smartCluster == True:
         log_file_simulations_clustered = cp.get('condor','dagman_log_simulations')+'_clustered'
-if cp.has_option('mdc','mdc_sets') :
-    log_file_mdcs = cp.get('condor','dagman_log_mdcs')
 
 # ---- Make directories to store the log files and error messages
 #      from the nodes in the DAG
@@ -1644,27 +1571,6 @@ if cp.has_section('waveforms') :
             if smartCluster == True:
               try: os.mkdir( 'output_clustered/simulations_' + set + '_' + str(scale_counter) )
               except: pass
-
-
-if cp.has_option('mdc','mdc_sets') :
-    mdc_setsList = cp.get('mdc','mdc_sets')
-    mdc_sets = mdc_setsList.split(',')
-    for set in mdc_sets :
-        # ---- The user can specify different injection scales for each
-        #      waveform set by including a section with that name in the ini
-        #      file.  Look for one.  If no special section for this waveform,
-        #      then use the default injection scales from [injection].
-        if cp.has_section(set) & cp.has_option(set,'injectionScales') :
-            injectionScalesList = cp.get(set,'injectionScales')
-            injectionScales = injectionScalesList.split(',')
-        else:
-            injectionScalesList = cp.get('injection','injectionScales')
-            injectionScales = injectionScalesList.split(',')
-        scale_counter = 0
-        for injectionScale in injectionScales :
-            try: os.mkdir( 'output/simulations_' + set + '_' + str(scale_counter) )
-            except: pass
-            scale_counter = scale_counter + 1
 
 
 # -------------------------------------------------------------------------
@@ -1731,26 +1637,6 @@ event_on_file = open('input/event_on_source.txt')
 event_on_list = event_on_file.readlines()
 nOnEvents = len(event_on_list)
 event_on_file.close()
-
-# ---- Read from the parameters file how job results files are to be
-#      distributed across nodes, and write that info to a file that
-#      will be used by the post-processing scripts.
-distributeOnSource = int(cp.get('output','distributeOnSource'))
-if distributeOnSource == 1:
-    jobNodeFileOnSource = cp.get('output','jobNodeFileOnSource')
-    nodeList = open( jobNodeFileOnSource,'w')
-    nodeList.write("Number_of_detectors %d\n"%(len(detector)))
-    for i in range(0,len(detector)) :
-        nodeList.write("%s\t"%(detector[i]))
-    nodeList.write("\n")
-    nodeList.write('event_on_source_file ')
-    nodeList.write(cwdstr + "/input/event_on_source.txt \n")
-    nodeList.write("Injection_file N/A \n")
-    nodeList.write('Number_of_jobs ')
-    nodeList.write("%d \n"%(len(segmentList)))
-    nodeList.write('Number_of_jobs_per_node ')
-    nodeList.write("%d \n"%(len(segmentList)))
-    nodeList.write(cwdstr + " \n")
 
 # ---- Add one node to the job for each segment to be analysed.
 for i in range(len(segmentList)):
@@ -2040,17 +1926,6 @@ if cp.has_section('waveforms') :
 
     # ---- Read [injection] parameters.
     waveform_set = cp.options('waveforms')
-
-    # ---- Read how distribute results on node and write to file
-    distributeSimulation = int(cp.get('output','distributeSimulation'))
-
-    if distributeSimulation == 1 :
-        nodePath = cp.get('output','nodePath')
-        onNodeSimulationPath = cp.get('output','onNodeSimulationPath')
-        nNodes = int(cp.get('output','nNodes'))
-        jobNodeFileSimulationPrefix = cp.get('output','jobNodeFileSimulationPrefix')
-        nodeOffset = int(cp.get('output','numberOfFirstNode'));
-        jobNumber = nodeOffset-1
 
     # ---- Write one dag for each waveform set.
     for set in waveform_set :
@@ -2350,217 +2225,6 @@ if cp.has_section('waveforms') :
           del mergeclusteredjob
 
 # -------------------------------------------------------------------------
-#      Write MDC simulation dags - one for each MDC set.
-# -------------------------------------------------------------------------
-
-# ---- All injection scales for a given MDC set will be handled by a
-#      single dag.
-
-# ---- Check for MDC sets.
-if cp.has_option('mdc','mdc_sets') :
-
-    # ---- Status message.
-    logger.info("Writing MDC job dag files ... ")
-
-    # ---- Get list of MDC sets to process.
-    mdc_setsList = cp.get('mdc','mdc_sets')
-    mdc_sets = mdc_setsList.split(',')
-
-    # ---- Check how many MDC segments are to be bundled into each xdetection job.
-    maxMDCSegNum = int(cp.get('output','maxMDCSegNum'))
-
-    # ---- Read how the user wants the results distributed (over nodes, or not)
-    #      and record this info to a file.
-    distributeSimulation = int(cp.get('output','distributeSimulation'))
-    if distributeSimulation == 1 :
-        nodePath = cp.get('output','nodePath')
-        onNodeSimulationPath = cp.get('output','onNodeSimulationPath')
-        nNodes = int(cp.get('output','nNodes'))
-        jobNodeFileSimulationPrefix = cp.get('output','jobNodeFileSimulationPrefix')
-        nodeOffset = int(cp.get('output','numberOfFirstNode'));
-        jobNumber = nodeOffset-1
-
-    # ---- Write one dag for each waveform set.
-    for set in mdc_sets :
-        logger.info('Writing dag for MDC set: {0}'.format(set))
-        if cp.has_section(set) & cp.has_option(set,'injectionScales') :
-            injectionScalesList = cp.get(set,'injectionScales')
-            injectionScales = injectionScalesList.split(',')
-        else:
-            injectionScalesList = cp.get('injection','injectionScales')
-            injectionScales = injectionScalesList.split(',')
-
-        # ---- Create a dag to which we can add jobs.
-        dag = pipeline.CondorDAG( log_file_simulations + "_" + set + uuidtag)
-
-        # ---- Set the name of the file that will contain the DAG.
-        dag.set_dag_file( "grb_" + set )
-
-        # ---- Make instance of XsearchJob.
-        job = xcondor.XsearchJob(cp)
-
-        # ---- Make instance of XmergeJob. This job will merge the results files
-        #      produced by the several analysis nodes.
-        mergejob = xcondor.XmergeJob(cp)
-
-        #      Make analysis jobs for all segments in the MDC segment list.
-        #      Read segment list from file.
-        segFileName = 'input/segment_' + set +  '.txt'
-        if not os.path.isfile(segFileName):
-            logger.error("Error: non existant segment file: {0}".format(segFileName))
-
-        segmentList = []
-        segmentList = pipeline.ScienceData()
-        segmentList.read( segFileName , blockTime )
-
-        # ---- Read ini file to determine number of injections for this set.
-        numberOfInjections = int(cp.get(set,'numberOfChannels'))
-
-        # ---- Loop over injection scales.
-        scale_counter = 0
-        for injectionScale in injectionScales :
-            # ---- Merge all results for a single waveform+injection scale.
-            #mergenode = xcondor.XmergeNode(mergejob)
-            if xtmvaFlag:
-                xtmvanode.add_parent(mergenode)
-
-            # ---- Set up of jobs depends on how many injections are to be done
-            #      by each job: a fixed number (maxInjNum,maxMDCSegNum), or all
-            #      (maxInjNum==0,maxMDCSegNum==0).
-            if maxInjNum == 0 and maxMDCSegNum == 0:
-                # ---- Each analysis job will analyse any and all injections in
-                #      its analysis segment.
-                i = 0
-
-                # ---- Create job node.
-                node = xcondor.XsearchNode(job)
-                # ---- Assign first argument: parameters file
-                matlab_param_file = cwdstr + "/input/parameters_" + set \
-                    + "_" + str(scale_counter) + ".txt"
-                node.set_param_file(matlab_param_file)
-                # ---- Assign second argument: job (segment) number
-                node.set_x_jobnum(i)
-                # ---- Assign third argument: output directory
-                # ---- Check to see if distributing results files over nodes.
-                if 1 == distributeSimulation & 0 == maxInjNum:
-                    # ---- Yes: determine output directories and make sure they exist.
-                    #      Record directories in a file.
-                    jobNumber = (jobNumber+1-nodeOffset)%nNodes + nodeOffset
-                    nodeList = open( jobNodeFileSimulationPrefix + '_' + set \
-                        + "_seg%d"%(i) + "_injScale" + injectionScale + '.txt'  ,'w')
-                    nodeList.write("Number_of_detectors %d\n"%(len(detector)))
-                    for j in range(0,len(detector)) :
-                        nodeList.write("%s\t"%(detector[j]))
-                    nodeList.write("\n")
-                    nodeList.write('event_simulation_file ')
-                    nodeList.write(cwdstr + "/input/event_on_source.txt \n")
-                    nodeList.write('Injection_file ')
-                    nodeList.write(cwdstr + "/input/injection_" + set + ".txt \n")
-                    nodeList.write('Number_of_jobs ')
-                    nodeList.write("%d \n"%(numberOfInjections))
-                    nJobsPerNode = numberOfInjections
-                    nodeList.write('Number_of_jobs_per_node ')
-                    nodeList.write("%d \n"%(nJobsPerNode))
-                    # write path for each result file, on each node write results from
-                    # nJobsPerNode jobs
-                    #jobNumber = int((injectionNumber-1)/nJobsPerNode) + nodeOffset
-                    while ~(os.path.isdir (nodePath + "%d/"%(jobNumber))) &1:
-                        logger.info("Waiting for automount to unmount ...\n")
-                        time.sleep(10)
-                    # Write name of node before changing nodes
-                    #if 0 == (injectionNumber-1) % nJobsPerNode:
-                    logger.info("Node number %d"%(jobNumber))
-                    nodeList.write(nodePath + "%d/ \n"%(jobNumber))
-                    # Create directory for results files
-                    fullPath = nodePath + "%d/"%(jobNumber) + onNodeSimulationPath \
-                        + "_" + set + '_' + str(scale_counter)
-                    if ~(os.path.isdir (fullPath))& 1 :
-                        os.makedirs(fullPath)
-                    else:
-                        logger.warning("**WARNING** path: " + fullPath + \
-                            " already exists, previous results may be overwritten\n")
-                    node.set_output_dir(os.path.join( fullPath))
-                    for injectionNumber in range(1,numberOfInjections+1) :
-                        nodeList.write(fullPath + "/results_%d"%(i) +  \
-                            "_%d.mat \n"%(injectionNumber) )
-                    nodeList.close()
-                else:
-                    # ---- No: Set output directory to local.
-                    node.set_output_dir( os.path.join( cwdstr + \
-                        '/output/simulations_' + set + '_' + str(scale_counter) ) )
-                # ---- Assign fourth argument: injection number
-                #      KLUDGE: This will screw up injections if more than
-                #      one segment; injection number iterates only over
-                #      injections that fall within analysis interval.
-                node.set_x_injnum("1-%d"%(numberOfInjections))
-                #mergenode.add_parent(node)
-                node.set_retry(retryNumber)
-                # ---- Prepend human readable description to node name.
-                node.set_name("xdetection_simulation_" + set + "_injScale" \
-                    + str(scale_counter) + "_" + node.get_name())
-                dag.add_node(node)
-            # ---- if maxInjNum and maxMDCSegNum not 0
-            else:
-                # ---- Analyse maxInjNum injections in each job.  In this case output
-                #      files will go to the local directory output/simulations_*.
-                segJobs = range(int(math.ceil(float(len(segmentList))/float(maxMDCSegNum))))
-                injJobs = range(int(math.ceil(float(numberOfInjections)/float(maxInjNum))))
-                for iSegRange in segJobs :
-                    for iInjRange in injJobs :
-                        node = xcondor.XsearchNode(job)
-
-                        matlab_param_file = cwdstr + "/input/parameters_" + set \
-                            + "_" + str(scale_counter) + ".txt"
-                        node.set_param_file(matlab_param_file)
-
-                        if len(segJobs)==1:
-                            # ---- if we only have one segment
-                            node.set_x_jobnum('0')
-                        else:
-                            node.set_x_jobnum("%d"%(iSegRange*maxMDCSegNum) + "-" + \
-                                "%d"%(min((iSegRange+1)*maxMDCSegNum-1,len(segmentList)-1)))
-
-                        node.set_output_dir( os.path.join( cwdstr + '/output/simulations_' \
-                            + set + '_' + str(scale_counter) ) )
-
-                        # ---- WARNING - do not set injNum = 0 when running MDCs or
-                        #      we will not recreate the channel name properly in xdetection
-                        node.set_x_injnum("%d"%(iInjRange*maxInjNum+1) + "-" \
-                            + "%d"%(min((iInjRange+1)*maxInjNum,numberOfInjections)))
-
-                        #mergenode.add_parent(node)
-                        node.set_retry(retryNumber)
-                        # ---- Prepend human readable description to node name.
-                        node.set_name("xdetection_simulation_" + set + "_seg" \
-                            + str(iSegRange) + "_injScale" + str(scale_counter) \
-                            + "_injRange" + str(iInjRange) + "_" + node.get_name())
-                        dag.add_node(node)
-
-            # ---- Add job node to the dag.
-            # ---- Continue on to the next injection scale.
-            #mergenode.set_dir_prefix('simulations_' + set + '_' + str(scale_counter) + '/')
-            #mergenode.set_sn_flag("0 " + mergingCutsString)
-            #mergenode.set_retry(retryNumber)
-            # ---- Prepend human readable description to node name.
-            #mergenode.set_name("xmerge_simulation_" + set + "_seg" + \
-            #    "_injScale" + str(scale_counter) + "_" + mergenode.get_name())
-            #dag.add_node(mergenode)
-            scale_counter = scale_counter + 1
-
-        # ---- end loop over injections scales
-
-        # ---- Write out the submit files needed by condor.
-        dag.write_sub_files()
-        # ---- Write out the DAG itself.
-        dag.write_dag()
-
-        # ---- Delete used dag job
-        del dag
-        del job
-        #del mergejob
-    # ---- end loop overmdc sets
-
-# -------------------------------------------------------------------------
 #      Write xtmva dag.
 # -------------------------------------------------------------------------
 
@@ -2605,26 +2269,4 @@ sfile.close()
 # ---- Exit cleanly
 sys.exit( 0 )
 
-
-# -------------------------------------------------------------------------
-#      Leftover code samples.
-# -------------------------------------------------------------------------
-
-# # ---- Make data find job node.
-# df_job = pipeline.LSCDataFindJob( 'cache','logs', cp )
-
-# # ---- Make an empty list to hold the datafind jobs.
-# df_list = []
-
-# # ---- Loop over detectors and prepare a datafind job for each.
-# for ifo in ['H1', 'H2', 'L1']:
-#   df = pipeline.LSCDataFindNode( df_job )
-#   df.set_start( 700000000 )
-#   df.set_end( 700000100 )
-#   df.set_observatory( ifo[0] )
-#   df.set_type('RDS_R_L1')
-#   df.set_post_script('/why/oh/why/oh/why.sh')
-#   df.add_post_script_arg(df.get_output())
-#   dag.add_node(df)
-#   df_list.append(df)
 
