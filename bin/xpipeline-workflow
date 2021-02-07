@@ -320,7 +320,6 @@ if injdistrib:
 logger.info("    detector network: {0}".format(detector))
 if network_selection:
     logger.info("   network selection: automatic")
-logger.info("            mdc path: {0}".format(mdc_path))
 logger.info("           grid type: {0}".format(grid_type))
 if grid_type == 'file':
     logger.info("       grid sim file: {0}".format(grid_sim_file))
@@ -470,7 +469,7 @@ elif args.search_type in ['sn', 'allsky']:
 duration = int(end_time - start_time)
 
 
-# ---- We will copy all ifo data and mdc frame caches to the location
+# ---- We will copy all frame caches to the location
 #      stored in frameCacheAll.
 frameCacheAll = 'input/framecache.txt'
 
