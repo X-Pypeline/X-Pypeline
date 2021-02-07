@@ -34,18 +34,11 @@ class XsearchJob(pipeline.CondorDAGJob, pipeline.AnalysisJob):
         if use_xpypeline :
             self.add_condor_cmd('getenv',"true")
         else :
-            if 'raven' in hostname:
-                MCR_CACHE_PATH = '/tmp/'
-            elif 'ldas' in hostname:
-                MCR_CACHE_PATH = '/local/'
-            else:
-                print 'Warning : ' + hostname + ' does not have a specific MCR_CACHE_ROOT setup, using default'
-                MCR_CACHE_PATH = '/local/'
             self.add_condor_cmd('environment',"USER=$ENV(USER);HOME=$ENV(HOME);" \
                 "LD_LIBRARY_PATH=$ENV(LD_LIBRARY_PATH);" \
                 "XPIPE_INSTALL_BIN=$ENV(XPIPE_INSTALL_BIN);" \
                 "PATH=/usr/bin:/bin;" \
-                "MCR_CACHE_ROOT="+MCR_CACHE_PATH+"$ENV(USER)/.$(cluster)")
+                "MCR_CACHE_ROOT=/local/$ENV(USER)/.$(cluster)")
 
         # ---- Add accounting group flag.
         grouptag = 'ligo.' + \
@@ -246,16 +239,9 @@ class XmergeJob(pipeline.CondorDAGJob, pipeline.AnalysisJob):
         # ---- Add name of 'output' directory as first argument.
         self.add_arg('output')
         # ---- Add required environment variables.
-        if 'raven' in hostname:
-            MCR_CACHE_PATH = '/tmp/'
-        elif 'ldas' in hostname:
-            MCR_CACHE_PATH = '/local/'
-        else:
-            print 'Warning : ' + hostname + ' does not have a specific MCR_CACHE_ROOT setup, using default'
-            MCR_CACHE_PATH = '/local/'
         self.add_condor_cmd('environment',"USER=$ENV(USER);HOME=$ENV(HOME);" \
             "LD_LIBRARY_PATH=$ENV(LD_LIBRARY_PATH);" \
-            "MCR_CACHE_ROOT="+MCR_CACHE_PATH+"$ENV(USER)/.$(cluster)")
+            "MCR_CACHE_ROOT=/local/$ENV(USER)/.$(cluster)")
 
         # ----Add Accounting Group Flag
         grouptag = 'ligo.' + \
