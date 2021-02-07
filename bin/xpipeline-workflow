@@ -1962,15 +1962,23 @@ if cp.has_section('waveforms') :
         # ---- Set the name of the file that will contain the DAG.
         dag.set_dag_file( "grb_simulations_" + set )
 
-        # ---- Make instance of XsearchJob.
-        job = xcondor.XsearchJob(cp)
+        # ---- Make instance of search job.
+        if outputType == 'seedless' and doGPUOnSource == "true":
+            job = xcondor.XsearchGPUJob(cp)
+        else :
+            job = xcondor.XsearchJob(cp,UserName,use_xpypeline)
 
-        if outputType == 'seedless':
-            if doGPUSimulation == "true":
-                job = xcondor.XsearchGPUJob(cp)
+        # ---- Make merge jobs if needed.
+        if not use_xpypeline :
+            # ---- Make instance of XmergeJob.
+            mergejob = xcondor.XmergeJob(cp,UserName)
+            # ---- Put a single merge job node in mergejob.  This job will combine
+            #      into a single file the output of all of the on-source analysis jobs.
+            mergenode = xcondor.XmergeNode(mergejob)
+            if xtmvaFlag:
+                xtmvanode.add_parent(mergenode)
 
-        mergejob = xcondor.XmergeJob(cp)
-
+        # ---- If using smart clustering - THIS CODE MAY NOT WORK.
         if smartCluster == True:
           logger.info('Writing dag for on-the-fly clustered injection set: ' + set)
           dag_clustered = pipeline.CondorDAG( log_file_simulations_clustered + "_" + set + uuidtag )
@@ -1999,159 +2007,156 @@ if cp.has_section('waveforms') :
         f.close()
 
         if longInjections == True:
-          # ---- this method appends to an existing trigger file whatever bits of a long
-          # waveform are in adjacent segments
-          # The functionality is as follows: injection X is done first in segment 0 with parameters_0
-          # then if straddling next segment is done in segment 1 with parameters_1 but the results are
-          # appended to the existing trigger file
-          mergenode = []
-          if smartCluster == True:
-            mergeclusterednode = []
-          for injectionScale in injectionScales :
-              mergenode.append(xcondor.XmergeNode(mergejob))
-              if smartCluster == True:
-                mergeclusterednode.append(xcondor.XmergeClusteredNode(mergeclusteredjob))
-          if not(reUseInj):
-            # ---- Set buffer for handling long injections.
-            longInjSegBuffer = 0
-            if set.startswith('adi-a') :
-              longInjSegBuffer = 20
-            if set.startswith('adi-b') :
-              longInjSegBuffer = 6
-            if set.startswith('adi-c') :
-              longInjSegBuffer = 132
-            if set.startswith('adi-d') :
-              longInjSegBuffer = 74
-            if set.startswith('adi-e') :
-              longInjSegBuffer = 43
-            if set.startswith('mva') :
-              longInjSegBuffer = 132
-            if set.startswith('mediummixed') :
-              longInjSegBuffer = 6
-            if set.startswith('longmixed') :
-              longInjSegBuffer = 132
-            if set.startswith('ebbh-a') :
-              longInjSegBuffer = 7
-            if set.startswith('ebbh-d') :
-              longInjSegBuffer = 4
-            if set.startswith('ebbh-e') :
-              longInjSegBuffer = 4
+            # ---- This method appends to an existing trigger .mat file whatever
+            #      bits of a long-duration waveform are in adjacent segments. The
+            #      functionality is as follows: injection X is done first in 
+            #      segment 0 with parameters_0, then if straddling the next 
+            #      segment is done again in segment 1 with parameters_1 but the 
+            #      results are appended to the existing trigger file.
+            mergenode = []
+            if smartCluster == True:
+                mergeclusterednode = []
+            for injectionScale in injectionScales :
+                mergenode.append(xcondor.XmergeNode(mergejob))
+                if smartCluster == True:
+                    mergeclusterednode.append(xcondor.XmergeClusteredNode(mergeclusteredjob))
+            if not(reUseInj):
+                # ---- Set buffer for handling long injections.
+                longInjSegBuffer = 0
+                if set.startswith('adi-a') :
+                    longInjSegBuffer = 20
+                if set.startswith('adi-b') :
+                    longInjSegBuffer = 6
+                if set.startswith('adi-c') :
+                    longInjSegBuffer = 132
+                if set.startswith('adi-d') :
+                    longInjSegBuffer = 74
+                if set.startswith('adi-e') :
+                    longInjSegBuffer = 43
+                if set.startswith('mva') :
+                    longInjSegBuffer = 132
+                if set.startswith('mediummixed') :
+                    longInjSegBuffer = 6
+                if set.startswith('longmixed') :
+                    longInjSegBuffer = 132
+                if set.startswith('ebbh-a') :
+                    longInjSegBuffer = 7
+                if set.startswith('ebbh-d') :
+                    longInjSegBuffer = 4
+                if set.startswith('ebbh-e') :
+                    longInjSegBuffer = 4
 
-            # ---- simplified method to inject, a la allsky.py
-            for iInj in range(numberOfInjections) :
-              thisInjSeg = []
-              for i in range(len(segmentList)):
-                if abs(float(event_on_list[i].split(' ')[0]) - float(injection_list_time[iInj]))<=blockTime/2-transientTime+longInjSegBuffer :
-                  thisInjSeg.append(i)
+                # ---- simplified method to inject, a la allsky.py
+                for iInj in range(numberOfInjections) :
+                    thisInjSeg = []
+                    for i in range(len(segmentList)):
+                        if abs(float(event_on_list[i].split(' ')[0]) - float(injection_list_time[iInj]))<=blockTime/2-transientTime+longInjSegBuffer :
+                            thisInjSeg.append(i)
 
-              nodeList = []
-              for i in range(len(thisInjSeg)):
-                if thisInjSeg :
-                  thisInjSeg.sort()
-                  node = xcondor.XsearchNode(job)
-                  # set range of event numbers to be processed in this job
-                  node.set_x_jobnum("{0}".format(thisInjSeg[i]))
+                    nodeList = []
+                    for i in range(len(thisInjSeg)):
+                        if thisInjSeg :
+                            thisInjSeg.sort()
+                            if use_xpypeline :
+                                node = xcondor.XsearchNode(job)
+                            else :
+                                node = xcondor.XmatlabSearchNode(job)
+                                mergenode.add_parent(node)
+                            # set range of event numbers to be processed in this job
+                            node.set_x_jobnum("{0}".format(thisInjSeg[i]))
+                            # this is background trial
+                            if offSourceInj:
+                                node.set_output_dir("offsource_injection")
+                            else:
+                                node.set_output_dir("onsource_injection")
+                            # set path to param file
+                            matlab_param_file = cwdstr + "/input/parameters_simulation_" + set + "_0_" + str(thisInjSeg[i]) + ".txt" 
+                            node.set_param_file(matlab_param_file)
+                            #node.set_output_dir(os.path.join(cwdstr, "output", "off_source"))
+                            # Set injection number which for background jobs is 0
+                            node.set_x_injnum(str(iInj))
+                            node.set_retry(retryNumber)
+                            # ---- Prepend human readable description to node name.
+                            node.set_name("xdetection_simulation_" + set + "_inj" + str(iInj+1) + "_" + node.get_name())
+                            if len(thisInjSeg) == 1:
+                                # ---- Add job node to dag
+                                dag.add_node(node)
+                            else:
+                                # ---- Add job node to a list for parent-child relation
+                                nodeList.append(node)
 
-                  # this is background trial
-                  if offSourceInj:
-                      node.set_output_dir("offsource_injection")
-                  else:
-                      node.set_output_dir("onsource_injection")
-
-                  # set path to param file
-                  matlab_param_file = cwdstr + "/input/parameters_simulation_" + set + "_0_" + str(thisInjSeg[i]) + ".txt" 
-                  node.set_param_file(matlab_param_file)
-
-                  #node.set_output_dir(os.path.join(cwdstr, "output", "off_source"))
-
-                  # Set injection number which for background jobs is 0
-                  node.set_x_injnum(str(iInj))
-
-                  node.set_retry(retryNumber)
-                  # ---- Prepend human readable description to node name.
-                  node.set_name("xdetection_simulation_" + set + "_inj" + str(iInj+1) + "_" + node.get_name())
-                  if len(thisInjSeg) == 1:
-                    # ---- Add job node to dag
-                    dag.add_node(node)
-                  else:
-                    # ---- Add job node to a list for parent-child relation
-                    nodeList.append(node)
-
-              # --- if we have long injections make sure chunks are always added after the previous chunk
-              # --- in order of their segments, so xappendinjection can be applied correctly
-              if len(thisInjSeg) > 1:
-                for j in range(len(thisInjSeg) - 1):
-                  parentNode = nodeList[j]
-                  childNode = nodeList[j+1]
-                  childNode.add_parent(parentNode)
-                  dag.add_node(parentNode)
-                dag.add_node(nodeList[-1])
+                # --- if we have long injections make sure chunks are always added after the previous chunk
+                # --- in order of their segments, so xappendinjection can be applied correctly
+                if len(thisInjSeg) > 1:
+                    for j in range(len(thisInjSeg) - 1):
+                        parentNode = nodeList[j]
+                        childNode = nodeList[j+1]
+                        childNode.add_parent(parentNode)
+                        dag.add_node(parentNode)
+                    dag.add_node(nodeList[-1])
 
 
-          # ---- Loop over injection scales.
-          for scale_counter in range(len(injectionScales)) :
-              # ---- Point to already produced injection results if provided.
-              if reUseInj:
-                  mergenode[scale_counter].set_dir_prefix(mergingCutsPath + '/../output/simulations_' \
-                      + set + '_' + str(scale_counter) + '/')
-              else :
-                 #mergenode[scale_counter].set_dir_prefix('simulations_' + set + '_' + str(scale_counter) + '/')
-                 pass
-              #mergenode[scale_counter].set_sn_flag("1 " + mergingCutsString)
-              #mergenode[scale_counter].set_retry(retryNumber)
-              # ---- Prepend human readable description to node name.
-              #mergenode[scale_counter].set_name("xmerge_simulation_" + set + "_injScale" \
-              #    + str(scale_counter) + "_" + mergenode[scale_counter].get_name())
-              #dag.add_node(mergenode[scale_counter])
-              if smartCluster == True:
+            # ---- Loop over injection scales.
+            for scale_counter in range(len(injectionScales)) :
                 # ---- Point to already produced injection results if provided.
                 if reUseInj:
-                    mergeclusterednode[scale_counter].set_dir_prefix(mergingCutsPath + '/../output/simulations_' \
-                        + set + '_' + str(scale_counter) + '/')
+                    mergenode[scale_counter].set_dir_prefix(mergingCutsPath + '/../output/simulations_' \
+                      + set + '_' + str(scale_counter) + '/')
                 else :
-                    mergeclusterednode[scale_counter].set_dir_prefix('simulations_' + set + '_' + str(scale_counter) + '/')
-                mergeclusterednode[scale_counter].set_sn_flag("1 " + mergingCutsString)
-                mergeclusterednode[scale_counter].set_sc_flag("1")
-                mergeclusterednode[scale_counter].set_retry(retryNumberClustered)
+                    #mergenode[scale_counter].set_dir_prefix('simulations_' + set + '_' + str(scale_counter) + '/')
+                    pass
+                #mergenode[scale_counter].set_sn_flag("1 " + mergingCutsString)
+                #mergenode[scale_counter].set_retry(retryNumber)
                 # ---- Prepend human readable description to node name.
-                mergeclusterednode[scale_counter].set_name("xmergeclustered_simulation_" + set + "_injScale" \
-                    + str(scale_counter) + "_" + mergeclusterednode[scale_counter].get_name())
-                dag_clustered.add_node(mergeclusterednode[scale_counter])
+                #mergenode[scale_counter].set_name("xmerge_simulation_" + set + "_injScale" \
+                #    + str(scale_counter) + "_" + mergenode[scale_counter].get_name())
+                #dag.add_node(mergenode[scale_counter])
+                if smartCluster == True:
+                  # ---- Point to already produced injection results if provided.
+                  if reUseInj:
+                      mergeclusterednode[scale_counter].set_dir_prefix(mergingCutsPath + '/../output/simulations_' \
+                          + set + '_' + str(scale_counter) + '/')
+                  else :
+                      mergeclusterednode[scale_counter].set_dir_prefix('simulations_' + set + '_' + str(scale_counter) + '/')
+                  mergeclusterednode[scale_counter].set_sn_flag("1 " + mergingCutsString)
+                  mergeclusterednode[scale_counter].set_sc_flag("1")
+                  mergeclusterednode[scale_counter].set_retry(retryNumberClustered)
+                  # ---- Prepend human readable description to node name.
+                  mergeclusterednode[scale_counter].set_name("xmergeclustered_simulation_" + set + "_injScale" \
+                      + str(scale_counter) + "_" + mergeclusterednode[scale_counter].get_name())
+                  dag_clustered.add_node(mergeclusterednode[scale_counter])
         else:
             #mergenode = xcondor.XmergeNode(mergejob)
             if xtmvaFlag:
-              xtmvanode.add_parent(mergenode)
+                xtmvanode.add_parent(mergenode)
             if smartCluster == True:
-              mergeclusterednode = xcondor.XmergeClusteredNode(mergeclusteredjob)
+                mergeclusterednode = xcondor.XmergeClusteredNode(mergeclusteredjob)
             # Skip injection trigger production if path to already available triggers provided
             if not(reUseInj):
               # ---- Loop over segments
               for i in range(len(segmentList)):
                 # ---- For debug only
                 #print('We do not have injections that are done at the block border, we use standard GRB injection placing')
-                if  0 == maxInjNum:
+                if 0 == maxInjNum:
                     # ---- Create job node.
-                    node = xcondor.XsearchNode(job)
-
+                    if use_xpypeline :
+                        node = xcondor.XsearchNode(job)
+                    else :
+                        node = xcondor.XmatlabSearchNode(job)
+                        mergenode.add_parent(node)
                     node.set_x_jobnum("{0}".format(i))
-
                     # this is background trial
                     if offSourceInj:
                         node.set_output_dir("offsource_injection")
                     else:
                         node.set_output_dir("onsource_injection")
-
                     # set path to param file
                     matlab_param_file = cwdstr + "/input/parameters_simulation_" \
                         + set + "_" + str(scale_counter) + '_' + str(i) + ".txt"
                     node.set_param_file(matlab_param_file)
-
                     #node.set_output_dir(os.path.join(cwdstr, "output", "off_source"))
-
                     # Set injection number which for background jobs is 0
                     node.set_x_injnum(' '.join(list(range(0, numberOfInjections))))
-
-                    #mergenode.add_parent(node)
                     node.set_retry(retryNumber)
                     # ---- Prepend human readable description to node name.
                     node.set_name("xdetection_simulation_" + set + "_seg" \
@@ -2166,7 +2171,11 @@ if cp.has_section('waveforms') :
                                 thisSegmentInjNumber += 1
                                 thisSegmentInjStart = min(thisSegmentInjStart,iInj)
                         for iInjRange in range(int(math.ceil(float(thisSegmentInjNumber)/float(maxInjNum)))) :
-                            node = xcondor.XsearchNode(job)
+                            if use_xpypeline :
+                                node = xcondor.XsearchNode(job)
+                            else :
+                                node = xcondor.XmatlabSearchNode(job)
+                                #mergenode.add_parent(node)
 
                             node.set_x_jobnum("{0}".format(i+iWindow*jobsPerWindow))
 
@@ -2195,8 +2204,8 @@ if cp.has_section('waveforms') :
                             node.set_name("xdetection_simulation_" + set +  "_seg" + \
                                 str(i+iWindow*jobsPerWindow) + "_injScale" + str(0) \
                                 + "_injRange" + str(iInjRange) + "_" + node.get_name())
-                            dag.add_node(node)
                             # ---- Add job node to the dag.
+                            dag.add_node(node)
             # ---- Continue on to the next injection scale.
             # point to already produced injection results if provided
             if reUseInj:
@@ -2233,12 +2242,14 @@ if cp.has_section('waveforms') :
         # ---- Delete used dag job
         del dag
         del job
-        #del mergejob
+        if use_xpypeline :
+            del mergejob
         if smartCluster == True:
-          dag_clustered.write_sub_files()
-          dag_clustered.write_dag()
-          del dag_clustered
-          del mergeclusteredjob
+            dag_clustered.write_sub_files()
+            dag_clustered.write_dag()
+            del dag_clustered
+            del mergeclusteredjob
+
 
 # -------------------------------------------------------------------------
 #      Write xtmva dag.
