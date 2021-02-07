@@ -1672,7 +1672,10 @@ event_on_file.close()
 
 # ---- Add one node to the job for each segment to be analysed.
 for i in range(len(segmentList)):
-    node = xcondor.XsearchNode(job,Username,use_xpypeline)
+    if use_xpypeline :
+        node = xcondor.XsearchNode(job)
+    else :
+        node = xcondor.XmatlabSearchNode(job)
     # ---- Parameters file:
     matlab_param_file = cwdstr + "/input/parameters_on_source_" + str(i) + ".txt"
     node.set_param_file(matlab_param_file)

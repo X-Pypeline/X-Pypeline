@@ -182,6 +182,48 @@ class XsearchNode(pipeline.CondorDAGNode, pipeline.AnalysisNode):
     def get_x_injnum(self):
         return self.__x_injnum
 
+class XmatlabSearchNode(pipeline.CondorDAGNode, pipeline.AnalysisNode):
+    """
+    xsearch node
+    """
+    def __init__(self,job):
+        """
+        job = A CondorDAGJob.
+        """
+        pipeline.CondorDAGNode.__init__(self,job)
+        pipeline.AnalysisNode.__init__(self)
+        self.__x_jobnum = None
+        self.__x_injnum = None
+
+    # ---- Set parameters file.
+    def set_param_file(self, path):
+        self.add_var_arg(path)
+        self.__param_file = path
+
+    def get_param_file(self):
+        return self.__param_file
+
+    def set_x_jobnum(self, n):
+        self.add_var_arg(str(n))
+        self.__x_jobnum = n
+
+    def get_x_jobnum(self):
+        return self.__x_jobnum
+
+    def set_output_dir(self, path):
+        self.add_var_arg(path)
+        self.__output_dir = path
+
+    def get_output_dir(self,path):
+        return self.__output_dir
+
+    def set_x_injnum(self, n):
+        self.add_var_arg(n)
+        self.__x_injnum = n
+
+    def get_x_injnum(self):
+        return self.__x_injnum
+
 class XmergeJob(pipeline.CondorDAGJob, pipeline.AnalysisJob):
     """
     An x merge job
