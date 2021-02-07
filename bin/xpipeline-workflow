@@ -1644,8 +1644,6 @@ for i in range(len(segmentList)):
     matlab_param_file = cwdstr + "/input/parameters_on_source_" + str(i) + ".txt"
     node.set_param_file(matlab_param_file)
     node.set_x_jobnum(i)
-    if distributeOnSource == 1 :
-        nodeList.write(cwdstr + "/output/on_source" + "/results_%d.mat \n"%(i))
     # ---- On-source results files are always written to the local
     #      output/on_source directory - there are very few such jobs.
     node.set_output_dir( os.path.join( cwdstr + "/output/on_source" ) )
@@ -1687,9 +1685,6 @@ if smartCluster == True:
   dag_clustered.write_dag()
   del dag_clustered
   del mergeclusteredjob
-# --- close on source distribute file
-if distributeOnSource == 1 :
-    nodeList.close()
 
 # -------------------------------------------------------------------------
 #      Write ul-source dag.
@@ -1815,9 +1810,7 @@ maxOffNum = math.ceil(float(maxOffNum)/math.sqrt(float(numSky)))
 maxInjNum = math.ceil(float(maxInjNum)/math.sqrt(float(numSky)))
 
 if maxOffNum == 0 :
-    # ---- Each segment is to be analysed as a separate job.  There may be
-    #      a lot of them, so we will check below if the output files are to
-    #      be distributed over the cluster nodes.
+    # ---- Each segment is to be analysed as a separate job.  
     for i in range(nOffEvents):
         node = xcondor.XsearchNode(job)
 
