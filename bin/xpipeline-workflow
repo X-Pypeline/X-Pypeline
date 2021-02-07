@@ -1815,119 +1815,94 @@ dag = pipeline.CondorDAG(log_file_off_source + uuidtag)
 # ---- Set the name of the file that will contain the DAG.
 dag.set_dag_file( 'grb_off_source' )
 
-# ---- Make instance of XsearchJob.
-job = xcondor.XsearchJob(cp)
+# ---- Make instance of search job.
+if outputType == 'seedless' and doGPUOnSource == "true":
+    job = xcondor.XsearchGPUJob(cp)
+else :
+    job = xcondor.XsearchJob(cp,UserName,use_xpypeline)
 
-if outputType == 'seedless':
-    if doGPUOffSource == "true":
-        job = xcondor.XsearchGPUJob(cp)
-
-# ---- Make instance of XmergeJob.
-#mergejob = xcondor.XmergeJob(cp)
-# ---- Put a single merge job node in mergejob.  This job will combine
-#      into a single file the output of all of the off-source analysis jobs.
-#mergenode = xcondor.XmergeNode(mergejob)
-
-if xtmvaFlag:
-    xtmvanode.add_parent(mergenode)
+# ---- Make merge jobs if needed.
+if not use_xpypeline :
+    # ---- Make instance of XmergeJob.
+    mergejob = xcondor.XmergeJob(cp,UserName)
+    # ---- Put a single merge job node in mergejob.  This job will combine
+    #      into a single file the output of all of the off-source analysis jobs.
+    mergenode = xcondor.XmergeNode(mergejob)
+    if xtmvaFlag:
+        xtmvanode.add_parent(mergenode)
 
 # ---- Load off-source segments.
 #segmentList = pipeline.ScienceData()
 #segmentList.read( 'input/segment_off_source.txt', blockTime )
 
-# ---- KLUDGE FIX: now we have option of limiting number of
-#      background jobs using ini file we should ensure that
-#      we only run the correct number of jobs.
+# ---- Read the number of events from the event list.
 event_off_file = open('input/event_off_source.txt')
 event_off_list = event_off_file.readlines()
 nOffEvents = len(event_off_list)
 event_off_file.close()
-# ---- END OF KLUDGE FIX
 
-# ---- Check how many segments are to be bundled into each job, and create
-#      job nodes accordingly.
-maxInjNum = int(cp.get('output','maxInjNum'))
+## ---- Check how many segments are to be bundled into each job, and create
+##      job nodes accordingly.
+#if cp.has_option('output','maxInjNum'):
+#    maxInjNum = int(cp.get('output','maxInjNum'))
+#else:
+#    maxInjNum = 1
+#
+## ---- Rescale by the number of sky position so that all jobs have the
+##      same length regardless of the number of sky position
+#maxInjNum = math.ceil(float(maxInjNum)/math.sqrt(float(numSky)))
+
+# ---- Bundle segments together so that maxOffNum segments are analysed by each
+#      condor job node.
+# ---- First check how many segments are to be bundled into each job. 
 if cp.has_option('output','maxOffNum'):
     maxOffNum = int(cp.get('output','maxOffNum'))
 else:
-    maxOffNum = maxInjNum
-
-# ---- Rescale by the number of sky position so that all jobs have the
-#      same length regardless of the number of sky position
+    maxOffNum = 1
+# ---- Rescale by the number of sky positions so that all jobs have similar 
+#      run times regardless of the number of sky positions.
 maxOffNum = math.ceil(float(maxOffNum)/math.sqrt(float(numSky)))
-maxInjNum = math.ceil(float(maxInjNum)/math.sqrt(float(numSky)))
-
-if maxOffNum == 0 :
-    # ---- Each segment is to be analysed as a separate job.  
-    for i in range(nOffEvents):
+nSets = int(math.ceil(float(nOffEvents)/float(maxOffNum)))
+for i in range(nSets) :
+    if use_xpypeline :
         node = xcondor.XsearchNode(job)
+    else :
+        node = xcondor.XmatlabSearchNode(job)
+        mergenode.add_parent(node)
+    upper_event_number = min((i+1)*maxOffNum, nOffEvents)
+    lower_event_number = i*maxOffNum
+    job_range = [str(i) for i in range(lower_event_number, upper_event_number)]
+    segmentstr = str(int(math.floor((jobsPerWindow*i)/nSets)))
+    # set range of event numbers to be processed in this job
+    node.set_x_jobnum("{0}".format(' '.join(job_range)))
+    # this is background trial
+    node.set_output_dir("background")
+    # set path to param file
+    matlab_param_file = cwdstr + "/input/parameters_off_source_" + segmentstr + ".txt"
+    node.set_param_file(matlab_param_file)
+    #node.set_output_dir(os.path.join(cwdstr, "output", "off_source"))
+    # Set injection number which for background jobs is 0
+    node.set_x_injnum('0')
+    # add this as a depednecy to the merge jobs dag
+    #mergenode.add_parent(node)
+    node.set_retry(retryNumber)
+    # ---- Prepend human readable description to node name.
+    node.set_name("xdetection_off_source_seg" + str(i) + "_" + node.get_name())
+    dag.add_node(node)
 
-        # set range of event numbers to be processed in this job
-        node.set_x_jobnum("{0}".format(i))
+if not use_xpypeline :
+    # ---- Set the arguments of the merge job.
+    mergenode.set_dir_prefix("off_source/")
+    mergenode.set_sn_flag("0 " + mergingCutsString)
+    # ---- Set the retry number.
+    mergenode.set_retry(retryNumber)
+    # ---- Prepend human readable description to node name.
+    mergenode.set_name("xmerge_off_source_" + mergenode.get_name())
+    # ---- Add this node to the dag.
+    dag.add_node(mergenode)
 
-        # this is background trial
-        node.set_output_dir("background")
-
-        # set path to param file
-        matlab_param_file = cwdstr + "/input/parameters_off_source.txt"
-        node.set_param_file(matlab_param_file)
-
-        #node.set_output_dir(os.path.join(cwdstr, "output", "off_source"))
-
-        # Set injection number which for background jobs is 0
-        node.set_x_injnum('0')
-
-        # add this as a depednecy to the merge jobs dag
-        #mergenode.add_parent(node)
-
-        node.set_retry(retryNumber)
-        # ---- Prepend human readable description to node name.
-        node.set_name("xdetection_off_source_seg" + str(i) + "_" + node.get_name())
-        dag.add_node(node)
-else:
-    # ---- This option bundles together segments so that maxOffNum segments
-    #      are analysed by each condor job node.
-    #      In this case all output files come back to the local output/off_source
-    #      directory.
-    nSets = int(math.ceil(float(nOffEvents)/float(maxOffNum)))
-    for i in range(nSets) :
-        node = xcondor.XsearchNode(job)
-        upper_event_number = min((i+1)*maxOffNum, nOffEvents)
-        lower_event_number = i*maxOffNum
-        job_range = [str(i) for i in range(lower_event_number, upper_event_number)]
-        segmentstr = str(int(math.floor((jobsPerWindow*i)/nSets)))
-
-        # set range of event numbers to be processed in this job
-        node.set_x_jobnum("{0}".format(' '.join(job_range)))
-
-        # this is background trial
-        node.set_output_dir("background")
-
-        # set path to param file
-        matlab_param_file = cwdstr + "/input/parameters_off_source_" + segmentstr + ".txt"
-        node.set_param_file(matlab_param_file)
-
-        #node.set_output_dir(os.path.join(cwdstr, "output", "off_source"))
-
-        # Set injection number which for background jobs is 0
-        node.set_x_injnum('0')
-
-        # add this as a depednecy to the merge jobs dag
-        #mergenode.add_parent(node)
-
-        node.set_retry(retryNumber)
-        # ---- Prepend human readable description to node name.
-        node.set_name("xdetection_off_source_seg" + str(i) + "_" + node.get_name())
-        dag.add_node(node)
-
-# ---- Supply remaining XmergeJob node parameters, add job to the dag.
-#mergenode.set_dir_prefix("off_source/")
-#mergenode.set_sn_flag("0 " + mergingCutsString)
-#mergenode.set_retry(retryNumber)
-# ---- Prepend human readable description to node name.
-#mergenode.set_name("xmerge_off_source_" + mergenode.get_name())
-#dag.add_node(mergenode)
-# ---- do the same if clustering.
+# ---- Set the arguments of the smart-clustering merge job if using smart 
+#      clustering. THIS CODE MAY NOT WORK.
 if smartCluster == True:
   logger.info("Writing off-source clustered dag ... ")
   dag_clustered = pipeline.CondorDAG(log_file_off_source_clustered + uuidtag)
@@ -1945,16 +1920,17 @@ if smartCluster == True:
 dag.write_sub_files()
 # ---- Write out the DAG itself.
 dag.write_dag()
-# ---- Delete used dag and jobs
+# ---- Delete used dag and jobs.
 del dag
 del job
-#del mergejob
-# --- Close file recording distribution of off-source results.
+if not use_xpypeline :
+    del mergejob
 if smartCluster == True:
-  dag_clustered.write_sub_files()
-  dag_clustered.write_dag()
-  del dag_clustered
-  del mergeclusteredjob
+    dag_clustered.write_sub_files()
+    dag_clustered.write_dag()
+    del dag_clustered
+    del mergeclusteredjob
+
 
 # -------------------------------------------------------------------------
 #      Write on-the-fly simulations dags - one for each waveform set.
