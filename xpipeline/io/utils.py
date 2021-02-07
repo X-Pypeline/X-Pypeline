@@ -45,6 +45,8 @@ def write_onsource(filename, outputType, frameCacheAll, skyPositionList, likelih
                 fParam.write(parameters[i] + ':' + value + '\n')
     if outputType == 'seedless' :
         fParam.write('seedlessparams:input/seedless_onsource.txt\n')
+    if applyGates:
+        fParam.write('gatingfile:input/gates.txt\n')
     fParam.close()
 
 
@@ -75,6 +77,8 @@ def write_ul_source(filename, outputType, frameCacheAll, skyPositionList, likeli
     fParam.write('superDecimateRate:100\n')
     if outputType == 'seedless' :
         fParam.write('seedlessparams:input/seedless_ul.txt\n')
+    if applyGates:
+        fParam.write('gatingfile:input/gates.txt\n')
     fParam.close()
 
 
@@ -101,6 +105,8 @@ def write_offsource(filename, outputType, frameCacheAll, skyPositionList, likeli
                 fParam.write(parameters[i] + ':' + value + '\n')
     if outputType == 'seedless' :
         fParam.write('seedlessparams:input/seedless_offsource.txt\n')
+    if applyGates:
+        fParam.write('gatingfile:input/gates.txt\n')
     fParam.close()
 
 
@@ -137,6 +143,8 @@ def write_waveforms(filename, outputType, frameCacheAll, skyPositionList, likeli
     # fParam.write('catalogdirectory:' + XPIPELINE_ROOT  + '/waveforms\n')
     if outputType == 'seedless' :
       fParam.write('seedlessparams:input/seedless_simulation.txt\n')
+    if applyGates:
+        fParam.write('gatingfile:input/gates.txt\n')
     fParam.close()
 
 def write_mdc(filename, outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, cp, injectionScalesList, disableFastInjections, waveform):

@@ -337,7 +337,7 @@ logger.info("\n")
 summary_file = 'grb_summary.txt'
 # ---- Append to summary file.
 sfile = open(summary_file,'a')
-sfile.write('\t'.join(['\nname','gps','ra','dec','network','numSky','numBG','analyse','\n']))
+sfile.write('\t'.join(['\nname','\tgps','\tra','dec','network','numSky','numBG','analyse','\n']))
 sfile.write('\t'.join([grb_name,str(trigger_time),str(ra),str(decl)]))
 sfile.close()
 
@@ -419,11 +419,11 @@ if (seed > pow(2,31)-2) or (seed < 0):
 # ---- Read needed variables from [parameters] and [background] sections.
 background_period = cp.getint('background','backgroundPeriod')
 
-if cp.has_option('parameters','doAsymmetricBackground') :
-    doAsymmetricBackground   = cp.getint('parameters','doAsymmetricBackground')
+if cp.has_option('background','doAsymmetricBackground') :
+    doAsymmetricBackground   = cp.getint('background','doAsymmetricBackground')
 
-if cp.has_option('parameters','backgroundAsymmetryFactor') :
-    backgroundAsymmetryFactor = cp.getfloat('parameters', 'backgroundAsymmetryFactor')
+if cp.has_option('background','backgroundAsymmetryFactor') :
+    backgroundAsymmetryFactor = cp.getfloat('background', 'backgroundAsymmetryFactor')
 
 blockTime         =  cp.getint('parameters','blockTime')
 whiteningTime     =  cp.getfloat('parameters','whiteningTime')
@@ -438,6 +438,14 @@ jobsPerWindow = int(math.ceil(float(onSourceTimeLength)/float(blockTime-2*transi
 onSourceWindowLength=2*transientTime+jobsPerWindow*(blockTime-2*transientTime)
 minimumFrequency = cp.getint('parameters','minimumFrequency')
 maximumFrequency = cp.getint('parameters','maximumFrequency')
+if cp.has_option('segfind','applyGates'):
+    applyGates = int(cp.get('segfind','applyGates'))
+    if applyGates:
+        print >> sys.stdout, "Will attempt to apply gating to this analysis."
+    else:
+        applyGates = 0
+        print >> sys.stdout, "Running analysis without applying gates."
+
 
 channelListLine   = cp.get('input','channelList')
 channelList       = channelListLine.split(',')
@@ -832,6 +840,14 @@ elif args.search_type in ['sn', 'allsky']:
 
 coincidence_on_source_segment_chunks.write('input/segment_on_source.txt')
 
+# ---- Write the 'window', 'event', and 'segment' files for the on-source analysis. 
+#      The 'window' file lists the trigger time for the external event. 
+#      The 'event' file lists the center time of each block required to cover 
+#      the on-source window.  In general there is no obvious relationship 
+#      between the window time and event times, since you may need
+#      multiple events to cover the on-source window, and the events are 
+#      placed in time starting from the beginning of the window, not relative
+#      to the trigger time.
 
 # Write on_source_window to file
 fwin = open('input/window_on_source.txt', 'w')
@@ -847,7 +863,7 @@ if args.search_type == 'grb':
     # We must choose a sky grid and then loop over the on source segments with this selected grid and shift the grid slightly for each on source chunk as the earth has rotated
     # slightly for each chunk. We then proceed to do the same things with the injects and off source
     # ---- Generate sky positions for patch about ra, dec at trigger_time.
-    if int(cp.get('input','usexchooseskylocations')) and sky_pos_err:
+    if sky_pos_err:
         skyPosFilename_trigger = 'input/sky_positions_trigger_time.txt'
         if grid_type == 'healpix' or grid_type == 'circular':
             logger.info("Calling xmakeskygrid to generate {0}".format(skyPosFilename_trigger))
@@ -855,8 +871,8 @@ if args.search_type == 'grb':
             decl_str = str(decl)
             sky_pos_err_str = str(sky_pos_err)
             xmakeskygridCall = ' '.join([ "xmakeskygrid", ra_str, decl_str,
-                str(trigger_time), sky_pos_err_str, cp.get('input','numSigmaSkyPos'),
-                siteStrTilde, cp.get('input','delayTol'), skyPosFilename_trigger,
+                str(trigger_time), sky_pos_err_str, cp.get('skygrid','numSigmaSkyPos'),
+                siteStrTilde, cp.get('skygrid','delayTol'), skyPosFilename_trigger,
                 grid_type, '0'])
             logger.info(xmakeskygridCall)
             os.system(xmakeskygridCall)
@@ -898,7 +914,7 @@ for iSeg in range(len(coincidence_on_source_segment_chunks)):
         skyPosFilename = 'input/sky_positions_' + str(iSeg) + '.txt'
 
         skyPosFilename = 'input/sky_positions_' + str(iSeg) + '.txt'
-        if int(cp.get('input','usexchooseskylocations')) and sky_pos_err:
+        if sky_pos_err:
             logger.info("Calling xconvertskylocations to generate {0}".format(skyPosFilename))
             xconvertskylocationsCall = ' '.join([ "xconvertskylocations",
                 str(skyPosFilename_trigger),
@@ -1039,6 +1055,10 @@ if args.search_type == 'grb':
     # ---- Split coincidence segment list into "chunks".
     coincidence_off_source_segment_chunks = setuputils.make_chunks(coincidence_off_source, onSourceWindowLength, 2*transientTime)
 
+    # ---- Write the 'window' file for the off-source analysis. This file lists
+    #      dummy trigger times for the external event. The 'event' file will be 
+    #      generated later from the 'window' file. We do not need a 'segment' 
+    #      file for the off-source analysis.
     # ---- Make event list and segment list files for the zero-lag off-source times.
     f = open('input/window_off_source.txt', 'w')
 
@@ -1119,8 +1139,8 @@ if lagFile:
 logger.info("... finished writing off-source event file.")
 
 # -----------------------------------------------------------------------------
-#      Read in off-source event file and check each event passes meets our
-#                            network criteria.
+#      Read in off-source window file and check each dummy window passes meets
+#                            our network criteria.
 # -----------------------------------------------------------------------------
 if args.search_type == 'grb':
 # KLUDGE so that we don't have to reindent the code below
@@ -1416,7 +1436,7 @@ if cp.has_section('waveforms') :
                 logger.info("{0}".format(jitter_injection_command))
                 os.system(jitter_injection_command)
 
-        # ---- Apply calibiration uncertainties to injections if required. We use
+        # ---- Apply calibration uncertainties to injections if required. We use
         #      the real detector (rather than the virtual detector) for determining
         #      calibration uncertainties, as the virtual detector may not have
         #      been operational at the time of the trigger.
@@ -1449,7 +1469,7 @@ if cp.has_section('waveforms') :
 if xtmvaFlag:
     # ---- Extract required data from [xtmva] section.
     if cp.has_section('xtmva'):
-        WFtrain    = cp.get('xtmva','WFtrain')
+        #WFtrain    = cp.get('xtmva','WFtrain')
         classifier = cp.get('xtmva','classifier')
         tmvadir    = cp.get('xtmva','tmvadir')
         # ---- Copy xtmva scripts to the local directory.
@@ -1462,8 +1482,8 @@ if xtmvaFlag:
         xtmvainifile = open('./xtmva.ini','w')
         inistring = '[Settings]' + '\n'
         xtmvainifile.write(inistring)
-        inistring = 'WFtrain=' + WFtrain + '\n'
-        xtmvainifile.write(inistring)
+        #inistring = 'WFtrain=' + WFtrain + '\n'
+        #xtmvainifile.write(inistring)
         inistring = 'classifier=' + classifier + '\n'
         xtmvainifile.write(inistring)
         inistring = '[Folders]' + '\n'
@@ -1478,7 +1498,8 @@ if xtmvaFlag:
             waveform_set = cp.options('waveforms')
             for set in waveform_set :
                 # ---- Add all sets to the testing list EXCEPT for the traininiget.
-                if not (set==WFtrain):
+                #if not (set==WFtrain):
+                if 1==1
                     # ---- Read the number of injections from the log file.
                     injfilename = "input/injection_" + set + ".txt"
                     injfile = open(injfilename)
@@ -1794,7 +1815,7 @@ event_off_file = open('input/event_off_source.txt')
 event_off_list = event_off_file.readlines()
 nOffEvents = len(event_off_list)
 event_off_file.close()
-# ---- END OF KLUDGE FXI
+# ---- END OF KLUDGE FIX
 
 # ---- Check how many segments are to be bundled into each job, and create
 #      job nodes accordingly.
@@ -2255,7 +2276,7 @@ logger.info("############################################")
 
 # ---- Append to summary file.
 sfile = open(summary_file,'a')
-sfile.write('\t 1')
+sfile.write('\t 1 \n')
 sfile.close()
 
 # ---- Exit cleanly
