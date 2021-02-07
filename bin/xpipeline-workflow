@@ -214,6 +214,18 @@ def parse_commandline():
 			the smart clustering for large production analyses.
                         """,
                         dest='smartCluster', action='store_true', default=False)
+    parser.add_argument("--use-xpypeline", help=
+                        """
+                        This will produce an extra set of DAGs that will run
+			the smart clustering for large production analyses.
+                        """,
+                        dest='use_xpypeline', action='store_true', default=False)
+    parser.add_argument("--user", help=
+                        """
+                        User's Albert.Einstein username. If not specified then the whoami
+			system comand will be used to guess it.
+                        """,
+                        dest='UserName',default=None)
     group = parser.add_mutually_exclusive_group()
     group.add_argument("-v", "--verbose", action="store_true")
     group.add_argument("-q", "--quiet", action="store_true")
@@ -224,10 +236,10 @@ def parse_commandline():
 # -------------------------------------------------------------------------
 #      Parse the command line options.
 # -------------------------------------------------------------------------
+
 args = parse_commandline()
 
-# Set command line arguments to variables to be used later in the code
-# Also based on command line arguments set some other defaults
+# ---- Set command line arguments to variables to be used later in the code.
 reUseInj              = args.reUseInj
 mergingCutsPath       = args.mergingCutsPath
 grid_type             = args.grid_type
@@ -252,13 +264,12 @@ smartCluster          = args.smartCluster
 minimalMem            = args.minimalMem
 FAR                   = args.FAR
 FAP                   = args.FAP
+UserName              = args.UserName
+use_xpypeline         = args.use_xpypeline
 
 logger = log.Logger('X-Pypeline')
 
-#
-#    Validating inputs
-#
-
+# ---- Validate detector list.
 for iDet in detector:
     if not iDet in lal.cached_detector_by_prefix.keys():
         raise ValueError('One of the detectors '
@@ -267,12 +278,13 @@ for iDet in detector:
                         'include {0}'.format(
                         lal.cached_detector_by_prefix.keys()))
 
-#
-#    Naming defaults
-#
+# ---- Guess the condor username if not supplied.
+if not UserName :
+    UserName = os.popen('whoami').read().rstrip()
 
-# ---- grb_name should have format e.g., "GRB070201"
-#      we append GRB prefix if missing 
+# ---- The variable grb_name should be of the format "GRB070201*". Append the
+#      prefix "GRB" if missing.
+#      :KLUDGE: This should be removed for supernova and all-sky searches.
 if not(grb_name.startswith('GRB')):
     grb_name = 'GRB' + grb_name
 
@@ -438,14 +450,13 @@ jobsPerWindow = int(math.ceil(float(onSourceTimeLength)/float(blockTime-2*transi
 onSourceWindowLength=2*transientTime+jobsPerWindow*(blockTime-2*transientTime)
 minimumFrequency = cp.getint('parameters','minimumFrequency')
 maximumFrequency = cp.getint('parameters','maximumFrequency')
+applyGates = 0
 if cp.has_option('segfind','applyGates'):
     applyGates = int(cp.get('segfind','applyGates'))
-    if applyGates:
-        print >> sys.stdout, "Will attempt to apply gating to this analysis."
-    else:
-        applyGates = 0
-        print >> sys.stdout, "Running analysis without applying gates."
-
+if applyGates:
+    logger.info('Gating ON: Will apply any gates specified in the .ini file.')
+else:
+    logger.info('Gating OFF: Will ignore any gates specified in the .ini file.')
 
 channelListLine   = cp.get('input','channelList')
 channelList       = channelListLine.split(',')
@@ -1623,20 +1634,21 @@ dag = pipeline.CondorDAG(log_file_on_source + uuidtag)
 # ---- Set the name of the file that will contain the DAG.
 dag.set_dag_file( 'grb_on_source' )
 
-# ---- Make instance of XsearchJob.
-job = xcondor.XsearchJob(cp)
+# ---- Make instance of search job.
+if outputType == 'seedless' and doGPUOnSource == "true":
+    job = xcondor.XsearchGPUJob(cp)
+else :
+    job = xcondor.XsearchJob(cp,UserName,use_xpypeline)
 
-if outputType == 'seedless':
-    if doGPUOnSource == "true":
-        job = xcondor.XsearchGPUJob(cp)
-
-# ---- Make instance of XmergeJob.
-#mergejob = xcondor.XmergeJob(cp)
-# ---- Put a single merge job node in mergejob.  This job will combine
-#      into a single file the output of all of the off-source analysis jobs.
-#mergenode = xcondor.XmergeNode(mergejob)
-if xtmvaFlag:
-    xtmvanode.add_parent(mergenode)
+# ---- Make merge jobs if needed.
+if not use_xpypeline :
+    # ---- Make instance of XmergeJob.
+    mergejob = xcondor.XmergeJob(cp,UserName)
+    # ---- Put a single merge job node in mergejob.  This job will combine
+    #      into a single file the output of all of the off-source analysis jobs.
+    mergenode = xcondor.XmergeNode(mergejob)
+    if xtmvaFlag:
+        xtmvanode.add_parent(mergenode)
 
 # ---- if clustering.
 if smartCluster == True:
@@ -1660,7 +1672,7 @@ event_on_file.close()
 
 # ---- Add one node to the job for each segment to be analysed.
 for i in range(len(segmentList)):
-    node = xcondor.XsearchNode(job)
+    node = xcondor.XsearchNode(job,Username,use_xpypeline)
     # ---- Parameters file:
     matlab_param_file = cwdstr + "/input/parameters_on_source_" + str(i) + ".txt"
     node.set_param_file(matlab_param_file)
@@ -1675,13 +1687,14 @@ for i in range(len(segmentList)):
     node.set_name("xdetection_on_source_seg" + str(i) + "_" + node.get_name())
     dag.add_node(node)
 
-# ---- Supply remaining XmergeJob node parameters, add job to the dag.
-#mergenode.set_dir_prefix("on_source/")
-#mergenode.set_sn_flag("0 " + mergingCutsString)
-#mergenode.set_retry(retryNumber)
-# ---- Prepend human readable description to node name.
-#mergenode.set_name("xmerge_on_source_" + mergenode.get_name())
-#dag.add_node(mergenode)
+if not use_xpypeline :
+    # ---- Supply remaining XmergeJob node parameters, add job to the dag.
+    mergenode.set_dir_prefix("on_source/")
+    mergenode.set_sn_flag("0 " + mergingCutsString)
+    mergenode.set_retry(retryNumber)
+    # ---- Prepend human readable description to node name.
+    mergenode.set_name("xmerge_on_source_" + mergenode.get_name())
+    dag.add_node(mergenode)
 
 # ---- do the same if clustering.
 if smartCluster == True:
@@ -1699,7 +1712,8 @@ dag.write_dag()
 # ---- Delete used dag job
 del dag
 del job
-#del mergejob
+if not use_xpypeline :
+    del mergejob
 # --- if we cluster
 if smartCluster == True:
   dag_clustered.write_sub_files()

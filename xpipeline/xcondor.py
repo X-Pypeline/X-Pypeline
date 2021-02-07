@@ -8,14 +8,17 @@ class XsearchJob(pipeline.CondorDAGJob, pipeline.AnalysisJob):
     """
     An x search job
     """
-    def __init__(self,cp):
+    def __init__(self,cp,UserName,use_xpypeline):
         """
         cp = ConfigParser object from which options are read.
         """
-        # ---- Get path to executable from parameters file.
-        # self.__executable = cp.get('condor','xsearch')
+        # ---- Specify executable.
+        if use_xpypeline :
+            exec_name = 'xpipeline-analysis'
+        else :
+            exec_name = 'xdetection'
         # ---- Get path to executable.
-        os.system('which xpipeline-analysis > path_file.txt')
+        os.system('which ' + exec_name + ' > path_file.txt')
         f = open('path_file.txt','r')
         xpipeline_analysisstr = f.read()
         f.close()
@@ -28,9 +31,23 @@ class XsearchJob(pipeline.CondorDAGJob, pipeline.AnalysisJob):
         self.__param_file = None
 
         # ---- Add required environment variables.
-        self.add_condor_cmd('getenv',"true")
+        if use_xpypeline :
+            self.add_condor_cmd('getenv',"true")
+        else :
+            if 'raven' in hostname:
+                MCR_CACHE_PATH = '/tmp/'
+            elif 'ldas' in hostname:
+                MCR_CACHE_PATH = '/local/'
+            else:
+                print 'Warning : ' + hostname + ' does not have a specific MCR_CACHE_ROOT setup, using default'
+                MCR_CACHE_PATH = '/local/'
+            self.add_condor_cmd('environment',"USER=$ENV(USER);HOME=$ENV(HOME);" \
+                "LD_LIBRARY_PATH=$ENV(LD_LIBRARY_PATH);" \
+                "XPIPE_INSTALL_BIN=$ENV(XPIPE_INSTALL_BIN);" \
+                "PATH=/usr/bin:/bin;" \
+                "MCR_CACHE_ROOT="+MCR_CACHE_PATH+"$ENV(USER)/.$(cluster)")
 
-        # ----Add Accounting Group Flag
+        # ---- Add accounting group flag.
         grouptag = 'ligo.' + \
                 cp.get('condor','ProdDevSim') + '.' +\
                 cp.get('condor','Era') + '.' +\
@@ -38,14 +55,20 @@ class XsearchJob(pipeline.CondorDAGJob, pipeline.AnalysisJob):
                 cp.get('condor','SearchType')
         self.add_condor_cmd('accounting_group',grouptag)
 
-        # ----Add Username Flag
-        self.add_condor_cmd('accounting_group_user', cp.get('condor','UserName'))
+        # ---- Add condor username.
+        self.add_condor_cmd('accounting_group_user', UserName)
 
-        # ---- Add priority specification
+        # ---- Add priority specification.
         self.add_condor_cmd('priority', cp.get('condor', 'condorPriority'))
 
-        # --- add minimal memory needed
-        self.add_condor_cmd('request_memory', cp.get('condor', 'minimalSearchJobCPUMem'))
+        # ---- Add minimal memory needed.
+        if cp.has_option('condor', 'minimalSearchJobMem') :
+            minimalSearchJobMem = cp.get('condor', 'minimalSearchJobMem')
+        elif minimalMem :
+            minimalSearchJobMem = minimalMem 
+        else :
+            minimalSearchJobMem = "2000"
+        self.add_condor_cmd('request_memory', minimalSearchJobMem)
 
         # ---- Path and file names for standard out, standard error for this job.
         self.set_stdout_file('logs/xsearch-$(cluster)-$(process).out')
@@ -163,7 +186,7 @@ class XmergeJob(pipeline.CondorDAGJob, pipeline.AnalysisJob):
     """
     An x merge job
     """
-    def __init__(self,cp):
+    def __init__(self,cp,UserName):
         """
         cp = ConfigParser object from which options are read.
         """
@@ -181,8 +204,16 @@ class XmergeJob(pipeline.CondorDAGJob, pipeline.AnalysisJob):
         # ---- Add name of 'output' directory as first argument.
         self.add_arg('output')
         # ---- Add required environment variables.
+        if 'raven' in hostname:
+            MCR_CACHE_PATH = '/tmp/'
+        elif 'ldas' in hostname:
+            MCR_CACHE_PATH = '/local/'
+        else:
+            print 'Warning : ' + hostname + ' does not have a specific MCR_CACHE_ROOT setup, using default'
+            MCR_CACHE_PATH = '/local/'
         self.add_condor_cmd('environment',"USER=$ENV(USER);HOME=$ENV(HOME);" \
-            "LD_LIBRARY_PATH=$ENV(LD_LIBRARY_PATH)")
+            "LD_LIBRARY_PATH=$ENV(LD_LIBRARY_PATH);" \
+            "MCR_CACHE_ROOT="+MCR_CACHE_PATH+"$ENV(USER)/.$(cluster)")
 
         # ----Add Accounting Group Flag
         grouptag = 'ligo.' + \
@@ -192,22 +223,24 @@ class XmergeJob(pipeline.CondorDAGJob, pipeline.AnalysisJob):
                 cp.get('condor','SearchType')
         self.add_condor_cmd('accounting_group',grouptag)
 
-        # ----Add Username Flag
-        self.add_condor_cmd('accounting_group_user',cp.get('condor','UserName'))
+        # ----Add condor username. 
+        self.add_condor_cmd('accounting_group_user','UserName')
 
         # ---- Add priority specification
         self.add_condor_cmd('priority', cp.get('condor', 'condorPriority'))
 
-        # --- add minimal memory needed
-        self.add_condor_cmd('request_memory', cp.get('condor', 'minimalMergeJobMem'))
+        # ---- Add minimal memory needed.
+        if cp.has_option('condor', 'minimalMergeJobMem') :
+            minimalMergeJobMem = cp.get('condor', 'minimalMergeJobMem')
+        elif minimalMem :
+            minimalMergeJobMem = minimalMem 
+        else :
+            minimalMergeJobMem = "2000"
+        self.add_condor_cmd('request_memory', minimalMergeJobMem)
 
         # ---- Path and file names for standard out, standard error for this job.
         self.set_stdout_file('logs/xmerge-$(cluster)-$(process).out')
         self.set_stderr_file('logs/xmerge-$(cluster)-$(process).err')
-
-        # If on Atlas
-        #if atlasFlag:
-        #   self.add_condor_cmd('getenv',"true")
 
         # ---- Name of condor job submission file to be written.
         self.set_sub_file('xmerge.sub')
