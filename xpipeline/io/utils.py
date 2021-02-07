@@ -20,7 +20,7 @@
 """
 
 
-def write_onsource(filename, outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, cp):
+def write_onsource(filename, outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, applyGates, cp):
 
     parameters = cp.options('parameters')
     # ---- Parameters file for on-source analysis.
@@ -50,7 +50,7 @@ def write_onsource(filename, outputType, frameCacheAll, skyPositionList, likelih
     fParam.close()
 
 
-def write_ul_source(filename, outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, cp):
+def write_ul_source(filename, outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, applyGates, cp):
 
     parameters = cp.options('parameters')
     # ---- Parameters file for ul-source analysis.
@@ -82,7 +82,7 @@ def write_ul_source(filename, outputType, frameCacheAll, skyPositionList, likeli
     fParam.close()
 
 
-def write_offsource(filename, outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, cp):
+def write_offsource(filename, outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, applyGates, cp):
 
     parameters = cp.options('parameters')
     # ---- Parameters file for off-source analysis.
@@ -110,7 +110,7 @@ def write_offsource(filename, outputType, frameCacheAll, skyPositionList, likeli
     fParam.close()
 
 
-def write_waveforms(filename, outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, cp, injectionScalesList, disableFastInjections, waveform):
+def write_waveforms(filename, outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, applyGates, cp, injectionScalesList, disableFastInjections, waveform):
 
     parameters = cp.options('parameters')
     fParam=open(filename, 'w')

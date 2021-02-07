@@ -995,13 +995,13 @@ for iSeg in range(len(coincidence_on_source_segment_chunks)):
     logger.info("Writing Matlab-formatted parameter files ...")
 
     # ---- Parameters file for on-source analysis.
-    ioutils.write_onsource('input/parameters_on_source_' + str(iSeg) + '.txt', outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, cp)
+    ioutils.write_onsource('input/parameters_on_source_' + str(iSeg) + '.txt', outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, applyGates, cp)
 
     # ---- Parameters file for ul-source analysis.
-    ioutils.write_ul_source('input/parameters_ul_source_' + str(iSeg) + '.txt',outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, cp)
+    ioutils.write_ul_source('input/parameters_ul_source_' + str(iSeg) + '.txt',outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, applyGates, cp)
 
     # ---- Parameters file for off-source analysis.
-    ioutils.write_offsource('input/parameters_off_source_' + str(iSeg) + '.txt', outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, cp)
+    ioutils.write_offsource('input/parameters_off_source_' + str(iSeg) + '.txt', outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, applyGates, cp)
 
     # ---- Parameter files for on-the-fly simulated waveform analyses, if requested.
     if cp.has_section('waveforms') :
@@ -1022,7 +1022,7 @@ for iSeg in range(len(coincidence_on_source_segment_chunks)):
                 injectionScales = injectionScalesList.split(',')
 
             # ---- If we do long injections we will have one single parameter file
-            ioutils.write_waveforms("input/parameters_simulation_" + iwaveform + "_0_" + str(iSeg) + ".txt", outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, cp, injectionScalesList, disableFastInjections, iwaveform)
+            ioutils.write_waveforms("input/parameters_simulation_" + iwaveform + "_0_" + str(iSeg) + ".txt", outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, applyGates, cp, injectionScalesList, disableFastInjections, iwaveform)
 
 
 f.close()
