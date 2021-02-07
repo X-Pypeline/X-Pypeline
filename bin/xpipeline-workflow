@@ -1499,7 +1499,7 @@ if xtmvaFlag:
             for set in waveform_set :
                 # ---- Add all sets to the testing list EXCEPT for the traininiget.
                 #if not (set==WFtrain):
-                if 1==1
+                if True :
                     # ---- Read the number of injections from the log file.
                     injfilename = "input/injection_" + set + ".txt"
                     injfile = open(injfilename)
