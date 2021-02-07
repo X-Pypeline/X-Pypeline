@@ -1841,17 +1841,6 @@ event_off_list = event_off_file.readlines()
 nOffEvents = len(event_off_list)
 event_off_file.close()
 
-## ---- Check how many segments are to be bundled into each job, and create
-##      job nodes accordingly.
-#if cp.has_option('output','maxInjNum'):
-#    maxInjNum = int(cp.get('output','maxInjNum'))
-#else:
-#    maxInjNum = 1
-#
-## ---- Rescale by the number of sky position so that all jobs have the
-##      same length regardless of the number of sky position
-#maxInjNum = math.ceil(float(maxInjNum)/math.sqrt(float(numSky)))
-
 # ---- Bundle segments together so that maxOffNum segments are analysed by each
 #      condor job node.
 # ---- First check how many segments are to be bundled into each job. 
@@ -1935,6 +1924,17 @@ if smartCluster == True:
 # -------------------------------------------------------------------------
 #      Write on-the-fly simulations dags - one for each waveform set.
 # -------------------------------------------------------------------------
+
+# ---- Check how many injections are to be bundled into each job, and create
+#      job nodes accordingly.
+if cp.has_option('output','maxInjNum'):
+    maxInjNum = int(cp.get('output','maxInjNum'))
+else:
+    maxInjNum = 1
+
+# ---- Rescale by the number of sky position so that all jobs have the
+#      same length regardless of the number of sky position
+maxInjNum = math.ceil(float(maxInjNum)/math.sqrt(float(numSky)))
 
 # ---- All injection scales for a given waveform set will be handled by a
 #      single dag.
