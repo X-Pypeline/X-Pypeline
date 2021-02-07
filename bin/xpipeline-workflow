@@ -1858,22 +1858,22 @@ for i in range(nSets) :
     else :
         node = xcondor.XmatlabSearchNode(job)
         mergenode.add_parent(node)
-    upper_event_number = min((i+1)*maxOffNum, nOffEvents)
     lower_event_number = i*maxOffNum
+    upper_event_number = min((i+1)*maxOffNum, nOffEvents)
     job_range = [str(i) for i in range(lower_event_number, upper_event_number)]
     segmentstr = str(int(math.floor((jobsPerWindow*i)/nSets)))
-    # set range of event numbers to be processed in this job
-    node.set_x_jobnum("{0}".format(' '.join(job_range)))
-    # this is background trial
-    node.set_output_dir("background")
     # set path to param file
     matlab_param_file = cwdstr + "/input/parameters_off_source_" + segmentstr + ".txt"
     node.set_param_file(matlab_param_file)
-    #node.set_output_dir(os.path.join(cwdstr, "output", "off_source"))
+    # set range of event numbers to be processed in this job
+    node.set_x_jobnum("{0}".format(' '.join(job_range)))
+    if use_xpypeline :
+        node = xcondor.XsearchNode(job)
+        node.set_output_dir("background")
+    else :
+        node.set_output_dir(os.path.join(cwdstr, "output", "off_source"))
     # Set injection number which for background jobs is 0
     node.set_x_injnum('0')
-    # add this as a depednecy to the merge jobs dag
-    #mergenode.add_parent(node)
     node.set_retry(retryNumber)
     # ---- Prepend human readable description to node name.
     node.set_name("xdetection_off_source_seg" + str(i) + "_" + node.get_name())
