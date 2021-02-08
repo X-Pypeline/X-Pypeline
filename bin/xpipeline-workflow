@@ -565,7 +565,7 @@ except:
 #      Retrieve single-IFO segment lists for analysis period.
 # -------------------------------------------------------------------------
 
-# Write our analysis duration as a gwpy segment list
+# ---- Write our analysis duration as a gwpy segment list.
 analysis_segment = SegmentList([Segment(start_time, end_time)])
 
 # ---- Prepare storage for full segment lists.
@@ -583,7 +583,7 @@ veto_seg_files = setuputils.validate_vetos(detector, start_time, end_time, cp)
 # ---- Read in segment_lists to ScienceData object.
 for (iFile, ifo) in zip(analysis_seg_files, detector):
 
-    # ---- Read full segment list into gwpy
+    # ---- Read full segment list into gwpy.
     #      Throw away science segment shorter than the
     #      blockTime value read from the configuration file.
     logger.info('Reading segment list from file {0}'.format(iFile))
@@ -648,12 +648,14 @@ if network_selection :
                                transientTime,
                                onSourceWindowLength)
 
+    logger.info("\nSelected network ", detector)
 
-logger.info('Based on valid network creating Tilde string useful for reading in MATLAB...')
+
 # -----------------------------------------------------------------------------
 #               Construct tilde-separated list of sites
 # -----------------------------------------------------------------------------
 
+logger.info('Based on valid network creating Tilde string useful for reading in MATLAB...')
 # ---- Initialise tilde-separated list of sites.
 siteStrTilde = ''
 for iDet in range(0,len(detector)):
