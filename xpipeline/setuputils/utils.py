@@ -22,16 +22,14 @@ from gwpy.segments import Segment, DataQualityDict, SegmentList, DataQualityFlag
 import operator
 
 def query_veto_definer_file(ifo, start, end, cp):
-    # Obtain segments that are analysis ready
-    name = cp.get(ifo, "include-segments") 
-    analysis_ready = DataQualityFlag.query(name.format(ifo), start, end)
-    #analysis_ready = DataQualityFlag.query('{0}:DMT-ANALYSIS_READY:1'.format(ifo), start, end)
-    # Define the start and stop time of analysis ready
+    # ---- Obtain segments that are analysis-ready.
+    analysis_ready = DataQualityFlag.query(cp.get(ifo,"include-segments"), start, end)
+    # ---- Define the start and stop time of analysis ready.
     analysis_ready_start = analysis_ready.active.extent()[0]
-    analysis_ready_end = analysis_ready.active.extent()[1]
-    # Query for vetos found during this time.
+    analysis_ready_end   = analysis_ready.active.extent()[1]
+    # ---- Query for vetos found during this time.
     vdf = DataQualityDict.from_veto_definer_file(cp.get('segfind', 'veto-file'), analysis_ready_start, analysis_ready_end)
-    # Populate only for analysis ready segments.
+    # ---- Populate only for analysis-ready segments.
     vdf.populate(segments=analysis_ready.active)
 
     return vdf
@@ -62,9 +60,8 @@ def validate_segments(ifos, start, end, cp, trigger_time=None):
     """
     analysis_seg_files = []
 
-    # If simulating noise skip all segment, veto 
-    # and network validation checks. The on source and off source is
-    # simulated and therefore has no DQ issues.
+    # ---- If simulating noise skip all segment, veto and network validation checks. 
+    #      The on-source and off-source are simulated and therefore have no DQ issues.
     if cp.has_option('parameters','makeSimulatedNoise'):
         for ifo in ifos:
             print('Making simulated noise, creating temp segment file')
@@ -84,30 +81,29 @@ def validate_segments(ifos, start, end, cp, trigger_time=None):
                 else:
                     analysis_seg_files.append(cp.get(ifo,'segment-list'))
             else:
-                # Query for veto definer file
+                # ---- Query for veto definer file.
                 vdf = query_veto_definer_file(ifo, start, end, cp) 
 
-                # Filter for cat1 vetos
+                # ---- Filter for cat1 vetos.
                 segs = filter_for_cat_type(vdf, ifo, [1])
 
                 # ---- Write out cat1 veto to text file.
                 filename_cat1 = "input/" + ifo +  "-veto-cat1.txt"
                 segs.write(filename_cat1)
 
-                # Compute analysis ready segments in order to
-                # subtract out cat1 vetos
-                name = cp.get(ifo, "include-segments") 
-                analysis_ready = DataQualityFlag.query(name.format(ifo), start, end)
-                #analysis_ready = DataQualityFlag.query('{0}:DMT-ANALYSIS_READY:1'.format(ifo), start, end)
+                # ---- Compute analysis ready segments in order to subtract out cat1 vetos.
+                analysis_ready = DataQualityFlag.query(cp.get(ifo,"include-segments"), start, end)
 
-                # Subtract cat 1 veto from analysis_ready
+                # ---- Subtract cat 1 vetoes from analysis_ready.
                 analysis_ready_minus_cat1 = analysis_ready.active - segs
-                # Save new segment list to file
+
+                # ---- Save new segment list to file.
                 filename_analysis_ready_minus_cat1 = "input/" + ifo + "_science_cat1.txt"
                 analysis_ready_minus_cat1.write(filename_analysis_ready_minus_cat1)
                 analysis_seg_files.append(filename_analysis_ready_minus_cat1)
 
     return analysis_seg_files
+
 
 def validate_network():
 
@@ -133,9 +129,8 @@ def validate_vetos(ifos, start, end, cp):
     """
     veto_seg_files = []
 
-    # If simulating noise skip all segment, veto 
-    # and network validation checks. The on source and off source is
-    # simulated and therefore has no DQ issues.
+    # ---- If simulating noise skip all segment, veto and network validation checks. 
+    #      The on-source and off-source are simulated and therefore have no DQ issues.
     if cp.has_option('parameters','makeSimulatedNoise'):
         for ifo in ifos:
             veto_seg_files.append("None")
@@ -151,10 +146,10 @@ def validate_vetos(ifos, start, end, cp):
                 else:
                     veto_seg_files.append(cp.get(ifo,'veto-list'))
             else:
-                # Query for veto definer file
+                # ---- Query for veto definer file.
                 vdf = query_veto_definer_file(ifo, start, end, cp)
 
-                # Filter for cat24 vetos
+                # ---- Filter for cat24 vetos.
                 cat = [2, 4]
                 for iCat in cat:
                     segs = filter_for_cat_type(vdf, ifo, [iCat])
@@ -188,3 +183,5 @@ def make_chunks(segment, length, overlap=0):
             time_left -= increment
 
     return SegmentList(chunks)
+
+

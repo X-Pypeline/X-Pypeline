@@ -521,12 +521,6 @@ for jj in range(0,len(keepIndex)):
     channel.append(channelList[keepIndex[jj]])
     frameType.append(frameTypeList[keepIndex[jj]])
 
-
-logger.info("DELETE ME: detectors: ", detector)
-logger.info("DELETE ME: channels:  ", channel)
-logger.info("DELETE ME: frame types:", frameType)
-
-
 # ---- Status message.
 logger.info("... finished validating network.          ")
 
@@ -534,9 +528,6 @@ logger.info("... finished validating network.          ")
 # -------------------------------------------------------------------------
 #      Retrieve single-IFO segment lists for analysis period.
 # -------------------------------------------------------------------------
-
-# ---- Write our analysis duration as a gwpy segment list.
-#analysis_segment = SegmentList([Segment(start_time, end_time)])
 
 # ---- Prepare storage for full segment lists.
 full_segment_list = []
@@ -559,8 +550,8 @@ for (iFile, ifo) in zip(analysis_seg_files, detector):
     logger.info('Reading segment list from file {0}'.format(iFile))
     full_segment = SegmentList.read(iFile)
     logger.info('... finished reading segment list.')
-    logger.info('Checking for segments less than {0}.'.format(blockTime))
-    full_segment = SegmentList([seg for seg in full_segment if abs(seg) > blockTime])
+    logger.info('Removing segments with duration less than {0} seconds.'.format(blockTime))
+    full_segment = SegmentList([seg for seg in full_segment if abs(seg) >= blockTime])
     logger.info('Done')
 
     # ---- Finally, append segment for this detector to the full list.
