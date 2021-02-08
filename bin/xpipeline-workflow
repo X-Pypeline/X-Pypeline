@@ -233,6 +233,7 @@ def parse_commandline():
 
     return args
 
+
 # -------------------------------------------------------------------------
 #      Parse the command line options.
 # -------------------------------------------------------------------------
@@ -290,23 +291,6 @@ if not(grb_name.startswith('GRB')):
 
 
 # -------------------------------------------------------------------------
-#      Test to see if we are running on Atlas.
-# -------------------------------------------------------------------------
-
-# ---- Get partial hostname.
-hostname = socket.gethostname()
-
-# ---- Get full hostame.
-fullhostname = socket.getfqdn()
-
-# ---- Check hostname and set flag if necessary.
-if 'atlas' in fullhostname:
-    atlasFlag = 1
-else:
-    atlasFlag = 0
-
-
-# -------------------------------------------------------------------------
 #      Status message.  Report all supplied arguments.
 # -------------------------------------------------------------------------
 
@@ -338,28 +322,22 @@ if grid_type == 'file':
 logger.info("     condor priority: {0}".format(condorPriority))
 if mergingCutsPath:
     logger.info("   merging cuts from: {0}".format(mergingCutsPat))
-if atlasFlag:
-    logger.info("    running on atlas: yes")
 if xtmvaFlag:
     logger.info("       running XTMVA: yes")
 logger.info("\n")
 
-# ---- Write ASCII file holding xpipeline-workflow command.
-
-summary_file = 'grb_summary.txt'
 # ---- Append to summary file.
+summary_file = 'grb_summary.txt'
 sfile = open(summary_file,'a')
 sfile.write('\t'.join(['\nname','\tgps','\tra','dec','network','numSky','numBG','analyse','\n']))
 sfile.write('\t'.join([grb_name,str(trigger_time),str(ra),str(decl)]))
 sfile.close()
 
-# ---- We will record the command line arguments to xpipeline-workflow in a file called
-#      grb.param.
-#      This file is used by xgrbwebpage.py which expects the short form of
-#      the options to have been used
+# ---- Write ASCII file holding xpipeline-workflow command.
 command_string = 'xpipeline-workflow '
 with open('xpipeline-workflow.param', 'w') as f:
     f.write(command_string + ' '.join(sys.argv[1:]) + '\n')
+
 
 # -------------------------------------------------------------------------
 #      Preparatory.
@@ -371,17 +349,19 @@ uuidtag = str(uuid.uuid4()).replace('-','')
 # ---- Record the current working directory in a string.
 cwdstr = "."
 
-# ---- Make directory to store text files (segment lists, parameter
+# ---- Make directory to store helper files (segment lists, parameter
 #      files, etc.) that will be input to X-Pipeline.  This is done
-#      lsto minimize clutter in the working directory.
-try: os.mkdir( 'input' )
-except: pass  # -- Kludge: should probably fail with error message.
+#      to minimize clutter in the working directory.
+try: 
+    os.mkdir( 'input' )
+except: 
+    logger.error("Unable to create input/ directory.")
 
-# ---- Find files which define merging cuts
+# ---- Find files which define merging cuts (if requested).
 mergingCutsString = ""
 if mergingCutsPath:
-    preCutFile = glob.glob(mergingCutsPath + '/*xmake_args_tuned_pre.txt')
-    cutFile = glob.glob(mergingCutsPath + '/*xmake_args_tuned.txt')
+    preCutFile  = glob.glob(mergingCutsPath + '/*xmake_args_tuned_pre.txt')
+    cutFile     = glob.glob(mergingCutsPath + '/*xmake_args_tuned.txt')
     origResults = glob.glob(mergingCutsPath + '/*closedbox.mat')
     mergingCutsString = cutFile[0] + " " + origResults[0]
     if preCutFile:
@@ -395,14 +375,10 @@ if mergingCutsPath:
 # ---- Status message.
 logger.info("Parsing parameters (ini) file ...")
 
-# ---- Check the params_file exists
+# ---- Check the params_file exists.
 if not os.path.isfile(params_file):
     logger.error("Non existent parameter file: {0}".format(params_file))
     raise ValueError("Misspelled or non-existent ini file")
-
-# Set some ini file defaults
-doAsymmetricBackground    = 0
-backgroundAsymmetryFactor = 0.5
 
 # ---- Create configuration-file-parser object and read parameters file.
 cp = ConfigParser()
@@ -428,28 +404,19 @@ if (seed > pow(2,31)-2) or (seed < 0):
 #      moved into the relevant sections of the script where the
 #      variables are actually used.
 
-# ---- Read needed variables from [parameters] and [background] sections.
-background_period = cp.getint('background','backgroundPeriod')
-
-if cp.has_option('background','doAsymmetricBackground') :
-    doAsymmetricBackground   = cp.getint('background','doAsymmetricBackground')
-
-if cp.has_option('background','backgroundAsymmetryFactor') :
-    backgroundAsymmetryFactor = cp.getfloat('background', 'backgroundAsymmetryFactor')
-
-blockTime         =  cp.getint('parameters','blockTime')
-whiteningTime     =  cp.getfloat('parameters','whiteningTime')
-transientTime     =  4 * whiteningTime
-onSourceBeginOffset = cp.getint('parameters','onSourceBeginOffset')
-onSourceEndOffset   = cp.getint('parameters','onSourceEndOffset')
-onSourceEndOffset   = max(onSourceEndOffset,manualEndOffset)
-onSourceTimeLength = onSourceEndOffset - onSourceBeginOffset
-outputType = cp.get('parameters','outputType')
-xparseoutputtype.parse(outputType,cp)
-jobsPerWindow = int(math.ceil(float(onSourceTimeLength)/float(blockTime-2*transientTime)))
-onSourceWindowLength=2*transientTime+jobsPerWindow*(blockTime-2*transientTime)
-minimumFrequency = cp.getint('parameters','minimumFrequency')
-maximumFrequency = cp.getint('parameters','maximumFrequency')
+# ---- Read needed variables from the [parameters] section.
+blockTime            = cp.getint('parameters','blockTime')
+whiteningTime        = cp.getfloat('parameters','whiteningTime')
+transientTime        = 4 * whiteningTime
+onSourceBeginOffset  = cp.getint('parameters','onSourceBeginOffset')
+onSourceEndOffset    = cp.getint('parameters','onSourceEndOffset')
+onSourceEndOffset    = max(onSourceEndOffset,manualEndOffset)
+onSourceTimeLength   = onSourceEndOffset - onSourceBeginOffset
+outputType           = cp.get('parameters','outputType')
+jobsPerWindow        = int(math.ceil(float(onSourceTimeLength)/float(blockTime-2*transientTime)))
+onSourceWindowLength = 2*transientTime+jobsPerWindow*(blockTime-2*transientTime)
+minimumFrequency     = cp.getint('parameters','minimumFrequency')
+maximumFrequency     = cp.getint('parameters','maximumFrequency')
 applyGates = 0
 if cp.has_option('segfind','applyGates'):
     applyGates = int(cp.get('segfind','applyGates'))
@@ -458,6 +425,10 @@ if applyGates:
 else:
     logger.info('Gating OFF: Will ignore any gates specified in the .ini file.')
 
+# ---- Generate input/ text files required by the 'seedless' analysis (does nothing otherwise).
+xparseoutputtype.parse(outputType,cp)
+
+# ---- Read needed variables from the [input] section.
 channelListLine   = cp.get('input','channelList')
 channelList       = channelListLine.split(',')
 frameTypeListLine = cp.get('input','frameTypeList')
@@ -465,42 +436,39 @@ frameTypeList     = frameTypeListLine.split(',')
 detectorListLine  = cp.get('input','detectorList')
 detectorList      = detectorListLine.split(',')
 
-# ---- Interval of data to be analysed.
-# ---- Allow for asymmetric background analyses, if needed by the online analysis
-# ---- Flag to be read from ini file
+# ---- Read needed variables from the [background] section and set total interval 
+#      of data required for the analysis.
+background_period = cp.getint('background','backgroundPeriod')
+# ---- Set total interval of data required for the analysis.
 if args.search_type == 'grb':
+    # ---- GRB-type searches have the option of an asymmetric background, 
+    #      typically used for online/low-latency analysis. Check for this.
+    if cp.has_option('background','doAsymmetricBackground') :
+        doAsymmetricBackground = cp.getint('background','doAsymmetricBackground')
+    else :
+        doAsymmetricBackground = 0
     if doAsymmetricBackground == 0:
-        logger.info("Running analysis with symmetric background")
+        # ---- Symmetric background.
         start_time = int(trigger_time - background_period / 2)
-        end_time = int(trigger_time + background_period / 2)
-    # ---- introduce fractional background asymmetry
+        end_time   = int(trigger_time + background_period / 2)
+        logger.info("Running analysis with symmetric background: [" + str(start_time) + "," + str(end_time) + "]")
     else:
+        # ---- Asymmetric background.
+        if cp.has_option('background','backgroundAsymmetryFactor') :
+            backgroundAsymmetryFactor = cp.getfloat('background', 'backgroundAsymmetryFactor')
+        else :
+            backgroundAsymmetryFactor = 0.5
         if backgroundAsymmetryFactor < 1.0:
-            logger.warning("Running analysis with asymmetric background")
             start_time = int(trigger_time - background_period*backgroundAsymmetryFactor)
-            end_time = int(trigger_time + background_period*(1.0 - backgroundAsymmetryFactor))
+            end_time   = int(trigger_time + background_period*(1.0 - backgroundAsymmetryFactor))
+            logger.info("Running analysis with asymmetric background: [" + str(start_time) + "," + str(end_time) + "]" )
         else:
-            logger.error( "Running analysis with asymmetric background but with wrong fractional asymmetry. backgroundAsymmetryFactor should be less than 1.0")
+            logger.error("Invalid value of backgroundAsymmetryFactor: " + str(backgroundAsymmetryFactor) + ". Value should be in interval (0,1).")
 elif args.search_type in ['sn', 'allsky']:
     start_time = int(trigger_time + onSourceBeginOffset - transientTime)
-    end_time = int(trigger_time + onSourceEndOffset + transientTime)
-
+    end_time   = int(trigger_time + onSourceEndOffset + transientTime)
+# ---- Total duration required.
 duration = int(end_time - start_time)
-
-
-# ---- We will copy all frame caches to the location
-#      stored in frameCacheAll.
-frameCacheAll = 'input/framecache.txt'
-
-# ---- Check for frame cache for real ifo data
-try:
-    dataFrameCache = cp.get('input','frameCacheFile')
-except:
-    logger.warning("Warning: No frameCacheFile file specified in "
-        "[input] section of configuration file.")
-    logger.warning("        A frameCache for the ifo data file will be "
-        "generated automatically.")
-    dataFrameCache = None
 
 # ---- Check for a seed value for matlab's random number generator.
 try:
@@ -516,6 +484,7 @@ if (seed > pow(2,31)-2) or (seed < 0):
 
 # ---- Status message.
 logger.info("... finished parsing parameters (ini) file.")
+
 
 # -------------------------------------------------------------------------
 #      Validate list of detectors given.
@@ -555,34 +524,41 @@ for jj in range(0,len(keepIndex)):
 # ---- Status message.
 logger.info("... finished validating network.          ")
 
-logger.info("... checking if framecache exists ...     ")
-# ---- If dataFrameCache is specified and exists we will add it to frameCacheAll
-if dataFrameCache:
-    logger.info("... framecache does exists ...     ")
-    # ---- check the frameCache specified actually exists
+
+# -------------------------------------------------------------------------
+#      Check for / generate frame cache.
+# -------------------------------------------------------------------------
+
+# ---- Name of frame cache file to be created.
+frameCacheAll = 'input/framecache.txt'
+
+# ---- Check .ini file for user-specified frame cache.
+try:
+    dataFrameCache = cp.get('input','frameCacheFile')
+    # ---- Verify the frameCache specified actually exists.
+    logger.info("Checking frameCacheFile file specified in configuration file...")
     if not os.path.isfile(dataFrameCache):
         logger.error("non existant framecache: {0}".format(dataFrameCache))
-
-    # ---- if the specified frame cache exists then concat it other frame caches
+    else:
+        logger.info("... file exists.")
+    # ---- If the specified frame cache exists then concatenate it into the master frame cache.
     command = 'cat ' + dataFrameCache + '  >> ' + frameCacheAll
     os.system(command)
-else:
-    # ---- Status message.
-    logger.info("... framecache does NOT exists ...     ")
-    logger.info("Writing framecache file for ifo data...")
+except:
+    dataFrameCache = None
+    logger.info("No frameCacheFile file specified in configuration file. Attempting to generate one ...")
     f = open(frameCacheAll, 'w')
     f.close()
     connection = gwdatafind.connect()
     for (iframetype, idet) in zip(frameType, detector):
-        logger.info("Writing framecache file for detector {0} and frameType {1}...".format(idet, iframetype))
+        logger.info("... writing framecache file for detector {0} and frameType {1}...".format(idet, iframetype))
         cache = connection.find_urls(idet[0], iframetype, start_time, end_time, urltype='file')
         with open(frameCacheAll, 'a+') as fobj:
             write_cache(map(CacheEntry.from_T050017, cache), fobj)
-    logger.info("Convert lal style frame cache to MATLAB style")
+    logger.info("... converting lal-style frame cache to MATLAB style")
     os.system('convertlalcache.pl {0} {0}_MATLAB.txt'.format(frameCacheAll))
-
     # ---- Status message.
-    logger.info("... finished writing framecache file for ifo data")
+    logger.info("... finished writing frame cache file.")
 
 
 # -------------------------------------------------------------------------
@@ -619,6 +595,7 @@ for (iFile, ifo) in zip(analysis_seg_files, detector):
 
     # ---- Finally, append segment for this detector to the full list.
     full_segment_list.append(full_segment)
+
 
 # -------------------------------------------------------------------------
 #      Choose detector network based on on-source data quality.
