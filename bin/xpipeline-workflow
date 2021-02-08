@@ -900,8 +900,10 @@ if args.search_type == 'grb':
 
 f = open('input/event_on_source.txt', 'w')
 fseg = open('input/segment_on_source.txt', 'w')
+logger.info("******** >>>>> About to loop over on-source chunks: ")
 # For each on source segment choose the sky locations
 for iSeg in range(len(coincidence_on_source_segment_chunks)):
+    logger.info("******** >>>>> Looping over on-source chunks: " + str(iSeg))
     # ---- Write event to event file.
     time_range_string = str((float(coincidence_on_source_segment_chunks[iSeg].start) + \
                             float(coincidence_on_source_segment_chunks[iSeg].end)) / 2) + \
@@ -2154,9 +2156,9 @@ if cp.has_section('waveforms') :
                             # this is background trial
                             # this is background trial
                             if offSourceInj:
-                                node.set_output_dir("offsource_injectionXX")
+                                node.set_output_dir("offsource_injection")
                             else:
-                                node.set_output_dir("onsource_injectionYY")
+                                node.set_output_dir("onsource_injection")
 
                             # set path to param file
                             matlab_param_file = cwdstr + "/input/parameters_simulation_" \
