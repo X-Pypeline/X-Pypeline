@@ -23,7 +23,9 @@ import operator
 
 def query_veto_definer_file(ifo, start, end, cp):
     # Obtain segments that are analysis ready
-    analysis_ready = DataQualityFlag.query('{0}:DMT-ANALYSIS_READY:1'.format(ifo), start, end)
+    name = cp.get(ifo, "include-segments") 
+    analysis_ready = DataQualityFlag.query(name.format(ifo), start, end)
+    #analysis_ready = DataQualityFlag.query('{0}:DMT-ANALYSIS_READY:1'.format(ifo), start, end)
     # Define the start and stop time of analysis ready
     analysis_ready_start = analysis_ready.active.extent()[0]
     analysis_ready_end = analysis_ready.active.extent()[1]
