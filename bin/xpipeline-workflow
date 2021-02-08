@@ -494,7 +494,7 @@ logger.info("... finished parsing parameters (ini) file.")
 #      only perform this once???
 
 # ---- Status message.
-logger.info("Comparing requested network to list of known detectors ...")
+logger.info("Comparing requested network to list of known detectors in .ini file ...")
 
 # ---- For each detector specified with the --detector option, compare to
 #      the list of known detectors from the .ini file.  Keep only the requested
@@ -521,44 +521,14 @@ for jj in range(0,len(keepIndex)):
     channel.append(channelList[keepIndex[jj]])
     frameType.append(frameTypeList[keepIndex[jj]])
 
+
+logger.info("DELETE ME: detectors: ", detector)
+logger.info("DELETE ME: channels:  ", channel)
+logger.info("DELETE ME: frame types:", frameType)
+
+
 # ---- Status message.
 logger.info("... finished validating network.          ")
-
-
-# -------------------------------------------------------------------------
-#      Check for / generate frame cache.
-# -------------------------------------------------------------------------
-
-# ---- Name of frame cache file to be created.
-frameCacheAll = 'input/framecache.txt'
-
-# ---- Check .ini file for user-specified frame cache.
-try:
-    dataFrameCache = cp.get('input','frameCacheFile')
-    # ---- Verify the frameCache specified actually exists.
-    logger.info("Checking frameCacheFile file specified in configuration file...")
-    if not os.path.isfile(dataFrameCache):
-        logger.error("non existant framecache: {0}".format(dataFrameCache))
-    else:
-        logger.info("... file exists.")
-    # ---- If the specified frame cache exists then concatenate it into the master frame cache.
-    command = 'cat ' + dataFrameCache + '  >> ' + frameCacheAll
-    os.system(command)
-except:
-    dataFrameCache = None
-    logger.info("No frameCacheFile file specified in configuration file. Attempting to generate one ...")
-    f = open(frameCacheAll, 'w')
-    f.close()
-    connection = gwdatafind.connect()
-    for (iframetype, idet) in zip(frameType, detector):
-        logger.info("... writing framecache file for detector {0} and frameType {1}...".format(idet, iframetype))
-        cache = connection.find_urls(idet[0], iframetype, start_time, end_time, urltype='file')
-        with open(frameCacheAll, 'a+') as fobj:
-            write_cache(map(CacheEntry.from_T050017, cache), fobj)
-    logger.info("... converting lal-style frame cache to MATLAB style")
-    os.system('convertlalcache.pl {0} {0}_MATLAB.txt'.format(frameCacheAll))
-    # ---- Status message.
-    logger.info("... finished writing frame cache file.")
 
 
 # -------------------------------------------------------------------------
@@ -566,7 +536,7 @@ except:
 # -------------------------------------------------------------------------
 
 # ---- Write our analysis duration as a gwpy segment list.
-analysis_segment = SegmentList([Segment(start_time, end_time)])
+#analysis_segment = SegmentList([Segment(start_time, end_time)])
 
 # ---- Prepare storage for full segment lists.
 full_segment_list = []
@@ -601,10 +571,10 @@ for (iFile, ifo) in zip(analysis_seg_files, detector):
 #      Choose detector network based on on-source data quality.
 # -------------------------------------------------------------------------
 
-# ---- Pulled the segment lists stuff outside of the "if network_selection"
-#      statement since we need these to test the off-source segments.
 # ---- Get cat1 and cat24 segment files for all ifos used.
 #      Use 'None' when no file exists.
+#      Note that we will need these files again later when we check the 
+#      data quality of the individual off-source segments.
 all_detectors = lal.cached_detector_by_prefix.keys()
 cat1_segment_file_list = {}
 cat24_segment_file_list = {}
@@ -686,6 +656,43 @@ frameTypeStrTilde = ''
 for frameTypeName in frameType:
   frameTypeStrTilde = frameTypeStrTilde + frameTypeName + '~'
 frameTypeStrTilde = frameTypeStrTilde[0:len(frameTypeStrTilde)-1]
+
+
+# -------------------------------------------------------------------------
+#      Check for / generate frame cache.
+# -------------------------------------------------------------------------
+
+# ---- Name of frame cache file to be created.
+frameCacheAll = 'input/framecache.txt'
+
+# ---- Check .ini file for user-specified frame cache.
+try:
+    dataFrameCache = cp.get('input','frameCacheFile')
+    # ---- Verify the frameCache specified actually exists.
+    logger.info("Checking frameCacheFile file specified in configuration file...")
+    if not os.path.isfile(dataFrameCache):
+        logger.error("non existant framecache: {0}".format(dataFrameCache))
+    else:
+        logger.info("... file exists.")
+    # ---- If the specified frame cache exists then concatenate it into the master frame cache.
+    command = 'cat ' + dataFrameCache + '  >> ' + frameCacheAll
+    os.system(command)
+except:
+    dataFrameCache = None
+    logger.info("No frameCacheFile file specified in configuration file. Attempting to generate one ...")
+    f = open(frameCacheAll, 'w')
+    f.close()
+    connection = gwdatafind.connect()
+    for (iframetype, idet) in zip(frameType, detector):
+        logger.info("... writing framecache file for detector {0} and frameType {1}...".format(idet, iframetype))
+        cache = connection.find_urls(idet[0], iframetype, start_time, end_time, urltype='file')
+        with open(frameCacheAll, 'a+') as fobj:
+            write_cache(map(CacheEntry.from_T050017, cache), fobj)
+    logger.info("... converting lal-style frame cache to MATLAB style")
+    os.system('convertlalcache.pl {0} {0}_MATLAB.txt'.format(frameCacheAll))
+    # ---- Status message.
+    logger.info("... finished writing frame cache file.")
+
 
 # -------------------------------------------------------------------------
 #      Write channel file.

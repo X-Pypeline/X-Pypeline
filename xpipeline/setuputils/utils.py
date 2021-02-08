@@ -94,7 +94,9 @@ def validate_segments(ifos, start, end, cp, trigger_time=None):
 
                 # Compute analysis ready segments in order to
                 # subtract out cat1 vetos
-                analysis_ready = DataQualityFlag.query('{0}:DMT-ANALYSIS_READY:1'.format(ifo), start, end)
+                name = cp.get(ifo, "include-segments") 
+                analysis_ready = DataQualityFlag.query(name.format(ifo), start, end)
+                #analysis_ready = DataQualityFlag.query('{0}:DMT-ANALYSIS_READY:1'.format(ifo), start, end)
 
                 # Subtract cat 1 veto from analysis_ready
                 analysis_ready_minus_cat1 = analysis_ready.active - segs
