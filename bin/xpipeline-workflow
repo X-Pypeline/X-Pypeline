@@ -718,37 +718,10 @@ elif len(detector) == 1 :
     likelihoodType = "likelihoodType_1det1site"
 
 else :
-    #N = str(len(detector))
     logger.info("Network has {0} ifos: {1}".format(len(detector),detector))
     lagType = "lags_{0}det{0}site".format(len(detector))
     likelihoodType = "likelihoodType_{0}det{0}site".format(len(detector))
-    print(lagType)
-    print(likelihoodType)
 
-#elif len(detector) ==1:
-#    logger.info("One ifo in network: {0}".format(detector))
-#    lagType = []
-#    likelihoodType = "likelihoodType_1det1site"
-
-#elif len(detector) ==2:
-#    logger.info("Two misaligned ifos in network: {0}".format(detector))
-#    lagType = "lags_2det2site"
-#    likelihoodType = "likelihoodType_2det2site"
-
-#elif len(detector) ==3:
-#    logger.info("Three ifos at three sites: {0}".format(detector))
-#    lagType = "lags_3det3site"
-#    likelihoodType = "likelihoodType_3det3site"
-
-#elif len(detector) ==4:
-#    logger.info("Four ifos at four sites: {0}".format(detector))
-#    lagType = "lags_4det4site"
-#    likelihoodType = "likelihoodType_4det4site"
-
-#elif len(detector) ==5:
-#    logger.info("Five ifos at five sites: {0}".format(detector))
-#    lagType = "lags_5det5site"
-#    likelihoodType = "likelihoodType_5det5site"
 
 
 # -----------------------------------------------------------------------------
@@ -760,8 +733,8 @@ if lagType:
     try:
         lagFile =  cp.get('background',lagType)
     except:
-        logger.warning("No lagFile specified in configuration file.")
-        logger.warning("No time lag jobs will be made.")
+        logger.warning("No lag file specified in configuration file.")
+        logger.warning("No external time lags will be made.")
         lagFile =  None
 
     if lagFile:
@@ -785,6 +758,7 @@ except:
 
 logger.info("Using likelihoods: {0}".format(likelihoodTypeStr))
 
+
 # -------------------------------------------------------------------------
 #    Make coincidence segment list for on-source, zero-lag segment.
 # -------------------------------------------------------------------------
@@ -792,13 +766,17 @@ logger.info("Using likelihoods: {0}".format(likelihoodTypeStr))
 # ---- Status message.
 logger.info("Writing on-source event file ...          ")
 
-# Here we calculate and create a setgment of the actual on source window of the analysis. This is not necessarily the same as the size of the onsource coincident segment which relates to the requested blockTime.
+# ---- Here we create a segment of the actual on-source window of the analysis. 
+#      This is not necessarily the same as the size of the on-source coincident 
+#      segment which relates to the requested blockTime.
 on_source_start_time = int(trigger_time + onSourceBeginOffset - transientTime)
-on_source_end_time = int(trigger_time + onSourceEndOffset + transientTime)
+on_source_end_time   = int(trigger_time + onSourceEndOffset + transientTime)
 on_source_window = SegmentList([Segment(on_source_start_time, on_source_end_time)])
 
-# check that on-source segment overlaps with science segments
+# ---- Check that the on-source segment overlaps with the science segments.
 for seg in full_segment_list:
+    logger.info('{0}'.format(on_source_window))
+    logger.info('{0}'.format(seg))
     if not seg.intersects(on_source_window):
         logger.error("Error: on-source period is not a coincidence segment "
                      "of the specified network."
