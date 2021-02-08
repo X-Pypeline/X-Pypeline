@@ -579,12 +579,15 @@ for ifo in all_detectors:
         cat1_segment_file_list[ifo] = "None"
         cat24_segment_file_list[ifo] = "None"
 
+if network_selection :
+    logger.error( "Network selection not yet functional - sorry!")
+
 if network_selection and blockTime < 256:
     logger.error( "Network selection does not currently "
         "work for blockTimes < 256s \n")
 
 if network_selection :
-    logger.info("\nSelecting ifo network from {0}".format(detector))
+    logger.info("Selecting ifo network from {0}".format(detector))
 
     # ---- Write file containing GRB trigger time.
     ftriggertime=open('input/trigger_time.txt', 'w')
