@@ -567,7 +567,7 @@ for (iFile, ifo) in zip(analysis_seg_files, detector):
 #      Note that we will need these files again later when we check the 
 #      data quality of the individual off-source segments.
 all_detectors = lal.cached_detector_by_prefix.keys()
-cat1_segment_file_list = {}
+cat1_segment_file_list  = {}
 cat24_segment_file_list = {}
 for ifo in all_detectors:
     try:
@@ -616,7 +616,6 @@ if network_selection :
 #               Construct tilde-separated list of sites
 # -----------------------------------------------------------------------------
 
-logger.info('Based on valid network creating Tilde string useful for reading in MATLAB...')
 # ---- Initialise tilde-separated list of sites.
 siteStrTilde = ''
 for iDet in range(0,len(detector)):
@@ -645,7 +644,7 @@ sfile.close()
 # ---- Real frame type, for reading frames.
 frameTypeStrTilde = ''
 for frameTypeName in frameType:
-  frameTypeStrTilde = frameTypeStrTilde + frameTypeName + '~'
+    frameTypeStrTilde = frameTypeStrTilde + frameTypeName + '~'
 frameTypeStrTilde = frameTypeStrTilde[0:len(frameTypeStrTilde)-1]
 
 
@@ -703,40 +702,54 @@ f.close()
 logger.info("... finished writing channel file.        ")
 
 
-logger.info('Based on valid network selecting ini file params, '
-            'such as lagType and likelihoodType.')
-
 # -------------------------------------------------------------------------
 #      Choose appropriate likelihoods and lags for this network.
 # -------------------------------------------------------------------------
 
-if len(detector) ==0:
+logger.info('Selecting network-dependent parameters from the .ini file, '
+            'such as lag file and likelihoodType.')
+
+if len(detector) == 0 :
     logger.error("No ifos in network!!!")
 
-elif len(detector) ==1:
+elif len(detector) == 1 :
     logger.info("One ifo in network: {0}".format(detector))
     lagType = []
     likelihoodType = "likelihoodType_1det1site"
 
-elif len(detector) ==2:
-    logger.info("Two misaligned ifos in network: {0}".format(detector))
-    lagType = "lags_2det2site"
-    likelihoodType = "likelihoodType_2det2site"
+else :
+    #N = str(len(detector))
+    logger.info("Network has {0} ifos: {1}".format(len(detector),detector))
+    lagType = "lags_{0}det{0}site".format(len(detector))
+    likelihoodType = "likelihoodType_{0}det{0}site".format(len(detector))
+    print(lagType)
+    print(likelihoodType)
 
-elif len(detector) ==3:
-    logger.info("Three ifos at three sites: {0}".format(detector))
-    lagType = "lags_3det3site"
-    likelihoodType = "likelihoodType_3det3site"
+#elif len(detector) ==1:
+#    logger.info("One ifo in network: {0}".format(detector))
+#    lagType = []
+#    likelihoodType = "likelihoodType_1det1site"
 
-elif len(detector) ==4:
-    logger.info("Four ifos at four sites: {0}".format(detector))
-    lagType = "lags_4det4site"
-    likelihoodType = "likelihoodType_4det4site"
+#elif len(detector) ==2:
+#    logger.info("Two misaligned ifos in network: {0}".format(detector))
+#    lagType = "lags_2det2site"
+#    likelihoodType = "likelihoodType_2det2site"
 
-elif len(detector) ==5:
-    logger.info("Five ifos at five sites: {0}".format(detector))
-    lagType = "lags_5det5site"
-    likelihoodType = "likelihoodType_5det5site"
+#elif len(detector) ==3:
+#    logger.info("Three ifos at three sites: {0}".format(detector))
+#    lagType = "lags_3det3site"
+#    likelihoodType = "likelihoodType_3det3site"
+
+#elif len(detector) ==4:
+#    logger.info("Four ifos at four sites: {0}".format(detector))
+#    lagType = "lags_4det4site"
+#    likelihoodType = "likelihoodType_4det4site"
+
+#elif len(detector) ==5:
+#    logger.info("Five ifos at five sites: {0}".format(detector))
+#    lagType = "lags_5det5site"
+#    likelihoodType = "likelihoodType_5det5site"
+
 
 # -----------------------------------------------------------------------------
 #         Having figured out network read in appropriate lag file.
