@@ -584,7 +584,7 @@ if network_selection and blockTime < 256:
         "work for blockTimes < 256s \n")
 
 if network_selection :
-    logger.info("\nSelecting ifo network from ", detector)
+    logger.info("\nSelecting ifo network from {0}".format(detector))
 
     # ---- Write file containing GRB trigger time.
     ftriggertime=open('input/trigger_time.txt', 'w')
@@ -770,7 +770,7 @@ logger.info("Writing on-source event file ...          ")
 #      This is not necessarily the same as the size of the on-source coincident 
 #      segment which relates to the requested blockTime.
 on_source_start_time = int(trigger_time + onSourceBeginOffset - transientTime)
-on_source_end_time   = int(trigger_time + onSourceEndOffset + transientTime)
+on_source_end_time   = int(trigger_time + onSourceEndOffset   + transientTime)
 on_source_window = SegmentList([Segment(on_source_start_time, on_source_end_time)])
 
 # ---- Check that the on-source segment overlaps with the science segments.

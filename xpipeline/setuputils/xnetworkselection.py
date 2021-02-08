@@ -20,13 +20,8 @@
 """
 import numpy as np
 
-def main(detectorList,
-   centerTimesFile,
-   timeOffsetsFile,
-   cat1_segment_file,
-   cat24_segment_file,
-   output_file,
-   verbosity, windowBeginOffset, windowEndOffset, transientTime, windowLength):
+def main(detectorList, centerTimesFile, timeOffsetsFile, cat1_segment_file, cat24_segment_file, 
+    output_file, windowBeginOffset, windowEndOffset, transientTime, windowLength):
     """
       detectors_considered        cell array of ifos to be considered, e.g.,
                                   ['H1' 'H2' 'L1'], size (1 * nIfo).
@@ -39,8 +34,6 @@ def main(detectorList,
                                   cat1_seglist(nIfo).duration()
       cat2_seglist                Similar to cat1_seglist but containing cat2 
                                   veto segments (deadtime).
-      verbosity                   string used to control verbosity of output,
-                                  either 'verbose' or 'quiet'. 
       output_file                  String. Name of file to which we will write
                                    the detector networks. 
       windowBeginOffset            String. Offset [sec] between start of on-source
