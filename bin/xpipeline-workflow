@@ -901,6 +901,7 @@ if args.search_type == 'grb':
 f = open('input/event_on_source.txt', 'w')
 fseg = open('input/segment_on_source.txt', 'w')
 logger.info("******** >>>>> About to loop over on-source chunks: ")
+logger.info("               number of chunks: " + str(len(coincidence_on_source_segment_chunks)))
 # For each on source segment choose the sky locations
 for iSeg in range(len(coincidence_on_source_segment_chunks)):
     logger.info("******** >>>>> Looping over on-source chunks: " + str(iSeg))
@@ -1026,7 +1027,7 @@ for iSeg in range(len(coincidence_on_source_segment_chunks)):
             # ---- If we do long injections we will have one single parameter file
             ioutils.write_waveforms("input/parameters_simulation_" + iwaveform + "_0_" + str(iSeg) + ".txt", outputType, frameCacheAll, skyPositionList, likelihoodTypeStr, onSourceEndOffset, applyGates, cp, injectionScalesList, disableFastInjections, iwaveform)
 
-
+logger.info("About to close files.")
 f.close()
 fseg.close()
 
