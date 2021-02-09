@@ -726,7 +726,6 @@ else :
     likelihoodType = "likelihoodType_{0}det{0}site".format(len(detector))
 
 
-
 # -----------------------------------------------------------------------------
 #         Having figured out network read in appropriate lag file.
 # -----------------------------------------------------------------------------
@@ -936,8 +935,8 @@ for iSeg in range(len(coincidence_on_source_segment_chunks)):
 
             # ---- Set skyPositionList arg that will be written to matlab format
             #      parameters files.
-            with open(skyPosFilename, 'w') as f:
-                f.write(str(theta) + ' ' + str(phi) + ' 1.00000 0.02716')
+            with open(skyPosFilename, 'w') as fsky:
+                fsky.write(str(theta) + ' ' + str(phi) + ' 1.00000 0.02716')
             skyPositionList = skyPosFilename
 
     elif args.search_type in ['sn', 'allsky']:
